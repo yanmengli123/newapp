@@ -31,7 +31,7 @@ python backend/main.py  # Starts on port 8000
 ## Architecture
 
 - **Entry point**: `src/main.tsx` - Sets up MantineProvider, BrowserRouter, and renders App
-- **Routing**: `src/App.tsx` - Defines routes at `/`, `/query`, `/browser`, `/jbrowse`, `/blast`, `/viz`, `/data`, `/gene/:geneId`, `/chromosome/:seqid`
+- **Routing**: `src/App.tsx` - Defines routes at `/`, `/query`, `/browser`, `/jbrowse`, `/blast`, `/viz`, `/data`, `/tools`, `/gene/:geneId`, `/chromosome/:seqid`
 - **UI Framework**: Mantine v8 with `@mantine/core` and `@mantine/hooks`
 - **Icons**: Tabler icons via `@tabler/icons-react`
 - **Genome Browser**: JBrowse via `@jbrowse/react-linear-genome-view2`
@@ -44,7 +44,7 @@ The app uses an `AppShell` layout with a header navigation bar. All pages are wr
 - **Layout components**: `src/components/layout/` - AppHeader, AppFooter
 - **Home components**: `src/components/home/` - HeroSection, FeatureGrid, WhySection, GeneSearch
 - **Common components**: `src/components/common/` - PlaceholderPage
-- **Pages**: `src/pages/` - HomePage, GeneQueryPage, BrowserPage, JBrowsePage, BlastPage, VizPage, DataPage, GenePage, ChromosomePage
+- **Pages**: `src/pages/` - HomePage, GeneQueryPage, BrowserPage, JBrowsePage, BlastPage, VizPage, DataPage, GenePage, ChromosomePage, ToolsPage
 - **Chat components**: `src/components/chat/` - ChatWidget, ChatLauncher, ChatWindow, ChatMessageBubble
 - **API client**: `src/lib/chatApi.ts` - Chat API wrapper
 - **Gene API client**: `src/lib/geneApi.ts` - Gene/Chromosome/GO/KEGG API wrapper (GRCg6a database)
@@ -72,6 +72,8 @@ The app uses an `AppShell` layout with a header navigation bar. All pages are wr
   - `GET /static/kegg_pathways/{pathway_id}.png` - Direct access to KEGG pathway images
   - `GET /kegg-images/{pathway_id}.png` - Alternative route for KEGG pathway images
   - `GET /kegg-images/{pathway_id}/info` - Alternative route for pathway metadata
+  - `POST /tools/primer3` - Primer3 PCR primer design (gene_id, include_flank, product_size_min/max, num_primers)
+  - `POST /tools/domain-search` - Protein domain search using local HMMER + Pfam database
 - **CORS**: Enabled for localhost:5173-5175, localhost:3000
 - **Chat Features**: Intent detection for bioinformatics queries (genome stats, GFF stats, sequence extraction, gene finding)
 - **Data Files**:
