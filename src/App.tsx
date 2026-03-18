@@ -11,6 +11,7 @@ import GeneQueryPage from './pages/GeneQueryPage';
 import HomePage from './pages/HomePage';
 import JBrowsePage from './pages/JBrowsePage';
 import VizPage from './pages/VizPage';
+import ToolsPage from './pages/ToolsPage';
 import ChatWidget from './components/chat/ChatWidget';
 
 export default function App() {
@@ -32,6 +33,7 @@ export default function App() {
             <Route path="/data" element={<DataPage />} />
             <Route path="/gene/:geneId" element={<GenePage />} />
             <Route path="/chromosome/:seqid" element={<ChromosomePage />} />
+            <Route path="/tools" element={<ToolsPage />} />
           </Routes>
 
           <Divider my="xl" />

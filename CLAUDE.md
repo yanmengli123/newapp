@@ -105,3 +105,28 @@ The app uses an `AppShell` layout with a header navigation bar. All pages are wr
 - Gene IDs use format: `gene-XXXXX` (e.g., `gene-A4GALT`)
 - Search accepts gene_id, gene_symbol, or chromosome region (NC_xxx:start-end)
 - GenePage (`/gene/:geneId`) displays: gene info, transcripts, exons, CDS, proteins, GO annotations, KEGG pathways with local pathway images
+
+## Git Management
+
+```bash
+# Initialize (already done)
+git init
+
+# Commit changes
+git add .
+git commit -m "description"
+
+# View history
+git log --oneline
+
+#回退操作
+git reset --soft HEAD~1    # 回退到上一个提交（保留修改）
+git reset --hard HEAD~1   # 回退到上一个提交（丢弃修改）
+git reset --hard <commit_id>  # 回退到指定提交
+
+# 撤销修改
+git checkout -- <file>
+
+# 推送到远程
+git push origin master
+```

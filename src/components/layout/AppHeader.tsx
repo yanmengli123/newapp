@@ -1,5 +1,5 @@
-import { Box, Button, Container, Group, Text, ThemeIcon } from "@mantine/core";
-import { IconDna } from "@tabler/icons-react";
+import { Box, Button, Container, Group, Text, ThemeIcon, Menu } from "@mantine/core";
+import { IconDna, IconTool, IconBox } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
 function HeaderNav() {
@@ -14,6 +14,31 @@ function HeaderNav() {
       <Button variant="subtle" component={Link} to="/jbrowse">
         JBrowse
       </Button>
+      <Menu shadow="md" width={200}>
+        <Menu.Target>
+          <Button variant="subtle" leftSection={<IconTool size={16} />}>
+            Tools
+          </Button>
+        </Menu.Target>
+
+        <Menu.Dropdown>
+          <Menu.Label>Bioinformatics Tools</Menu.Label>
+          <Menu.Item
+            component={Link}
+            to="/tools"
+            leftSection={<IconDna size={14} />}
+          >
+            Primer3 Design
+          </Menu.Item>
+          <Menu.Item
+            component={Link}
+            to="/tools"
+            leftSection={<IconBox size={14} />}
+          >
+            Domain Search
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
       <Button variant="subtle" component={Link} to="/viz">
         Visualizations
       </Button>

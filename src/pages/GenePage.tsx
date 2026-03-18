@@ -445,14 +445,21 @@ export default function GenePage() {
           <Text c="dimmed" size="sm">No GO annotations available</Text>
         ) : (
           <Stack gap="md">
+            {/* Extract go_annotations safely */}
+            {(() => {
+              const go = goAnnotations.go_annotations;
+              if (!go) return <Text c="dimmed">No GO annotations available</Text>;
+
+              return (
+                <>
             {/* Biological Process */}
-            {goAnnotations.go_annotations.biological_process.length > 0 && (
+            {go.biological_process.length > 0 && (
               <Box>
                 <Text size="sm" fw={500} mb="xs" c="blue">
-                  Biological Process ({goAnnotations.go_annotations.biological_process.length})
+                  Biological Process ({go.biological_process.length})
                 </Text>
                 <Group gap="xs">
-                  {goAnnotations.go_annotations.biological_process.slice(0, 10).map((go) => (
+                  {go.biological_process.slice(0, 10).map((go) => (
                     <Anchor
                       key={go.go_id}
                       href={`https://amigo.geneontology.org/amigo/term/${go.go_id}`}
@@ -465,21 +472,21 @@ export default function GenePage() {
                       </Badge>
                     </Anchor>
                   ))}
-                  {goAnnotations.go_annotations.biological_process.length > 10 && (
-                    <Text size="xs" c="dimmed">+{goAnnotations.go_annotations.biological_process.length - 10} more</Text>
+                  {go.biological_process.length > 10 && (
+                    <Text size="xs" c="dimmed">+{go.biological_process.length - 10} more</Text>
                   )}
                 </Group>
               </Box>
             )}
 
             {/* Molecular Function */}
-            {goAnnotations.go_annotations.molecular_function.length > 0 && (
+            {go.molecular_function.length > 0 && (
               <Box>
                 <Text size="sm" fw={500} mb="xs" c="green">
-                  Molecular Function ({goAnnotations.go_annotations.molecular_function.length})
+                  Molecular Function ({go.molecular_function.length})
                 </Text>
                 <Group gap="xs">
-                  {goAnnotations.go_annotations.molecular_function.slice(0, 10).map((go) => (
+                  {go.molecular_function.slice(0, 10).map((go) => (
                     <Anchor
                       key={go.go_id}
                       href={`https://amigo.geneontology.org/amigo/term/${go.go_id}`}
@@ -492,21 +499,21 @@ export default function GenePage() {
                       </Badge>
                     </Anchor>
                   ))}
-                  {goAnnotations.go_annotations.molecular_function.length > 10 && (
-                    <Text size="xs" c="dimmed">+{goAnnotations.go_annotations.molecular_function.length - 10} more</Text>
+                  {go.molecular_function.length > 10 && (
+                    <Text size="xs" c="dimmed">+{go.molecular_function.length - 10} more</Text>
                   )}
                 </Group>
               </Box>
             )}
 
             {/* Cellular Component */}
-            {goAnnotations.go_annotations.cellular_component.length > 0 && (
+            {go.cellular_component.length > 0 && (
               <Box>
                 <Text size="sm" fw={500} mb="xs" c="orange">
-                  Cellular Component ({goAnnotations.go_annotations.cellular_component.length})
+                  Cellular Component ({go.cellular_component.length})
                 </Text>
                 <Group gap="xs">
-                  {goAnnotations.go_annotations.cellular_component.slice(0, 10).map((go) => (
+                  {go.cellular_component.slice(0, 10).map((go) => (
                     <Anchor
                       key={go.go_id}
                       href={`https://amigo.geneontology.org/amigo/term/${go.go_id}`}
@@ -519,12 +526,15 @@ export default function GenePage() {
                       </Badge>
                     </Anchor>
                   ))}
-                  {goAnnotations.go_annotations.cellular_component.length > 10 && (
-                    <Text size="xs" c="dimmed">+{goAnnotations.go_annotations.cellular_component.length - 10} more</Text>
+                  {go.cellular_component.length > 10 && (
+                    <Text size="xs" c="dimmed">+{go.cellular_component.length - 10} more</Text>
                   )}
                 </Group>
               </Box>
             )}
+                </>
+              );
+            })()}
           </Stack>
         )}
       </Paper>
@@ -830,24 +840,19 @@ export default function GenePage() {
               src={`http://localhost:8000/kegg-images/${selectedPathway.id}.png`}
               alt={selectedPathway.name}
               radius="md"
-              fit="contain"
               mah={600}
-              withPlaceholder
-              placeholder={
-                <Stack align="center" gap="sm" py="xl">
-                  <Text c="dimmed">Pathway image not available</Text>
-                  <Anchor
-                    href={`https://www.kegg.jp/kegg-bin/show_pathway?map=${selectedPathway.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button variant="light" size="sm">
-                      View on KEGG Website
-                    </Button>
-                  </Anchor>
-                </Stack>
-              }
+              style={{ background: '#f8f9fa' }}
             />
+            <Text c="dimmed" size="xs" mt="xs">
+              If image is not available,{' '}
+              <Anchor
+                href={`https://www.kegg.jp/kegg-bin/show_pathway?map=${selectedPathway.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                view on KEGG website
+              </Anchor>
+            </Text>
             <Group justify="space-between" mt="md">
               <Text size="xs" c="dimmed">
                 Pathway ID: {selectedPathway.id}

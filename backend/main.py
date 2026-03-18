@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 # ========== 2. 导入自定义路由（放在核心导入后） ==========
 from api.go_kegg_routes import router as go_kegg_router
 from api.go_kegg_routes import attach_annotations_to_gene_page
+from api.tool_routes import router as tool_router
 
 # ========== 3. 全局配置（只定义一次，避免重复） ==========
 # 数据库路径
@@ -198,6 +199,9 @@ app.mount("/static", StaticFiles(directory=str(STATIC_ROOT)), name="static")
 
 # ========== 8. 注册自定义路由（仅保留go_kegg_router） ==========
 app.include_router(go_kegg_router)
+
+# 注册工具路由 (Primer3, Domain Search)
+app.include_router(tool_router)
 
 
 # 导入新路由
@@ -683,8 +687,8 @@ def get_gene_page(
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "grcg6a_fastapi_backend:app",
+        "main:app",
         host="0.0.0.0",
-        port=8002,  # 统一用8002端口
+        port=8000,
         reload=False,
     )

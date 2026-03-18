@@ -229,14 +229,6 @@ export async function getChromosomeGenes(
 export interface GOAnnotation {
   go_id: string;
   go_name: string;
-  definition: string;
-  evidence_code: string;
-  source: string;
-}
-
-export interface GOAnnotation {
-  go_id: string;
-  go_name: string;
   go_definition?: string;
   go_namespace: string;
   evidence_code?: string;
@@ -296,7 +288,22 @@ export async function getGeneGOAnnotations(geneId: string): Promise<GOAnnotation
   if (!response.ok) {
     throw new Error(`Failed to get GO annotations: ${response.statusText}`);
   }
-  return response.json();
+  const data = await response.json();
+
+  // Transform items into grouped go_annotations
+  if (data.items && data.items.length > 0) {
+    const biological_process = data.items.filter((item: GOAnnotation) => item.go_namespace === 'biological_process');
+    const molecular_function = data.items.filter((item: GOAnnotation) => item.go_namespace === 'molecular_function');
+    const cellular_component = data.items.filter((item: GOAnnotation) => item.go_namespace === 'cellular_component');
+
+    data.go_annotations = {
+      biological_process,
+      molecular_function,
+      cellular_component,
+    };
+  }
+
+  return data;
 }
 
 export async function getGeneKEGGAnnotations(geneId: string): Promise<KEGGAnnotationsResponse> {
@@ -309,6 +316,106 @@ export async function getGeneKEGGAnnotations(geneId: string): Promise<KEGGAnnota
   const response = await fetch(`${API_BASE}/annotations/kegg/${encodeURIComponent(geneId)}`);
   if (!response.ok) {
     throw new Error(`Failed to get KEGG annotations: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// ========== Tools API ==========
+
+export interface Primer3Result {
+  success: boolean;
+  gene_id: string;
+  gene_info?: {
+    gene_id: string;
+    seqid: string;
+    gene_start: number;
+    gene_end: number;
+    strand: string;
+    region_start: number;
+    region_end: number;
+    region_length: number;
+  };
+  sequence_length?: number;
+  num_primers_found?: number;
+  primers?: Array<{
+    primer_num: number;
+    forward_seq: string;
+    reverse_seq: string;
+    forward_tm: number;
+    reverse_tm: number;
+    product_size: number;
+    forward_start: number;
+    forward_end: number;
+    reverse_start: number;
+    reverse_end: number;
+  }>;
+  error?: string;
+}
+
+export interface DomainSearchResult {
+  gene_id: string;
+  protein_id: string;
+  protein_length: number;
+  success: boolean;
+  domains: Array<{
+    accession: string;
+    name: string;
+    database: string;
+    start: number;
+    end: number;
+    evalue: number | null;
+    score: number | null;
+  }>;
+  message: string | null;
+  error: string | null;
+  method: string;
+}
+
+export async function designPrimers(
+  geneId: string,
+  includeFlank = 100,
+  productSizeMin = 150,
+  productSizeMax = 300,
+  numPrimers = 5
+): Promise<Primer3Result> {
+  // First search for the gene to get the correct gene_id format
+  const searchResult = await searchGenes(geneId, 1);
+  if (searchResult.items.length > 0) {
+    geneId = searchResult.items[0].gene_id;
+  }
+
+  const params = new URLSearchParams({
+    gene_id: geneId,
+    include_flank: includeFlank.toString(),
+    product_size_min: productSizeMin.toString(),
+    product_size_max: productSizeMax.toString(),
+    num_primers: numPrimers.toString(),
+  });
+
+  const response = await fetch(`${API_BASE}/tools/primer3?${params}`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || `Failed to design primers: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function searchDomains(geneId: string): Promise<DomainSearchResult> {
+  // First search for the gene to get the correct gene_id format
+  const searchResult = await searchGenes(geneId, 1);
+  if (searchResult.items.length > 0) {
+    geneId = searchResult.items[0].gene_id;
+  }
+
+  const params = new URLSearchParams({ gene_id: geneId });
+  const response = await fetch(`${API_BASE}/tools/domain-search?${params}`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || `Failed to search domains: ${response.statusText}`);
   }
   return response.json();
 }
