@@ -154,16 +154,31 @@ def load_gene_go(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
 
 from functools import lru_cache
 
+# ========== Overview 类通路分类降级表（KEGG 不提供 CLASS 行） ==========
+# 9 条 Overview/总览通路：KEGG REST API 无 CLASS 行，手动推导分类
+_OVERVIEW_FALLBACK: dict[str, str] = {
+    "gga01100": "Metabolism; Global/Overview maps",
+    "gga01200": "Metabolism; Global/Overview maps",
+    "gga01210": "Metabolism; Global/Overview maps",
+    "gga01212": "Metabolism; Global/Overview maps",
+    "gga01230": "Metabolism; Global/Overview maps",
+    "gga01232": "Metabolism; Global/Overview maps",
+    "gga01240": "Metabolism; Global/Overview maps",
+    "gga01250": "Metabolism; Global/Overview maps",
+    "gga01320": "Organismal Systems; Environmental Information Processing; Overview",
+}
+
+
 @lru_cache(maxsize=500)
 def fetch_kegg_pathway_class(pathway_id: str) -> str | None:
     """
-    获取通路分类：库优先 → API 兜底 → 自动回写数据库
+    获取通路分类：库优先 → Overview 降级 → API 兜底 → 自动回写数据库
 
     策略：
     - 优先从 kegg_pathway_asset.pathway_class 读取（已预填充则零 IO）
-    - 为空时请求 KEGG REST API（每个通路只请求一次，lru_cache 保护）
+    - Overview 类通路使用 _OVERVIEW_FALLBACK 降级表
+    - 其余请求 KEGG REST API（timeout 30s，每个通路只请求一次，lru_cache 保护）
     - API 请求成功时自动回写 kegg_pathway_asset 表
-    - 预填充脚本可批量预热全部 195 条通路
 
     KGML 文件不含 CLASS 信息，故必须走 API。
     """
@@ -181,10 +196,14 @@ def fetch_kegg_pathway_class(pathway_id: str) -> str | None:
     if row and row["pathway_class"]:
         return row["pathway_class"]
 
-    # 2. 缓存未命中，请求 KEGG REST API
+    # 2. Overview 降级表（KEGG 不提供 CLASS 行）
+    if pathway_id in _OVERVIEW_FALLBACK:
+        return _OVERVIEW_FALLBACK[pathway_id]
+
+    # 3. 缓存未命中，请求 KEGG REST API
     url = f"{KEGG_BASE}/get/{pathway_id}"
     try:
-        with urlopen(url, timeout=10) as resp:
+        with urlopen(url, timeout=30) as resp:
             body = resp.read().decode("utf-8", errors="replace")
     except (HTTPError, URLError, Exception):
         logger.warning("Failed to fetch KEGG class for %s", pathway_id)
@@ -308,7 +327,7 @@ def list_all_kegg_pathways(request: Request):
         SELECT DISTINCT
             p.pathway_id,
             p.pathway_name,
-            p.pathway_class,
+            COALESCE(a.pathway_class, p.pathway_class) AS pathway_class,
             COUNT(DISTINCT p.gene_id) AS gene_count,
             a.png_url,
             a.png_width,
@@ -317,8 +336,8 @@ def list_all_kegg_pathways(request: Request):
             a.gene_count AS annotated_gene_count
         FROM gene_kegg_pathway p
         LEFT JOIN kegg_pathway_asset a ON p.pathway_id = a.pathway_id
-        GROUP BY p.pathway_id, p.pathway_name, p.pathway_class
-        ORDER BY p.pathway_class, p.pathway_name
+        GROUP BY p.pathway_id, p.pathway_name, COALESCE(a.pathway_class, p.pathway_class)
+        ORDER BY COALESCE(a.pathway_class, p.pathway_class), p.pathway_name
         """
     ).fetchall()
 
@@ -350,7 +369,8 @@ def get_kegg_pathway_detail(pathway_id: str, request: Request):
 
     pathway_rows = conn.execute(
         """
-        SELECT DISTINCT p.pathway_id, p.pathway_name, p.pathway_class,
+        SELECT DISTINCT p.pathway_id, p.pathway_name,
+               COALESCE(a.pathway_class, p.pathway_class) AS pathway_class,
                a.png_url, a.png_width, a.png_height,
                a.kgml_filename, a.node_count, a.gene_count AS annotated_gene_count
         FROM gene_kegg_pathway p
