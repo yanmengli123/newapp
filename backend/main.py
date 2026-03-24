@@ -11,7 +11,10 @@ from typing import Any
 from urllib.parse import unquote
 
 import gffutils
-from fastapi import FastAPI, APIRouter, HTTPException, Query, Request
+import psycopg2
+import psycopg2.extras
+import psycopg2.pool
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -24,9 +27,32 @@ from api.genome_analysis_routes import router as genome_router
 from api.chat_router import router as chat_router
 
 # ========== 3. 全局配置（统一从 config.py 读取） ==========
-from config import GRCG6A_DB_PATH, GRCG6A_STATIC_ROOT, KEGG_IMAGE_DIR
+from config import GRCG6A_DB_PATH, GRCG6A_STATIC_ROOT, GRCG6A_PG_DSN, KEGG_IMAGE_DIR
 APP_TITLE = "GRCg6a Gene API"
 APP_VERSION = "0.1.0"
+
+# ─────────────────────────────────────────────
+# PostgreSQL 连接池（dual-DB 架构）
+# ─────────────────────────────────────────────
+_pg_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+
+def init_pg_pool(minconn=2, maxconn=10) -> psycopg2.pool.ThreadedConnectionPool:
+    global _pg_pool
+    if _pg_pool is None:
+        _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+            minconn, maxconn, dsn=GRCG6A_PG_DSN,
+        )
+        logger.info("PostgreSQL pool initialized: min=%d max=%d dsn=%s", minconn, maxconn, GRCG6A_PG_DSN[:50])
+    return _pg_pool
+
+def pg_getconn() -> psycopg2.extensions.connection:
+    if _pg_pool is None:
+        init_pg_pool()
+    return _pg_pool.getconn()  # type: ignore[union-attr]
+
+def pg_putconn(conn: psycopg2.extensions.connection) -> None:
+    if _pg_pool is not None:
+        _pg_pool.putconn(conn)
 
 # 日志配置（只配置一次）
 logging.basicConfig(
@@ -120,12 +146,27 @@ def order_segments_for_display(segments: list[dict[str, Any]], strand: str) -> l
         return list(reversed(segments))
     return segments
 
-# ========== 5. App 生命周期（保留原有） ==========
+# ========== 5. App 生命周期（dual-DB: PG连接池 + gffutils/SQLite） ==========
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     if not GRCG6A_DB_PATH.exists():
         raise RuntimeError(f"Database file not found: {GRCG6A_DB_PATH}")
 
+    # ── PostgreSQL 连接池（所有业务表） ──────────
+    try:
+        pg_pool = init_pg_pool(minconn=2, maxconn=10)
+        pg_conn = pg_getconn()
+        try:
+            with pg_conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        finally:
+            pg_putconn(pg_conn)
+        logger.info("PostgreSQL connection pool ready")
+    except Exception:
+        logger.warning("PostgreSQL not available — GO/KEGG/Expression endpoints may fail")
+        pg_pool = None
+
+    # ── gffutils (仅用于 features 表，SQLite) ──────────
     gff_conn = sqlite3.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
     gff_db = gffutils.FeatureDB(gff_conn, keep_order=True)
     sql_conn = open_sqlite_ro(GRCG6A_DB_PATH)
@@ -164,6 +205,9 @@ async def lifespan(app: FastAPI):
     for gene_id, summary in gene_index_by_id.items():
         summary["ncbi_gene_id"] = gene_xref_ncbi.get(gene_id)
 
+    app.state.pg_pool = pg_pool
+    app.state.pg_getconn = pg_getconn
+    app.state.pg_putconn = pg_putconn
     app.state.gff = gff_db
     app.state.gff_conn = gff_conn
     app.state.sql = sql_conn
@@ -181,6 +225,10 @@ async def lifespan(app: FastAPI):
     gff_conn.close()
     if sql_write_conn is not None:
         sql_write_conn.close()
+    global _pg_pool
+    if _pg_pool is not None:
+        _pg_pool.closeall()
+        _pg_pool = None
 
 # ========== 6. 创建 App 实例（只创建一次） ==========
 app = FastAPI(
@@ -452,6 +500,105 @@ def _extract_gene_id_from_symbol_hit(hit):
         return gene_id
     return None
 
+# ========== 表达数据加载（PostgreSQL） ==========
+def _col_for_sample(sample, metric: str) -> str:
+    """根据样本元数据找到对应的 DB 列名
+
+    DB 列命名: e{stage}_{sex[0]}{rep}_{metric}
+    stage: E0→e0, E3.5→e35, E18.5→e185
+    sex: Female→f, Male→m
+    rep: 1/2/3
+    metric: fpkm / tpm
+    """
+    stage_raw = sample["stage"]
+    sex_code  = sample["sex"][0].lower()
+    rep       = sample["replicate"]
+    stage_map = {"E0": "e0", "E3.5": "e35", "E4.5": "e45",
+                 "E5.5": "e55", "E6.5": "e65", "E18.5": "e185"}
+    stage_key = stage_map.get(stage_raw, stage_raw.lower())
+    return f"{stage_key}_{sex_code}{rep}_{metric}"
+
+
+def load_gene_expression(pg_conn, gene_id: str) -> dict[str, Any] | None:
+    """加载单个基因的表达数据（PostgreSQL）"""
+    with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT * FROM gene_expression WHERE gene_id = %s", (gene_id,))
+        expr_row = cur.fetchone()
+    if expr_row is None:
+        return None
+
+    with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(
+            "SELECT * FROM expression_sample ORDER BY stage_order, sex, replicate"
+        )
+        samples = cur.fetchall()
+
+    items = []
+    fpkm_list = []
+    tpm_list = []
+    for s in samples:
+        fpkm_col = _col_for_sample(s, "fpkm")
+        tpm_col = _col_for_sample(s, "tpm")
+        fpkm_val = float(expr_row[fpkm_col]) if expr_row[fpkm_col] is not None else 0.0
+        tpm_val = float(expr_row[tpm_col]) if expr_row[tpm_col] is not None else 0.0
+        fpkm_list.append(fpkm_val)
+        tpm_list.append(tpm_val)
+        items.append({
+            "sample_id": s["id"],
+            "sample_name": s["sample_name"],
+            "stage": s["stage"],
+            "stage_label": s["stage_label"],
+            "sex": s["sex"],
+            "replicate": s["replicate"],
+            "fpkm": fpkm_val,
+            "tpm": tpm_val,
+        })
+
+    nonzero_fpkm = [v for v in fpkm_list if v > 0]
+    nonzero_tpm = [v for v in tpm_list if v > 0]
+    mean_fpkm = sum(fpkm_list) / len(fpkm_list) if fpkm_list else 0.0
+    mean_tpm = sum(tpm_list) / len(tpm_list) if tpm_list else 0.0
+    max_fpkm = max(fpkm_list) if fpkm_list else 0.0
+    max_tpm = max(tpm_list) if tpm_list else 0.0
+    max_fpkm_idx = fpkm_list.index(max_fpkm)
+    max_tpm_idx = tpm_list.index(max_tpm)
+
+    stage_sums = defaultdict(float)
+    stage_counts = defaultdict(int)
+    for i, item in enumerate(items):
+        stage_sums[item["stage"]] += fpkm_list[i]
+        stage_counts[item["stage"]] += 1
+    stage_means = {st: stage_sums[st] / stage_counts[st] for st in stage_sums}
+    top_stage_fpkm = max(stage_means, key=stage_means.get) if stage_means else None
+
+    female_vals = [fpkm_list[i] for i, s in enumerate(samples) if s["sex"] == "Female"]
+    male_vals = [fpkm_list[i] for i, s in enumerate(samples) if s["sex"] == "Male"]
+    female_mean = sum(female_vals) / len(female_vals) if female_vals else 0.0
+    male_mean = sum(male_vals) / len(male_vals) if male_vals else 0.0
+
+    def sex_bias(f: float, m: float) -> str:
+        if abs(f - m) <= 0.1:
+            return "No_difference"
+        return "Female_higher" if f > m else "Male_higher"
+
+    return {
+        "status": "available",
+        "samples": items,
+        "summary": {
+            "max_fpkm": round(max_fpkm, 4),
+            "max_fpkm_sample": items[max_fpkm_idx]["sample_name"] if max_fpkm_idx < len(items) else None,
+            "max_tpm": round(max_tpm, 4),
+            "max_tpm_sample": items[max_tpm_idx]["sample_name"] if max_tpm_idx < len(items) else None,
+            "mean_fpkm": round(mean_fpkm, 4),
+            "mean_tpm": round(mean_tpm, 4),
+            "expressed_samples": len(nonzero_fpkm),
+            "zero_samples": len(fpkm_list) - len(nonzero_fpkm),
+            "top_stage_fpkm": top_stage_fpkm,
+            "sex_bias": sex_bias(female_mean, male_mean),
+            "stage_fpkm_means": {st: round(v, 4) for st, v in sorted(stage_means.items())},
+        },
+    }
+
 # ========== 12. 核心路由（保留原有） ==========
 @app.get("/")
 def root(request: Request):
@@ -674,6 +821,18 @@ def get_gene_page(
             page["gene"]["gene_id"],
             write_conn=write_conn,
         )
+        # 附加表达数据（PostgreSQL）
+        pg_pool = getattr(state, "pg_pool", None)
+        if pg_pool is not None:
+            pg_conn = pg_getconn()
+            try:
+                expr = load_gene_expression(pg_conn, page["gene"]["gene_id"])
+            finally:
+                pg_putconn(pg_conn)
+            page["expression"] = expr if expr else {"status": "no_data"}
+        else:
+            page["expression"] = {"status": "pg_unavailable"}
+
         return page
     except HTTPException:
         raise
@@ -684,6 +843,24 @@ def get_gene_page(
             include_sequences,
         )
         raise
+
+@app.get("/genes/{gene_id}/expression")
+def get_gene_expression(gene_id: str, request: Request):
+    """独立端点：返回单个基因的完整表达数据（FPKM + TPM，36样本）"""
+    state = get_state(request)
+    resolved = resolve_gene_id(state, gene_id)
+    get_gene_feature_or_404(state, resolved)
+    pg_pool = getattr(state, "pg_pool", None)
+    if pg_pool is None:
+        return {"status": "pg_unavailable", "gene_id": resolved}
+    pg_conn = pg_getconn()
+    try:
+        expr = load_gene_expression(pg_conn, resolved)
+    finally:
+        pg_putconn(pg_conn)
+    if expr is None:
+        return {"status": "no_data", "gene_id": resolved}
+    return expr
 
 # ========== 13. 本地开发入口 ==========
 if __name__ == "__main__":

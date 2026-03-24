@@ -42,6 +42,15 @@ GRCG6A_PUBLIC_GENOME: Path = Path(
     os.getenv("GRCG6A_PUBLIC_GENOME", str(Path(__file__).parent.parent.parent / "public" / "genome"))
 ).resolve()
 
+# ─────────────────────────────────────────────
+# PostgreSQL DSN（docker-compose: 127.0.0.1:5433，Docker 内: postgres:5432）
+# 也可通过环境变量 DATABASE_URL 覆盖
+# ─────────────────────────────────────────────
+GRCG6A_PG_DSN: str = os.getenv(
+    "DATABASE_URL",
+    "postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a"
+)
+
 # HMMER/Pfam database (for domain search)
 GRCG6A_HMMER_DB: Path = Path(
     os.getenv("GRCG6A_HMMER_DB", str(_BASE / "hmmer_db" / "Pfam-A.hmm"))
@@ -49,5 +58,6 @@ GRCG6A_HMMER_DB: Path = Path(
 
 # KEGG pathway images (derived from static root)
 KEGG_IMAGE_DIR: Path = GRCG6A_STATIC_ROOT / "kegg_pathways"
+
 
 

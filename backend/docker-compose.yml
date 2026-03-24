@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL 数据库 ────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: grc_postgres_local
+    environment:
+      POSTGRES_DB: grcg6a
+      POSTGRES_USER: grcuser
+      POSTGRES_PASSWORD: grcpassword
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    ports:
+      - "5433:5432"
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=16MB
+      -c maintenance_work_mem=128MB
+      -c max_connections=50
+      -c effective_cache_size=1GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U grcuser -d grcg6a"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
