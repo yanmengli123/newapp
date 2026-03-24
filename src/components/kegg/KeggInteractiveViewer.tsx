@@ -55,7 +55,7 @@ export default function KeggInteractiveViewer({
     setLoading(true);
     setError(null);
     resetState();
-    getKEGGPathwayMapdata(pathwayId)
+    getKEGGPathwayMapdata(pathwayId, geneId)
       .then((data) => setMapdata(data))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mapdata"))
       .finally(() => setLoading(false));

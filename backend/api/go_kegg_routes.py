@@ -475,11 +475,14 @@ def get_kegg_pathway_info(pathway_id: str, request: Request):
 
 
 @router.get("/kegg/pathway/{pathway_id}/mapdata")
-def get_kegg_pathway_mapdata(pathway_id: str, request: Request):
+def get_kegg_pathway_mapdata(pathway_id: str, request: Request, gene_id: str | None = None):
     """
     获取通路节点坐标数据（来自 kegg_pathway_node + kegg_pathway_node_gene 表）。
     返回 nodes 数组，每项含 left/top/right/bottom/label/graphics_type/highlighted。
-    highlighted=true 表示该节点包含通路注释基因。
+
+    highlighted=true 的含义：
+    - 传入 gene_id 时：该节点包含当前页面的特定基因
+    - 未传 gene_id 时：该节点包含该通路的任意注释基因（兼容旧行为）
     """
     conn = get_sql(request)
 
@@ -514,6 +517,22 @@ def get_kegg_pathway_mapdata(pathway_id: str, request: Request):
         for sr in symbol_rows:
             kegg_gene_id_to_symbol[sr["kegg_gene_id"]] = sr["gene_symbol"]
 
+    # 当传入 gene_id 时，只高亮该特定基因
+    target_kegg_gene_ids: set[str] = set()
+    if gene_id:
+        # 通过 gene_xref + gene_kegg 找到该基因对应的 kegg_gene_id
+        target_rows = conn.execute(
+            """
+            SELECT k.kegg_gene_id FROM gene_xref x
+            LEFT JOIN gene_kegg k ON x.gene_id = k.gene_id
+            WHERE x.gene_id = ?
+            """,
+            (gene_id,),
+        ).fetchall()
+        for tr in target_rows:
+            if tr["kegg_gene_id"]:
+                target_kegg_gene_ids.add(tr["kegg_gene_id"])
+
     # 获取节点列表
     node_rows = conn.execute(
         """
@@ -534,7 +553,12 @@ def get_kegg_pathway_mapdata(pathway_id: str, request: Request):
     nodes = []
     for r in node_rows:
         kegg_ids = [k for k in (r["kegg_gene_ids"] or "").split(",") if k]
-        highlighted = any(kid in pathway_gene_ids for kid in kegg_ids)
+
+        # highlighted 逻辑：传入 gene_id 时只高亮该基因，否则高亮通路任意注释基因
+        if target_kegg_gene_ids:
+            highlighted = any(kid in target_kegg_gene_ids for kid in kegg_ids)
+        else:
+            highlighted = any(kid in pathway_gene_ids for kid in kegg_ids)
 
         gene_items = []
         for kid in kegg_ids:

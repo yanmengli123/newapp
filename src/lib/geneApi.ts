@@ -589,8 +589,10 @@ export async function getKEGGPathwayInfo(pathwayId: string): Promise<KEGGPathway
 }
 
 // Get KEGG pathway mapdata (hotspot coordinates)
-export async function getKEGGPathwayMapdata(pathwayId: string): Promise<KEGGPathwayMapdata> {
-  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/mapdata`);
+export async function getKEGGPathwayMapdata(pathwayId: string, geneId?: string): Promise<KEGGPathwayMapdata> {
+  const url = `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/mapdata`
+    + (geneId ? `?gene_id=${encodeURIComponent(geneId)}` : "");
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Pathway mapdata not found: ${pathwayId}`);
   }
