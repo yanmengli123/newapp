@@ -38,6 +38,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis), `src/lib/chatApi.ts` (chat)
+- **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器)
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)
@@ -45,7 +46,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **main.py** — FastAPI app, lifespan context (opens gffutils + SQLite), registers all routers
 - **api/** — Route modules:
   - `go_kegg_routes.py` — Gene/GO/KEGG endpoints (**registered**, prefix `/annotations`)
-  - `kegg_image_router.py` — KEGG pathway image serving (**registered**, prefix `/kegg-images`)
+  - `kegg_image_router.py` — KEGG pathway image serving via `_get_asset_path()` (**registered**, prefix `/kegg-images`)
   - `tool_routes.py` — Primer3, Domain Search tools (**registered**, prefix `/tools`)
   - `genome_analysis_routes.py` — Genome analysis job management + sample results (**registered**, prefix `/genome`)
   - `chat_router.py` — Chat (**registered**, prefix `/api`)
@@ -81,7 +82,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /annotations/kegg/pathway/{pathway_id}/info` — 通路元信息（来自 kegg_pathway_asset）
 - `GET /annotations/kegg/pathway/{pathway_id}/image` — 通路 PNG 图片
 - `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 节点坐标 JSON（含 nodes 数组）
-- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML 数据
+- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML 数据（支持 `?gene_id=` 查询目标基因）
 - `GET /annotations/kegg/kgml-cache/status` — KGML 缓存状态
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
 - `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
@@ -160,7 +161,7 @@ Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`
 | `kegg_pathway_node_gene` | ~15000 | 节点-基因映射（kegg_gene_id → gene_symbol） |
 
 **关键字段：**
-- `kegg_pathway_asset`: `png_relpath`, `png_url`, `png_width`, `png_height`, `kgml_filename`, `node_count`, `gene_count`
+- `kegg_pathway_asset`: `png_relpath`（相对项目根，含反斜杠如 `static\kegg_pathways\{id}.png`；读取时需用 `GRCG6A_STATIC_ROOT.parent` 拼接并规范化）, `png_url`, `png_width`, `png_height`, `kgml_filename`, `node_count`, `gene_count`
 - `kegg_pathway_node`: `entry_id`, `entry_type`, `entry_name`, `graphics_type`, `x/y/width/height`, `left_x/top_y/right_x/bottom_y`, `raw_names`, `link_url`
 - `kegg_pathway_node_gene`: `node_id`（关联 node）, `kegg_gene_id`（格式 `gga:NNNNNN`）, `gene_symbol`
 
@@ -199,6 +200,8 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
 - **Genome analysis**: `/genome/analysis/run` submits jobs; `/genome/sample/*` serves pre-generated results without running analysis.
 - **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
+- **KEGG Interactive Viewer**: PNG + SVG overlay via `viewBox` matching original image dimensions (`png_width`/`png_height`), `preserveAspectRatio="xMidYMid meet"` for responsive scaling. CSS pulse animation: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }` (defined in `App.css`).
+- **KEGG image paths**: `_get_asset_path()` in `kegg_image_router.py` resolves `png_relpath` using `GRCG6A_STATIC_ROOT.parent` (project root), not filesystem root.
 
 ## Git
 
