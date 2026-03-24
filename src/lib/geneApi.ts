@@ -93,6 +93,10 @@ export interface GenePageResponse {
   chromosome: ChromosomeResult;
   transcript_count: number;
   transcripts: TranscriptResult[];
+  annotations?: {
+    go: GOAnnotationsResponse;
+    kegg: KEGGAnnotationsResponse;
+  };
 }
 
 // Parse search query to determine search type
@@ -256,13 +260,21 @@ export interface GOAnnotationsResponse {
   total: number;
 }
 
-// KEGG Annotation types
+// KEGG Pathway: used in gene KEGG annotations and pathway list
 export interface KEGGPathway {
   pathway_id: string;
   pathway_name: string;
   pathway_class: string | null;
+  official_link: string;
+  // Asset fields (from kegg_pathway_asset table)
+  png_url?: string;
+  png_width?: number;
+  png_height?: number;
+  kgml_url?: string;
+  mapdata_api?: string;
+  interactive_api?: string;
+  // Legacy/compat
   kegg_link?: string;
-  official_link?: string;
 }
 
 export interface KEGGAnnotationsResponse {
@@ -428,8 +440,15 @@ export interface KEGGPathwayItem {
   pathway_name: string;
   pathway_class: string;
   gene_count: number;
+  node_count?: number;
+  annotated_gene_count?: number;
   official_link: string;
-  image_url: string;
+  png_url: string;
+  png_width?: number;
+  png_height?: number;
+  image_api?: string;
+  mapdata_api?: string;
+  info_api?: string;
 }
 
 export interface KEGGPathwaysResponse {
@@ -442,39 +461,87 @@ export interface KEGGPathwayDetail {
   pathway_name: string;
   pathway_class: string | null;
   gene_count: number;
+  node_count?: number;
+  annotated_gene_count?: number;
+  png_width?: number;
+  png_height?: number;
   genes: Array<{
     gene_id: string;
     gene_symbol: string;
     ncbi_gene_id: string | null;
+    kegg_gene_id: string | null;
     gene_link: string;
   }>;
   official_link: string;
-  image_url: string;
-  mapdata_url: string;
-  interactive_url: string;
+  png_url: string;
+  image_api?: string;
+  kgml_url?: string;
+  mapdata_api?: string;
+  interactive_api?: string;
+  info_api?: string;
 }
 
 export interface KEGGPathwayInfo {
   pathway_id: string;
   pathway_name: string;
-  image_url: string;
+  pathway_class: string | null;
+  png: {
+    filename: string;
+    url: string;
+    file_size: number;
+    width: number;
+    height: number;
+  };
+  kgml: {
+    filename: string;
+    relpath: string;
+    file_size: number;
+  };
+  stats: {
+    node_count: number;
+    gene_count: number;
+  };
   official_link: string;
-  local_image_path: string;
+  image_api: string;
+  mapdata_api: string;
+  interactive_api: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KEGGPathwayNodeGene {
+  kegg_gene_id: string;
+  gene_symbol: string | null;
+  in_pathway: boolean;
+}
+
+export interface KEGGPathwayNode {
+  entry_id: string;
+  entry_type: string;
+  label: string;
+  graphics_type: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  genes: KEGGPathwayNodeGene[];
+  highlighted: boolean;
+  link_url: string;
 }
 
 export interface KEGGPathwayMapdata {
   pathway_id: string;
   pathway_name: string;
-  gene_count: number;
-  hotspots: Array<{
-    gene_id: string;
-    gene_symbol: string;
-    start: number;
-    end: number;
-    seqid: string;
-    strand: string;
-    color: string;
-  }>;
+  png_width: number;
+  png_height: number;
+  total_nodes: number;
+  highlighted_nodes: number;
+  pathway_gene_count: number;
+  nodes: KEGGPathwayNode[];
   source: string;
 }
 
@@ -483,7 +550,11 @@ export interface KEGGPathwayInteractive {
   pathway_name: string;
   static_image: string;
   official_link: string;
-  api_data: string;
+  mapdata_api: string;
+  detail_api: string;
+  info_api: string;
+  kgml_available: boolean;
+  kgml_preview: string | null;
   message: string;
 }
 
@@ -549,6 +620,8 @@ export async function getKEGGImageInfo(pathwayId: string): Promise<{
   local_image_path: string;
   file_exists: boolean;
   file_size: number;
+  width: number;
+  height: number;
 }> {
   const response = await fetch(`${API_BASE}/kegg-images/${encodeURIComponent(pathwayId)}/info`);
   if (!response.ok) {

@@ -75,13 +75,13 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 
 ### GO/KEGG Annotations (11, prefix `/annotations`)
 - `GET /annotations/go/{gene_id}` — GO 注释
-- `GET /annotations/kegg/{gene_id}` — KEGG 通路
-- `GET /annotations/kegg/pathways` — 所有 KEGG 通路列表
+- `GET /annotations/kegg/{gene_id}` — KEGG 通路（含 png_url/kgml_url/mapdata_api）
+- `GET /annotations/kegg/pathways` — 所有 KEGG 通路列表（含节点统计）
 - `GET /annotations/kegg/pathway/{pathway_id}` — 通路详情（含成员基因）
-- `GET /annotations/kegg/pathway/{pathway_id}/info` — 通路信息
+- `GET /annotations/kegg/pathway/{pathway_id}/info` — 通路元信息（来自 kegg_pathway_asset）
 - `GET /annotations/kegg/pathway/{pathway_id}/image` — 通路 PNG 图片
-- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 热区坐标 JSON
-- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML
+- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 节点坐标 JSON（含 nodes 数组）
+- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML 数据
 - `GET /annotations/kegg/kgml-cache/status` — KGML 缓存状态
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
 - `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
@@ -151,6 +151,41 @@ All backend modules import from `config.py` — never hardcode `D:\jbrowsedata\p
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
+
+### KEGG Asset Tables (from KGML 解析入库)
+| 表名 | 行数 | 说明 |
+|------|------|------|
+| `kegg_pathway_asset` | ~195 | PNG/KGML 文件元数据、宽高、统计 |
+| `kegg_pathway_node` | ~31000 | KGML 节点坐标（left/top/right/bottom/graphics_type） |
+| `kegg_pathway_node_gene` | ~15000 | 节点-基因映射（kegg_gene_id → gene_symbol） |
+
+**关键字段：**
+- `kegg_pathway_asset`: `png_relpath`, `png_url`, `png_width`, `png_height`, `kgml_filename`, `node_count`, `gene_count`
+- `kegg_pathway_node`: `entry_id`, `entry_type`, `entry_name`, `graphics_type`, `x/y/width/height`, `left_x/top_y/right_x/bottom_y`, `raw_names`, `link_url`
+- `kegg_pathway_node_gene`: `node_id`（关联 node）, `kegg_gene_id`（格式 `gga:NNNNNN`）, `gene_symbol`
+
+**导入脚本**：`D:\jbrowsedata\projectdata\scripts\import_kegg_kgml_cache.py`
+```bash
+# 初始化表结构
+sqlite3 grcg6a_nc.db < scripts/kegg_schema.sql
+
+# 批量导入（PNG=kegg_pathways, KGML=kegg_kgml）
+python scripts/import_kegg_kgml_cache.py --db grcg6a_nc.db --png-dir static/kegg_pathways --kgml-dir static/kegg_kgml --replace
+
+# 单通路
+python scripts/import_kegg_kgml_cache.py --pathway-id gga00010 --replace
+
+# 干跑（不写入）
+python scripts/import_kegg_kgml_cache.py --dry-run
+```
+
+**`/mapdata` 返回格式**（`nodes` 数组，每节点含）：
+- `left/top/right/bottom`：前端可直接用的像素坐标
+- `graphics_type`：rectangle / circle / line 等
+- `genes[]`：含 `kegg_gene_id`、`gene_symbol`、`in_pathway`（是否通路注释基因）
+- `highlighted`：节点是否包含通路注释基因（用于热区着色）
+
+**`/gene/page` KEGG 整合字段**：每条 pathway 含 `png_url`、`kgml_url`、`mapdata_api`、`interactive_api`（来自 kegg_pathway_asset）
 
 ### Sample Results (pre-generated)
 Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition_bar, assembly_contig_length_bar, assembly_length_histogram, cds_gc123_bar, cds_length_distribution, cds_start_codon_bar, gene_length_distribution, genome_gc_window_line, gff_biotype_bar, gff_feature_type_bar, protein_length_distribution, plus additional charts per job. Interactive HTML via Plotly.

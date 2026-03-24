@@ -1,44 +1,39 @@
-# ========== 1. from __future__ 必须是文件第一行（核心修复语法错误） ==========
 from __future__ import annotations
-# 务必先导入 FileResponse
-from fastapi.responses import FileResponse
-# ========== 2. 统一导入（删除重复，按规范排序） ==========
+
 import logging
 import sqlite3
-import time
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
-import requests
-from fastapi import APIRouter, HTTPException, Request
-
 from config import GRCG6A_STATIC_ROOT
 
-# ========== 3. 全局配置（只定义一次，删除重复） ==========
 router = APIRouter(prefix="/annotations", tags=["annotations"])
-logger = logging.getLogger("grcg6a_fastapi_backend.annotations")
+logger = logging.getLogger("grcg6a_fastapi_backend")
 
-# KEGG基础配置
+# KEGG 基础配置
 KEGG_BASE = "https://rest.kegg.jp"
-KEGG_REQ_INTERVAL = 0.35  # <= 3 req/sec
-KEGG_IMAGE_DIR = GRCG6A_STATIC_ROOT / "kegg_pathways"
+KEGG_REQ_INTERVAL = 0.35
+KEGG_PNG_DIR = GRCG6A_STATIC_ROOT / "kegg_pathways"
+KEGG_KGML_DIR = GRCG6A_STATIC_ROOT / "kegg_kgml"
 KEGG_IMAGE_URL_PREFIX = "/static/kegg_pathways"
 
-# ========== 4. 工具函数（删除重复，保留核心） ==========
-def get_image_dir(request: Request) -> Path:
-    return request.app.state.kegg_image_dir
+
+# ========== 工具函数 ==========
 
 def get_sql(request: Request) -> sqlite3.Connection:
     return request.app.state.sql
+
 
 def resolve_gene_id(request: Request, gene_id: str) -> str:
     state = request.app.state
     if gene_id in state.gene_index_by_id:
         return gene_id
-
     hits = state.gene_index_by_symbol.get(gene_id.lower(), [])
     if len(hits) == 1:
         resolved = hits[0]["gene_id"]
@@ -46,24 +41,120 @@ def resolve_gene_id(request: Request, gene_id: str) -> str:
         return resolved
     return gene_id
 
+
 def amigo_url(go_id: str) -> str:
     return f"https://amigo.geneontology.org/amigo/term/{go_id.replace(':', '%3A')}"
+
 
 def kegg_pathway_url(pathway_id: str) -> str:
     return f"https://www.kegg.jp/entry/{pathway_id}"
 
-# ========== 5. KEGG通路图片接口（仅读本地，返回 PNG 文件） ==========
-# 注意：实际图片服务由 /kegg-images/{pathway_id}.png 提供（kegg_image_router.py）
-# 此处通过 annotations 前缀提供元信息，由后续 /info 接口处理
 
-# ========== 6. KEGG通路分类获取（保留原有逻辑，禁用写入） ==========
-@lru_cache(maxsize=2048)
+# ========== KEGG 通路 PNG 图片（静态文件） ==========
+
+@router.get("/kegg/pathway/{pathway_id}/image", response_class=FileResponse)
+def get_kegg_pathway_image(pathway_id: str):
+    """返回 KEGG 通路 PNG 图片，从 kegg_pathway_asset 表读取实际路径"""
+    # 查询 kegg_pathway_asset 获取实际文件路径
+    from config import GRCG6A_DB_PATH
+    conn = sqlite3.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT png_relpath FROM kegg_pathway_asset WHERE pathway_id = ?",
+        (pathway_id,),
+    ).fetchone()
+    conn.close()
+
+    if row and row["png_relpath"]:
+        image_path = Path(row["png_relpath"])
+    else:
+        image_path = KEGG_PNG_DIR / f"{pathway_id}.png"
+
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail=f"图片不存在：{image_path}")
+
+    return FileResponse(
+        path=image_path,
+        media_type="image/png",
+        filename=f"{pathway_id}.png",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+# ========== GO Annotations ==========
+
+def load_gene_go(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
+    gene_row = conn.execute(
+        """
+        SELECT gene_id, gene_symbol, ncbi_gene_id, ensembl_gene_id
+        FROM gene_xref WHERE gene_id = ?
+        """,
+        (gene_id,),
+    ).fetchone()
+
+    if gene_row is None:
+        raise HTTPException(status_code=404, detail=f"gene_xref not found for {gene_id}")
+
+    rows = conn.execute(
+        """
+        SELECT go_id, go_name, go_definition, go_namespace,
+               evidence_code, source
+        FROM gene_go
+        WHERE gene_id = ?
+        ORDER BY
+            CASE go_namespace
+                WHEN 'biological_process' THEN 1
+                WHEN 'molecular_function' THEN 2
+                WHEN 'cellular_component' THEN 3
+                ELSE 9
+            END,
+            go_name, go_id
+        """,
+        (gene_id,),
+    ).fetchall()
+
+    items: list[dict[str, Any]] = []
+    summary = {"bp_count": 0, "mf_count": 0, "cc_count": 0, "total": 0}
+
+    for r in rows:
+        ns = r["go_namespace"]
+        if ns == "biological_process":
+            summary["bp_count"] += 1
+        elif ns == "molecular_function":
+            summary["mf_count"] += 1
+        elif ns == "cellular_component":
+            summary["cc_count"] += 1
+
+        items.append({
+            "go_id": r["go_id"],
+            "go_name": r["go_name"],
+            "go_definition": r["go_definition"],
+            "go_namespace": r["go_namespace"],
+            "evidence_code": r["evidence_code"],
+            "source": r["source"],
+            "official_link": amigo_url(r["go_id"]),
+        })
+
+    summary["total"] = len(items)
+
+    return {
+        "gene_id": gene_row["gene_id"],
+        "gene_symbol": gene_row["gene_symbol"],
+        "ncbi_gene_id": gene_row["ncbi_gene_id"],
+        "ensembl_gene_id": gene_row["ensembl_gene_id"],
+        "summary": summary,
+        "items": items,
+    }
+
+
+# ========== KEGG Annotations ==========
+
 def fetch_kegg_pathway_class(pathway_id: str) -> str | None:
-    url = f"https://rest.kegg.jp/get/{pathway_id}"
-    logger.info("Fetching KEGG pathway class from %s", url)
+    """从 KEGG REST API 获取通路分类"""
+    url = f"{KEGG_BASE}/get/{pathway_id}"
     try:
-        with urlopen(url, timeout=5) as response:
-            body = response.read().decode("utf-8", errors="replace")
+        with urlopen(url, timeout=5) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
     except (HTTPError, URLError, Exception):
         logger.exception("Failed to fetch KEGG pathway class for %s", pathway_id)
         return None
@@ -85,113 +176,15 @@ def fetch_kegg_pathway_class(pathway_id: str) -> str | None:
             break
 
     if not collected:
-        logger.warning("KEGG response missing CLASS for pathway_id=%s", pathway_id)
         return None
     return " | ".join(collected)
 
-def hydrate_kegg_pathway_class(
-    read_conn: sqlite3.Connection,
-    write_conn: sqlite3.Connection | None,
-    pathway_id: str,
-    current_value: str | None,
-) -> str | None:
-    """禁用数据库写入，仅返回已有的分类信息"""
-    if current_value:
-        return current_value
-    # 仅读取，不写入数据库（避免只读权限错误）
-    return fetch_kegg_pathway_class(pathway_id)
 
-# ========== 7. GO注释加载（保留原有逻辑） ==========
-def load_gene_go(conn: sqlite3.Connection, gene_id: str) -> Dict[str, Any]:
-    gene_row = conn.execute(
-        """
-        SELECT gene_id, gene_symbol, ncbi_gene_id, ensembl_gene_id
-        FROM gene_xref
-        WHERE gene_id = ?
-        """,
-        (gene_id,),
-    ).fetchone()
-
-    if gene_row is None:
-        raise HTTPException(status_code=404, detail=f"gene_xref not found for {gene_id}")
-
-    rows = conn.execute(
-        """
-        SELECT
-            go_id,
-            go_name,
-            go_definition,
-            go_namespace,
-            evidence_code,
-            source
-        FROM gene_go
-        WHERE gene_id = ?
-        ORDER BY
-            CASE go_namespace
-                WHEN 'biological_process' THEN 1
-                WHEN 'molecular_function' THEN 2
-                WHEN 'cellular_component' THEN 3
-                ELSE 9
-            END,
-            go_name,
-            go_id
-        """,
-        (gene_id,),
-    ).fetchall()
-
-    items: List[Dict[str, Any]] = []
-    summary = {
-        "bp_count": 0,
-        "mf_count": 0,
-        "cc_count": 0,
-        "total": 0,
-    }
-
-    for r in rows:
-        ns = r["go_namespace"]
-        if ns == "biological_process":
-            summary["bp_count"] += 1
-        elif ns == "molecular_function":
-            summary["mf_count"] += 1
-        elif ns == "cellular_component":
-            summary["cc_count"] += 1
-
-        items.append(
-            {
-                "go_id": r["go_id"],
-                "go_name": r["go_name"],
-                "go_definition": r["go_definition"],
-                "go_namespace": r["go_namespace"],
-                "evidence_code": r["evidence_code"],
-                "source": r["source"],
-                "official_link": amigo_url(r["go_id"]),
-            }
-        )
-
-    summary["total"] = len(items)
-
-    return {
-        "gene_id": gene_row["gene_id"],
-        "gene_symbol": gene_row["gene_symbol"],
-        "ncbi_gene_id": gene_row["ncbi_gene_id"],
-        "ensembl_gene_id": gene_row["ensembl_gene_id"],
-        "summary": summary,
-        "items": items,
-    }
-
-# ========== 8. KEGG注释加载（禁用写入，避免只读错误） ==========
-def load_gene_kegg(
-    conn: sqlite3.Connection,
-    gene_id: str,
-    write_conn: sqlite3.Connection | None = None,
-) -> Dict[str, Any]:
+def load_gene_kegg(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
+    """加载基因的 KEGG 通路注释，带 png_url/kgml_url/mapdata_api（来自 kegg_pathway_asset）"""
     head = conn.execute(
         """
-        SELECT
-            x.gene_id,
-            x.gene_symbol,
-            x.ncbi_gene_id,
-            k.kegg_gene_id
+        SELECT x.gene_id, x.gene_symbol, x.ncbi_gene_id, k.kegg_gene_id
         FROM gene_xref x
         LEFT JOIN gene_kegg k ON x.gene_id = k.gene_id
         WHERE x.gene_id = ?
@@ -204,112 +197,67 @@ def load_gene_kegg(
 
     rows = conn.execute(
         """
-        SELECT
+        SELECT DISTINCT
             p.pathway_id,
             p.pathway_name,
             p.pathway_class,
-            i.image_url
+            a.png_url,
+            a.png_width,
+            a.png_height,
+            a.kgml_filename
         FROM gene_kegg_pathway p
-        LEFT JOIN kegg_pathway_image i
-          ON p.pathway_id = i.pathway_id
+        LEFT JOIN kegg_pathway_asset a ON p.pathway_id = a.pathway_id
         WHERE p.gene_id = ?
         ORDER BY p.pathway_name, p.pathway_id
         """,
         (gene_id,),
     ).fetchall()
 
-    items: List[Dict[str, Any]] = []
+    items: list[dict[str, Any]] = []
     for r in rows:
-        # 禁用数据库写入，仅读取已有分类
-        pathway_class = hydrate_kegg_pathway_class(
-            conn,
-            None,  # 强制传入None，禁用写入
-            r["pathway_id"],
-            r["pathway_class"],
-        )
-        items.append(
-            {
-                "pathway_id": r["pathway_id"],
-                "pathway_name": r["pathway_name"],
-                "pathway_class": pathway_class,
-                "official_link": kegg_pathway_url(r["pathway_id"]),
-                "image_url": r["image_url"],
-                "image_api": f"/annotations/kegg/pathway/{r['pathway_id']}/image",
-            }
-        )
+        pathway_class = r["pathway_class"]
+        if not pathway_class:
+            pathway_class = fetch_kegg_pathway_class(r["pathway_id"])
+
+        kgml_filename = r["kgml_filename"] or f"{r['pathway_id']}.kgml"
+
+        items.append({
+            "pathway_id": r["pathway_id"],
+            "pathway_name": r["pathway_name"],
+            "pathway_class": pathway_class,
+            "official_link": kegg_pathway_url(r["pathway_id"]),
+            "png_url": r["png_url"] or f"/static/kegg_pathways/{r['pathway_id']}.png",
+            "png_width": r["png_width"] or 0,
+            "png_height": r["png_height"] or 0,
+            "kgml_url": f"/static/kegg_kgml/{kgml_filename}",
+            "mapdata_api": f"/annotations/kegg/pathway/{r['pathway_id']}/mapdata",
+            "interactive_api": f"/annotations/kegg/pathway/{r['pathway_id']}/interactive",
+        })
 
     return {
         "gene_id": head["gene_id"],
         "gene_symbol": head["gene_symbol"],
         "ncbi_gene_id": head["ncbi_gene_id"],
         "kegg_gene_id": head["kegg_gene_id"],
-        "summary": {
-            "pathway_count": len(items),
-        },
+        "summary": {"pathway_count": len(items)},
         "items": items,
     }
 
 
-# go_kegg_routes.py 完整替换该函数
-from fastapi.responses import FileResponse
-from pathlib import Path
-from fastapi import HTTPException
+# ========== 路由接口（静态路由优先，参数路由在后） ==========
 
-
-# 放在所有导入之后，路由定义之前
-@router.get("/kegg/pathway/{pathway_id}/image", response_class=FileResponse)
-def get_kegg_pathway_image(pathway_id: str):
-    """强制返回图片，不依赖任何数据库/状态"""
-    # 硬编码图片路径（避免app.state依赖问题）
-    image_path = KEGG_IMAGE_DIR / f"{pathway_id}.png"
-
-    # 1. 检查文件是否存在
-    if not image_path.exists():
-        raise HTTPException(status_code=404, detail=f"图片不存在：{image_path}")
-
-    # 2. 检查文件是否是有效PNG（可选）
-    if not image_path.suffix.lower() == ".png":
-        raise HTTPException(status_code=400, detail="仅支持PNG格式图片")
-
-    # 3. 强制返回图片
-    return FileResponse(
-        path=image_path,
-        media_type="image/png",
-        filename=f"{pathway_id}.png",
-        # 禁用缓存（避免浏览器缓存旧数据）
-        headers={"Cache-Control": "no-cache"}
-    )
-
-
-# 新增JSON信息接口（单独路由，避免冲突）
-@router.get("/kegg/pathway/{pathway_id}/info")
-def get_kegg_pathway_info(pathway_id: str, request: Request):
-    conn = request.app.state.sql
-    row = conn.execute(
-        "SELECT pathway_name FROM gene_kegg_pathway WHERE pathway_id = ? LIMIT 1",
-        (pathway_id,)
-    ).fetchone()
-    pathway_name = row["pathway_name"] if row else "Unknown"
-
-    return {
-        "pathway_id": pathway_id,
-        "pathway_name": pathway_name,
-        "image_url": f"/static/kegg_pathways/{pathway_id}.png",
-        "official_link": f"https://www.kegg.jp/entry/{pathway_id}",
-        "local_image_path": str(KEGG_IMAGE_DIR / f"{pathway_id}.png")
-    }
-# ========== 9. 路由接口（保留原有） ==========
 @router.get("/go/{gene_id}")
 def get_gene_go(gene_id: str, request: Request):
     conn = get_sql(request)
     gene_id = resolve_gene_id(request, gene_id)
     return load_gene_go(conn, gene_id)
 
-# ========== 10. KEGG Annotations 接口（按优先级排序，静态路由优先） ==========
+
+# === KEGG 静态路由（必须在参数路由之前） ===
 
 @router.get("/kegg/pathways")
 def list_all_kegg_pathways(request: Request):
-    """获取所有 KEGG 通路列表"""
+    """获取所有 KEGG 通路列表（含 png_url/宽高，来自 kegg_pathway_asset）"""
     conn = get_sql(request)
     rows = conn.execute(
         """
@@ -317,8 +265,14 @@ def list_all_kegg_pathways(request: Request):
             p.pathway_id,
             p.pathway_name,
             p.pathway_class,
-            COUNT(DISTINCT p.gene_id) AS gene_count
+            COUNT(DISTINCT p.gene_id) AS gene_count,
+            a.png_url,
+            a.png_width,
+            a.png_height,
+            a.node_count,
+            a.gene_count AS annotated_gene_count
         FROM gene_kegg_pathway p
+        LEFT JOIN kegg_pathway_asset a ON p.pathway_id = a.pathway_id
         GROUP BY p.pathway_id, p.pathway_name, p.pathway_class
         ORDER BY p.pathway_class, p.pathway_name
         """
@@ -331,37 +285,33 @@ def list_all_kegg_pathways(request: Request):
             "pathway_name": r["pathway_name"],
             "pathway_class": r["pathway_class"] or "Unclassified",
             "gene_count": r["gene_count"],
+            "node_count": r["node_count"] or 0,
+            "annotated_gene_count": r["annotated_gene_count"] or 0,
             "official_link": kegg_pathway_url(r["pathway_id"]),
-            "image_url": f"/annotations/kegg/pathway/{r['pathway_id']}/image",
+            "png_url": r["png_url"] or f"/static/kegg_pathways/{r['pathway_id']}.png",
+            "png_width": r["png_width"] or 0,
+            "png_height": r["png_height"] or 0,
+            "image_api": f"/annotations/kegg/pathway/{r['pathway_id']}/image",
+            "mapdata_api": f"/annotations/kegg/pathway/{r['pathway_id']}/mapdata",
+            "info_api": f"/annotations/kegg/pathway/{r['pathway_id']}/info",
         })
 
-    return {
-        "total": len(items),
-        "items": items,
-    }
-
-
-@router.get("/kegg/{gene_id}")
-def get_gene_kegg(gene_id: str, request: Request):
-    conn = get_sql(request)
-    gene_id = resolve_gene_id(request, gene_id)
-    return load_gene_kegg(conn, gene_id, write_conn=None)
+    return {"total": len(items), "items": items}
 
 
 @router.get("/kegg/pathway/{pathway_id}")
 def get_kegg_pathway_detail(pathway_id: str, request: Request):
-    """获取 KEGG 通路详情（含成员基因列表）"""
+    """获取 KEGG 通路详情（含成员基因列表 + 资产信息）"""
     conn = get_sql(request)
 
-    # 查询通路基本信息
     pathway_rows = conn.execute(
         """
-        SELECT DISTINCT
-            pathway_id,
-            pathway_name,
-            pathway_class
-        FROM gene_kegg_pathway
-        WHERE pathway_id = ?
+        SELECT DISTINCT p.pathway_id, p.pathway_name, p.pathway_class,
+               a.png_url, a.png_width, a.png_height,
+               a.kgml_filename, a.node_count, a.gene_count AS annotated_gene_count
+        FROM gene_kegg_pathway p
+        LEFT JOIN kegg_pathway_asset a ON p.pathway_id = a.pathway_id
+        WHERE p.pathway_id = ?
         """,
         (pathway_id,),
     ).fetchall()
@@ -369,17 +319,13 @@ def get_kegg_pathway_detail(pathway_id: str, request: Request):
     if not pathway_rows:
         raise HTTPException(status_code=404, detail=f"Pathway not found: {pathway_id}")
 
-    pathway_info = pathway_rows[0]
+    p = pathway_rows[0]
+    kgml_filename = p["kgml_filename"] or f"{pathway_id}.kgml"
 
-    # 查询通路成员基因
     gene_rows = conn.execute(
         """
-        SELECT DISTINCT
-            x.gene_id,
-            x.gene_symbol,
-            x.ncbi_gene_id,
-            k.pathway_id,
-            k.pathway_name
+        SELECT DISTINCT x.gene_id, x.gene_symbol, x.ncbi_gene_id,
+               k.kegg_gene_id
         FROM gene_kegg_pathway k
         JOIN gene_xref x ON k.gene_id = x.gene_id
         WHERE k.pathway_id = ?
@@ -388,148 +334,254 @@ def get_kegg_pathway_detail(pathway_id: str, request: Request):
         (pathway_id,),
     ).fetchall()
 
-    genes = []
-    for r in gene_rows:
-        genes.append({
-            "gene_id": r["gene_id"],
-            "gene_symbol": r["gene_symbol"],
-            "ncbi_gene_id": r["ncbi_gene_id"],
-            "gene_link": f"/genes/{r['gene_id']}",
-        })
+    genes = [{
+        "gene_id": r["gene_id"],
+        "gene_symbol": r["gene_symbol"],
+        "ncbi_gene_id": r["ncbi_gene_id"],
+        "kegg_gene_id": r["kegg_gene_id"],
+        "gene_link": f"/genes/{r['gene_id']}",
+    } for r in gene_rows]
 
     return {
         "pathway_id": pathway_id,
-        "pathway_name": pathway_info["pathway_name"],
-        "pathway_class": pathway_info["pathway_class"],
+        "pathway_name": p["pathway_name"],
+        "pathway_class": p["pathway_class"],
         "gene_count": len(genes),
+        "node_count": p["node_count"] or 0,
+        "annotated_gene_count": p["annotated_gene_count"] or 0,
+        "png_width": p["png_width"] or 0,
+        "png_height": p["png_height"] or 0,
         "genes": genes,
         "official_link": kegg_pathway_url(pathway_id),
-        "image_url": f"/annotations/kegg/pathway/{pathway_id}/image",
-        "mapdata_url": f"/annotations/kegg/pathway/{pathway_id}/mapdata",
-        "interactive_url": f"/annotations/kegg/pathway/{pathway_id}/interactive",
+        "png_url": p["png_url"] or f"/static/kegg_pathways/{pathway_id}.png",
+        "image_api": f"/annotations/kegg/pathway/{pathway_id}/image",
+        "kgml_url": f"/static/kegg_kgml/{kgml_filename}",
+        "mapdata_api": f"/annotations/kegg/pathway/{pathway_id}/mapdata",
+        "interactive_api": f"/annotations/kegg/pathway/{pathway_id}/interactive",
+        "info_api": f"/annotations/kegg/pathway/{pathway_id}/info",
+    }
+
+
+@router.get("/kegg/pathway/{pathway_id}/info")
+def get_kegg_pathway_info(pathway_id: str, request: Request):
+    """获取通路元信息（来自 kegg_pathway_asset 表）"""
+    conn = get_sql(request)
+    row = conn.execute(
+        """
+        SELECT pathway_id, pathway_name, pathway_class,
+               png_filename, png_url, png_file_size, png_width, png_height,
+               kgml_filename, kgml_relpath, kgml_file_size,
+               node_count, gene_count, created_at, updated_at
+        FROM kegg_pathway_asset
+        WHERE pathway_id = ?
+        """,
+        (pathway_id,),
+    ).fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Pathway asset not found: {pathway_id}")
+
+    return {
+        "pathway_id": row["pathway_id"],
+        "pathway_name": row["pathway_name"],
+        "pathway_class": row["pathway_class"],
+        "png": {
+            "filename": row["png_filename"],
+            "url": row["png_url"],
+            "file_size": row["png_file_size"],
+            "width": row["png_width"],
+            "height": row["png_height"],
+        },
+        "kgml": {
+            "filename": row["kgml_filename"],
+            "relpath": row["kgml_relpath"],
+            "file_size": row["kgml_file_size"],
+        },
+        "stats": {
+            "node_count": row["node_count"],
+            "gene_count": row["gene_count"],
+        },
+        "official_link": kegg_pathway_url(pathway_id),
+        "image_api": f"/annotations/kegg/pathway/{pathway_id}/image",
+        "mapdata_api": f"/annotations/kegg/pathway/{pathway_id}/mapdata",
+        "interactive_api": f"/annotations/kegg/pathway/{pathway_id}/interactive",
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
     }
 
 
 @router.get("/kegg/pathway/{pathway_id}/mapdata")
 def get_kegg_pathway_mapdata(pathway_id: str, request: Request):
-    """获取 KEGG 通路热区坐标数据（JSON）"""
+    """
+    获取通路节点坐标数据（来自 kegg_pathway_node + kegg_pathway_node_gene 表）。
+    返回 nodes 数组，每项含 left/top/right/bottom/label/graphics_type/highlighted。
+    highlighted=true 表示该节点包含通路注释基因。
+    """
     conn = get_sql(request)
 
-    # 验证通路是否存在
-    pathway_row = conn.execute(
-        "SELECT pathway_id, pathway_name FROM gene_kegg_pathway WHERE pathway_id = ? LIMIT 1",
+    # 验证通路
+    asset_row = conn.execute(
+        "SELECT pathway_id, pathway_name, png_width, png_height FROM kegg_pathway_asset WHERE pathway_id = ?",
         (pathway_id,),
     ).fetchone()
 
-    if not pathway_row:
+    if not asset_row:
         raise HTTPException(status_code=404, detail=f"Pathway not found: {pathway_id}")
 
-    # 查询通路成员基因用于热区标注
+    # 获取通路注释基因列表（来自 gene_kegg_pathway）用于高亮判断
+    pathway_gene_ids: set[str] = set()
+    kegg_gene_id_to_symbol: dict[str, str] = {}
+
     gene_rows = conn.execute(
+        "SELECT gene_id, kegg_gene_id FROM gene_kegg_pathway WHERE pathway_id = ?",
+        (pathway_id,),
+    ).fetchall()
+    for gr in gene_rows:
+        if gr["kegg_gene_id"]:
+            pathway_gene_ids.add(gr["kegg_gene_id"])
+
+    # 从 gene_kegg 表解析 gene_symbol
+    if pathway_gene_ids:
+        placeholders = ",".join(["?"] * len(pathway_gene_ids))
+        symbol_rows = conn.execute(
+            f"SELECT kegg_gene_id, gene_symbol FROM gene_kegg WHERE kegg_gene_id IN ({placeholders})",
+            list(pathway_gene_ids),
+        ).fetchall()
+        for sr in symbol_rows:
+            kegg_gene_id_to_symbol[sr["kegg_gene_id"]] = sr["gene_symbol"]
+
+    # 获取节点列表
+    node_rows = conn.execute(
         """
-        SELECT
-            x.gene_id,
-            x.gene_symbol,
-            g.start,
-            g.end,
-            g.strand,
-            g.seqid
-        FROM gene_kegg_pathway k
-        JOIN gene_xref x ON k.gene_id = x.gene_id
-        JOIN features g ON x.gene_id = g.id
-        WHERE k.pathway_id = ?
-        ORDER BY g.start
+        SELECT n.entry_id, n.entry_type, n.entry_name, n.graphics_type,
+               n.x, n.y, n.width, n.height,
+               n.left_x, n.top_y, n.right_x, n.bottom_y,
+               n.raw_names, n.link_url,
+               GROUP_CONCAT(ng.kegg_gene_id, ',') AS kegg_gene_ids
+        FROM kegg_pathway_node n
+        LEFT JOIN kegg_pathway_node_gene ng ON n.id = ng.node_id
+        WHERE n.pathway_id = ?
+        GROUP BY n.entry_id
+        ORDER BY n.id
         """,
         (pathway_id,),
     ).fetchall()
 
-    # 生成热区数据（基于基因位置分布）
-    hotspots = []
-    for r in gene_rows:
-        # 简化的热区坐标：使用基因位置
-        hotspots.append({
-            "gene_id": r["gene_id"],
-            "gene_symbol": r["gene_symbol"],
-            "start": r["start"],
-            "end": r["end"],
-            "seqid": r["seqid"],
-            "strand": r["strand"],
-            "color": "#FF6B6B",  # 标注为通路相关基因
+    nodes = []
+    for r in node_rows:
+        kegg_ids = [k for k in (r["kegg_gene_ids"] or "").split(",") if k]
+        highlighted = any(kid in pathway_gene_ids for kid in kegg_ids)
+
+        gene_items = []
+        for kid in kegg_ids:
+            gene_items.append({
+                "kegg_gene_id": kid,
+                "gene_symbol": kegg_gene_id_to_symbol.get(kid),
+                "in_pathway": kid in pathway_gene_ids,
+            })
+
+        nodes.append({
+            "entry_id": r["entry_id"],
+            "entry_type": r["entry_type"],
+            "label": r["entry_name"],
+            "graphics_type": r["graphics_type"],
+            "x": r["x"],
+            "y": r["y"],
+            "width": r["width"],
+            "height": r["height"],
+            "left": r["left_x"],
+            "top": r["top_y"],
+            "right": r["right_x"],
+            "bottom": r["bottom_y"],
+            "genes": gene_items,
+            "highlighted": highlighted,
+            "link_url": r["link_url"],
         })
+
+    # 统计高亮节点数
+    highlighted_count = sum(1 for n in nodes if n["highlighted"])
 
     return {
         "pathway_id": pathway_id,
-        "pathway_name": pathway_row["pathway_name"],
-        "gene_count": len(hotspots),
-        "hotspots": hotspots,
-        "source": "grcg6a_annotation",
+        "pathway_name": asset_row["pathway_name"],
+        "png_width": asset_row["png_width"] or 0,
+        "png_height": asset_row["png_height"] or 0,
+        "total_nodes": len(nodes),
+        "highlighted_nodes": highlighted_count,
+        "pathway_gene_count": len(pathway_gene_ids),
+        "nodes": nodes,
+        "source": "kegg_pathway_node + kegg_pathway_node_gene",
     }
 
 
 @router.get("/kegg/pathway/{pathway_id}/interactive")
 def get_kegg_pathway_interactive(pathway_id: str, request: Request):
-    """获取 KEGG 通路可交互 HTML 页面数据"""
+    """获取通路可交互 HTML 渲染所需的完整数据"""
     conn = get_sql(request)
 
-    # 验证通路是否存在
-    pathway_row = conn.execute(
-        "SELECT pathway_id, pathway_name FROM gene_kegg_pathway WHERE pathway_id = ? LIMIT 1",
+    asset_row = conn.execute(
+        "SELECT pathway_id, pathway_name FROM kegg_pathway_asset WHERE pathway_id = ?",
         (pathway_id,),
     ).fetchone()
 
-    if not pathway_row:
+    if not asset_row:
         raise HTTPException(status_code=404, detail=f"Pathway not found: {pathway_id}")
 
-    # 返回交互页面所需的完整数据
+    kgml_file = KEGG_KGML_DIR / f"{pathway_id}.kgml"
+    kgml_content = None
+    if kgml_file.exists():
+        kgml_content = kgml_file.read_text(encoding="utf-8", errors="replace")
+
     return {
         "pathway_id": pathway_id,
-        "pathway_name": pathway_row["pathway_name"],
+        "pathway_name": asset_row["pathway_name"],
         "static_image": f"/annotations/kegg/pathway/{pathway_id}/image",
         "official_link": kegg_pathway_url(pathway_id),
-        "api_data": f"/annotations/kegg/pathway/{pathway_id}",
-        "message": "使用 image_url 加载静态图片，使用 api_data 获取基因数据",
+        "mapdata_api": f"/annotations/kegg/pathway/{pathway_id}/mapdata",
+        "detail_api": f"/annotations/kegg/pathway/{pathway_id}",
+        "info_api": f"/annotations/kegg/pathway/{pathway_id}/info",
+        "kgml_available": kgml_content is not None,
+        "kgml_preview": kgml_content[:500] + "..." if kgml_content and len(kgml_content) > 500 else kgml_content,
+        "message": "使用 mapdata_api 获取节点坐标进行 SVG/Canvas 叠加渲染",
     }
 
 
-# ========== 10. KGML 缓存管理接口 ==========
+# ========== KGML 缓存管理 ==========
 
 @router.get("/kegg/kgml-cache/status")
 def get_kgml_cache_status(request: Request):
     """获取 KGML 缓存状态"""
-    cache_dir = KEGG_IMAGE_DIR / "kgml"
-    if not cache_dir.exists():
-        cache_dir.mkdir(parents=True, exist_ok=True)
+    kgml_dir = KEGG_KGML_DIR
+    kgml_dir.mkdir(parents=True, exist_ok=True)
 
     cached_files = []
     total_size = 0
-    if cache_dir.exists():
-        for f in cache_dir.glob("*.xml"):
-            cached_files.append(f.name)
-            total_size += f.stat().st_size
+    for f in kgml_dir.glob("*.kgml"):
+        cached_files.append(f.name)
+        total_size += f.stat().st_size
 
     return {
         "cache_enabled": True,
-        "cache_dir": str(cache_dir),
+        "cache_dir": str(kgml_dir),
         "cached_count": len(cached_files),
         "total_size_bytes": total_size,
-        "cached_files": sorted(cached_files)[:20],  # 仅返回前20个
+        "cached_files": sorted(cached_files)[:20],
     }
 
 
 @router.post("/kegg/kgml-cache/refresh/{pathway_id}")
 def refresh_single_kgml_cache(pathway_id: str):
     """刷新单个通路的 KGML 缓存"""
-    cache_dir = KEGG_IMAGE_DIR / "kgml"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    kgml_dir = KEGG_KGML_DIR
+    kgml_dir.mkdir(parents=True, exist_ok=True)
 
-    kgml_url = f"https://rest.kegg.jp/get/{pathway_id}/kgml"
-    cache_file = cache_dir / f"{pathway_id}.xml"
+    kgml_url = f"{KEGG_BASE}/get/{pathway_id}/kgml"
+    cache_file = kgml_dir / f"{pathway_id}.kgml"
 
     try:
-        with urlopen(kgml_url, timeout=10) as response:
-            kgml_content = response.read().decode("utf-8", errors="replace")
-        with open(cache_file, "w", encoding="utf-8") as f:
-            f.write(kgml_content)
+        with urlopen(kgml_url, timeout=10) as resp:
+            kgml_content = resp.read().decode("utf-8", errors="replace")
+        cache_file.write_text(kgml_content, encoding="utf-8")
         return {
             "success": True,
             "pathway_id": pathway_id,
@@ -537,34 +589,30 @@ def refresh_single_kgml_cache(pathway_id: str):
             "file_size": cache_file.stat().st_size,
         }
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Failed to fetch KGML: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Failed to fetch KGML: {e}")
 
 
 @router.post("/kegg/kgml-cache/refresh")
-def refresh_all_kgml_cache():
-    """刷新所有通路的 KGML 缓存"""
-    import sqlite3 as sql
-    from config import GRCG6A_DB_PATH
-
-    conn = sql.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
-    conn.row_factory = sql.Row
-    rows = conn.execute("SELECT DISTINCT pathway_id FROM gene_kegg_pathway").fetchall()
-    conn.close()
-
+def refresh_all_kgml_cache(request: Request):
+    """批量刷新所有通路的 KGML 缓存"""
+    conn = get_sql(request)
+    rows = conn.execute(
+        "SELECT DISTINCT pathway_id FROM gene_kegg_pathway"
+    ).fetchall()
     pathway_ids = [r["pathway_id"] for r in rows]
-    cache_dir = KEGG_IMAGE_DIR / "kgml"
-    cache_dir.mkdir(parents=True, exist_ok=True)
 
-    refreshed = []
-    failed = []
+    kgml_dir = KEGG_KGML_DIR
+    kgml_dir.mkdir(parents=True, exist_ok=True)
+
+    refreshed: list[str] = []
+    failed: list[str] = []
     for pid in pathway_ids:
-        kgml_url = f"https://rest.kegg.jp/get/{pid}/kgml"
-        cache_file = cache_dir / f"{pid}.xml"
+        kgml_url = f"{KEGG_BASE}/get/{pid}/kgml"
+        cache_file = kgml_dir / f"{pid}.kgml"
         try:
-            with urlopen(kgml_url, timeout=10) as response:
-                kgml_content = response.read().decode("utf-8", errors="replace")
-            with open(cache_file, "w", encoding="utf-8") as f:
-                f.write(kgml_content)
+            with urlopen(kgml_url, timeout=10) as resp:
+                kgml_content = resp.read().decode("utf-8", errors="replace")
+            cache_file.write_text(kgml_content, encoding="utf-8")
             refreshed.append(pid)
         except Exception:
             failed.append(pid)
@@ -573,28 +621,31 @@ def refresh_all_kgml_cache():
         "total": len(pathway_ids),
         "refreshed": len(refreshed),
         "failed": len(failed),
-        "failed_ids": failed[:10],  # 最多返回10个失败ID
+        "failed_ids": failed[:10],
     }
 
 
-# ========== 11. 基因页面注释附加函数（保留原有） ==========
+# === KEGG 参数路由（必须在所有静态路由之后） ===
+
+@router.get("/kegg/{gene_id}")
+def get_gene_kegg(gene_id: str, request: Request):
+    """加载基因的 KEGG 通路注释（含 png_url/kgml_url/mapdata_api）"""
+    conn = get_sql(request)
+    gene_id = resolve_gene_id(request, gene_id)
+    return load_gene_kegg(conn, gene_id)
+
+
+# ========== 基因页面注释附加 ==========
+
 def attach_annotations_to_gene_page(
     conn: sqlite3.Connection,
-    page: Dict[str, Any],
+    page: dict[str, Any],
     gene_id: str,
-    write_conn: sqlite3.Connection | None = None,
-) -> Dict[str, Any]:
-    """附加GO/KEGG注释到基因页面数据"""
+    write_conn: sqlite3.Connection | None = None,  # 已禁用写入，仅保留兼容性
+) -> dict[str, Any]:
+    """附加 GO/KEGG 注释到基因页面数据，KEGG 项含 png_url/kgml_url/mapdata_api"""
     page["annotations"] = {
         "go": load_gene_go(conn, gene_id),
-        "kegg": load_gene_kegg(conn, gene_id, write_conn=None),  # 禁用写入
+        "kegg": load_gene_kegg(conn, gene_id),
     }
     return page
-
-
-
-
-
-
-
-
