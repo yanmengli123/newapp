@@ -517,9 +517,16 @@ def get_kegg_pathway_mapdata(pathway_id: str, request: Request, gene_id: str | N
         for sr in symbol_rows:
             kegg_gene_id_to_symbol[sr["kegg_gene_id"]] = sr["gene_symbol"]
 
-    # 当传入 gene_id 时，只高亮该特定基因
+    # 当传入 gene_id 时，获取目标基因的 symbol 用于 label 匹配
     target_kegg_gene_ids: set[str] = set()
+    target_gene_symbol: str | None = None
     if gene_id:
+        target_row = conn.execute(
+            "SELECT gene_symbol FROM gene_xref WHERE gene_id = ?",
+            (gene_id,),
+        ).fetchone()
+        if target_row and target_row["gene_symbol"]:
+            target_gene_symbol = target_row["gene_symbol"]
         # 通过 gene_xref + gene_kegg 找到该基因对应的 kegg_gene_id
         target_rows = conn.execute(
             """
@@ -554,8 +561,24 @@ def get_kegg_pathway_mapdata(pathway_id: str, request: Request, gene_id: str | N
     for r in node_rows:
         kegg_ids = [k for k in (r["kegg_gene_ids"] or "").split(",") if k]
 
-        # highlighted 逻辑：传入 gene_id 时只高亮该基因，否则高亮通路任意注释基因
-        if target_kegg_gene_ids:
+        # highlighted 逻辑（两层兜底）：
+        # 1. 优先用 label 匹配：若节点 label/raw_names 含目标基因名（大小写不敏感），则高亮
+        #    → 解决 KEGG 节点无 gene_id 映射但视觉上标注了基因名的问题（如 gga01100 中多个 A4GALT 节点）
+        # 2. 其次用 gene_id 匹配：节点含目标基因的 kegg_gene_id（覆盖多基因节点如 "MAPK3, MAPK1"）
+        # 3. 不传 gene_id 时：兼容旧行为，高亮通路任意注释基因
+        entry_name_lower = (r["entry_name"] or "").lower()
+        raw_names_lower = (r["raw_names"] or "").lower()
+        symbol_lower = (target_gene_symbol or "").lower()
+
+        if target_gene_symbol:
+            # 传了 gene_id：label 匹配优先（覆盖视觉上的基因标注）
+            label_match = symbol_lower and (
+                symbol_lower in entry_name_lower or
+                symbol_lower in raw_names_lower
+            )
+            id_match = any(kid in target_kegg_gene_ids for kid in kegg_ids)
+            highlighted = label_match or id_match
+        elif target_kegg_gene_ids:
             highlighted = any(kid in target_kegg_gene_ids for kid in kegg_ids)
         else:
             highlighted = any(kid in pathway_gene_ids for kid in kegg_ids)
