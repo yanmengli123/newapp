@@ -59,7 +59,7 @@ export default function KeggInteractiveViewer({
       .then((data) => setMapdata(data))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mapdata"))
       .finally(() => setLoading(false));
-  }, [opened, pathwayId]);
+  }, [opened, pathwayId, geneId]);
 
   // 监听 img 尺寸变化（覆盖：初次加载、缓存、窗口 resize、全屏进入/退出）
   // ResizeObserver 监听 img 元素本身的尺寸变化，比 fullscreenchange 事件更可靠

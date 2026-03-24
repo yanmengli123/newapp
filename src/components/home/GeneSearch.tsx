@@ -81,6 +81,7 @@ export default function GeneSearch() {
     };
 
     fetchSuggestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery]);
 
   // Navigation functions
