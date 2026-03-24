@@ -11,10 +11,16 @@ from Bio import SeqIO
 from primer3 import design_primers
 from pydantic import BaseModel, Field
 
+from genome_analysis.file_discovery import GenomeFileDiscovery
+
 logger = logging.getLogger(__name__)
 
-# 基因组文件路径
-GENOMIC_FNA = Path("D:/jbrowsedata/projectdata/GCF_000002315.6_GRCg6a_genomic.fixed.fna.gz")
+# 基因组文件路径 — 动态查找，不硬编码文件名
+_genome_file_discovery = GenomeFileDiscovery()
+
+def _get_genomic_fna() -> Path | None:
+    """从 file_discovery 查找基因组 FASTA 文件路径。"""
+    return _genome_file_discovery.get_file("genomic")
 
 
 class Primer3Request(BaseModel):
@@ -64,8 +70,13 @@ def extract_gene_sequence(
     start = max(1, gene.start - include_flank)
     end = gene.end + include_flank
 
+    genomic_fna = _get_genomic_fna()
+    if genomic_fna is None:
+        logger.error(f"Genomic FASTA file not found in {_genome_file_discovery.data_dir}")
+        return None, None
+
     try:
-        with gzip.open(GENOMIC_FNA, "rt") as handle:
+        with gzip.open(genomic_fna, "rt") as handle:
             for record in SeqIO.parse(handle, "fasta"):
                 if record.id == seqid:
                     seq = str(record.seq[start - 1:end])

@@ -4,131 +4,173 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a bioinformatics visualization platform built with React, TypeScript, and Vite. It uses Mantine UI (v8) for components and React Router for navigation. The app provides a homepage with placeholder routes for future modules: Genome Browser, Visualizations, and Datasets.
+Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeScript frontend with FastAPI backend. Frontend runs on port 5173, backend on port 8000.
 
 ## Commands
 
 ```bash
 # Frontend
-npm run dev      # Start development server with HMR (port 5173)
-npm run build    # Build for production (TypeScript check + Vite build)
-npm run lint     # Run ESLint on all files
-npm run preview  # Preview production build locally
+npm run dev      # Start dev server (port 5173)
+npm run build    # TypeScript check + production build
+npm run lint     # ESLint
 
-# Backend (requires Python with gffutils)
-# Install dependencies: pip install gffutils fastapi uvicorn pydantic
-python backend/main.py  # Starts on port 8000
+# Backend
+# 方式1：激活 venv 后运行
+cd backend
+venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+
+# 方式2：直接使用系统 Python
+D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 ```
-
-## Statistics
-
-- **Chromosomes**: 35 (chr1-28, chr29-32, chrW, chrZ, chrMT)
-- **Genes**: 23,640
-- **Genome size**: ~1.05 Gb (1,050,156,607 bp)
-- **Genes with GO annotations**: 12,890
-- **Genes with KEGG pathways**: 6,212
 
 ## Architecture
 
-- **Entry point**: `src/main.tsx` - Sets up MantineProvider, BrowserRouter, and renders App
-- **Routing**: `src/App.tsx` - Defines routes at `/`, `/query`, `/browser`, `/jbrowse`, `/blast`, `/viz`, `/data`, `/tools`, `/gene/:geneId`, `/chromosome/:seqid`
-- **UI Framework**: Mantine v8 with `@mantine/core` and `@mantine/hooks`
-- **Icons**: Tabler icons via `@tabler/icons-react`
-- **Genome Browser**: JBrowse via `@jbrowse/react-linear-genome-view2`
-- **Routing**: React Router v7 via `react-router-dom`
+### Frontend (src/)
+- **App.tsx** — Route definitions; ChatWidget rendered globally here
+- **Pages** — `src/pages/` (route targets in App.tsx)
+  - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
+  - `GeneQueryPage` — Autocomplete gene search
+  - `GenePage` — Gene detail: transcripts, exons, CDS, GO, KEGG
+  - `ChromosomePage` — Chromosome view with gene list
+  - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
+  - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
+  - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
+- **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis), `src/lib/chatApi.ts` (chat)
+- **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
-The app uses an `AppShell` layout with a header navigation bar. All pages are wrapped in a `Container` with consistent padding and dividers. The ChatWidget is rendered globally in App.tsx and floats over all pages.
+### Backend (backend/)
+- **config.py** — Centralized path configuration. All modules import from here; no hardcoded `D:\jbrowsedata\projectdata` paths allowed.
+- **main.py** — FastAPI app, lifespan context (opens gffutils + SQLite), registers all routers
+- **api/** — Route modules:
+  - `go_kegg_routes.py` — Gene/GO/KEGG endpoints (**registered**, prefix `/annotations`)
+  - `kegg_image_router.py` — KEGG pathway image serving (**registered**, prefix `/kegg-images`)
+  - `tool_routes.py` — Primer3, Domain Search tools (**registered**, prefix `/tools`)
+  - `genome_analysis_routes.py` — Genome analysis job management + sample results (**registered**, prefix `/genome`)
+  - `chat_router.py` — Chat (**registered**, prefix `/api`)
+- **genome_analysis/** — Analysis engine (not imported by main.py at startup; called at runtime):
+  - `analyzer.py` — Main analysis pipeline
+  - `task_manager.py` — Job queue, state in `jobs/` JSON files
+  - `output_config.py` — Chart keys, output structure
+  - `carousel_service.py` — Featured carousel management
+  - `file_discovery.py` — Genome file scanning
+  - `chart_exporter.py` — Chart export (HTML/PNG/SVG/JSON)
+  - `chart_styles.py` — Plotly chart theming
+  - `settings.py` — Analysis configuration
 
-## Component Organization
+## Backend Endpoints
 
-- **Layout components**: `src/components/layout/` - AppHeader, AppFooter
-- **Home components**: `src/components/home/` - HeroSection, FeatureGrid, WhySection, GeneSearch
-- **Common components**: `src/components/common/` - PlaceholderPage
-- **Pages**: `src/pages/` - HomePage, GeneQueryPage, BrowserPage, JBrowsePage, BlastPage, VizPage, DataPage, GenePage, ChromosomePage, ToolsPage
-- **Chat components**: `src/components/chat/` - ChatWidget, ChatLauncher, ChatWindow, ChatMessageBubble
-- **API client**: `src/lib/chatApi.ts` - Chat API wrapper
-- **Gene API client**: `src/lib/geneApi.ts` - Gene/Chromosome/GO/KEGG API wrapper (GRCg6a database)
-- **JBrowse config**: `src/jbrowseConfig.ts` - Linear genome view configuration with GRCg6a chicken genome assembly
-- **KEGG pathways**: `public/static/kegg_pathways/` - Local pathway images
+### Core Gene API (10)
+- `GET /` — API 根信息
+- `GET /health` — 健康检查
+- `GET /chromosomes` — 染色体列表
+- `GET /chromosomes/{seqid}` — 染色体详情
+- `GET /chromosomes/{seqid}/genes` — 染色体上的基因
+- `GET /search/genes?q=` — 基因搜索
+- `GET /genes/{gene_id}` — 基因详情
+- `GET /genes/{gene_id}/transcripts` — 转录本
+- `GET /genes/{gene_id}/sequences` — 序列
+- `GET /genes/{gene_id}/page` — 完整基因页面（含GO/KEGG）
 
-## Backend
+### GO/KEGG Annotations (11, prefix `/annotations`)
+- `GET /annotations/go/{gene_id}` — GO 注释
+- `GET /annotations/kegg/{gene_id}` — KEGG 通路
+- `GET /annotations/kegg/pathways` — 所有 KEGG 通路列表
+- `GET /annotations/kegg/pathway/{pathway_id}` — 通路详情（含成员基因）
+- `GET /annotations/kegg/pathway/{pathway_id}/info` — 通路信息
+- `GET /annotations/kegg/pathway/{pathway_id}/image` — 通路 PNG 图片
+- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 热区坐标 JSON
+- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML
+- `GET /annotations/kegg/kgml-cache/status` — KGML 缓存状态
+- `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
+- `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
 
-- **Location**: `backend/main.py` - FastAPI server
-- **Port**: 8000
-- **Endpoints**:
-  - `GET /health` - Health check
-  - `POST /api/chat` - Chat API (accepts `{"message": "..."}`)
-  - `GET /search/genes?q=` - Gene search by gene_id/symbol/name
-  - `GET /chromosomes` - List all chromosomes
-  - `GET /chromosomes/{seqid}` - Get chromosome details
-  - `GET /genes/{gene_id}` - Get gene details
-  - `GET /genes/{gene_id}/transcripts` - Get gene transcripts
-  - `GET /genes/{gene_id}/page` - Get full gene page with transcripts
-  - `GET /chromosomes/{seqid}/genes` - Get genes on chromosome (with start/end filter)
-  - `GET /annotations/go/{gene_id}` - Get GO annotations (biological_process, molecular_function, cellular_component)
-  - `GET /annotations/kegg/{gene_id}` - Get KEGG pathway annotations with links
-  - `GET /annotations/kegg/pathway/{pathway_id}/info` - Get KEGG pathway JSON metadata
-  - `GET /annotations/kegg/pathway/{pathway_id}/image` - Get KEGG pathway image
-  - `GET /static/kegg_pathways/{pathway_id}.png` - Direct access to KEGG pathway images
-  - `GET /kegg-images/{pathway_id}.png` - Alternative route for KEGG pathway images
-  - `GET /kegg-images/{pathway_id}/info` - Alternative route for pathway metadata
-  - `POST /tools/primer3` - Primer3 PCR primer design (gene_id, include_flank, product_size_min/max, num_primers)
-  - `POST /tools/domain-search` - Protein domain search using local HMMER + Pfam database
-- **CORS**: Enabled for localhost:5173-5175, localhost:3000
-- **Chat Features**: Intent detection for bioinformatics queries (genome stats, GFF stats, sequence extraction, gene finding)
-- **Data Files**:
-  - GRCg6a genome: `D:\jbrowsedata\rawdata\` (source files)
-  - Served from: `public/genome/` (filtered FASTA, GFF, and .fai index files)
-  - Gene database: `D:\jbrowsedata\projectdata\grcg6a_nc.db`
-    - Tables: features, relations, chromosome, transcript_seq, cds_seq, protein_seq, gene_xref, gene_go, gene_kegg, gene_kegg_pathway
-    - ~23,640 genes, ~6,212 genes with KEGG pathways
-  - KEGG pathway images: `D:\jbrowsedata\projectdata\static\kegg_pathways\`
+### KEGG Images (2, prefix `/kegg-images`)
+- `GET /kegg-images/{pathway_id}.png` — KEGG 通路图片
+- `GET /kegg-images/{pathway_id}/info` — 图片信息
 
-## Genome Data
+### Tools (2, prefix `/tools`)
+- `POST /tools/primer3` — Primer3 PCR 引物设计
+- `POST /tools/domain-search` — HMMER/Pfam 蛋白结构域搜索
 
-- **Source**: NCBI GCF_000002315.6 (GRCg6a chicken genome)
-- **Files in public/genome/**:
-  - `GCF_000002315.6_GRCg6a_genomic.fna` - Full genome sequence
-  - `GCF_000002315.6_GRCg6a_genomic.fna.fai` - FASTA index
-  - `GCF_000002315.6_GRCg6a_genomic.gff` - Gene annotations (filtered to NC_ chromosomes only)
-  - `aliases.txt` - Chromosome name aliases (NC_ IDs to chr1, chr2, etc.)
-- **Chromosomes**: 35 main chromosomes (chr1-28, chr29-32, chrW, chrZ, chrMT)
-- **Genome size**: ~1.05 Gb (1,050,156,607 bp)
+### Genome Analysis (21, prefix `/genome`)
+- `GET /genome/health` — 模块健康检查
+- `GET /genome/files` — 扫描基因组文件
+- `POST /genome/files/scan` — 重新扫描文件
+- `POST /genome/analysis/run` — 提交分析任务
+- `GET /genome/jobs` — 任务列表
+- `GET /genome/jobs/{job_id}` — 任务详情
+- `GET /genome/jobs/{job_id}/result` — 分析结果
+- `GET /genome/jobs/{job_id}/result/{module_name}` — 单模块结果
+- `GET /genome/jobs/{job_id}/downloads` — 下载列表
+- `GET /genome/carousel` — 轮播图清单
+- `GET /genome/carousel/images` — 轮播图片列表
+- `GET /genome/charts/{job_id}/{chart_key}/json` — 图表 JSON
+- `GET /genome/charts/{job_id}/{chart_key}/html` — 图表 HTML
+- `GET /genome/download/public/carousel/{filename}` — 下载轮播图
+- `GET /genome/download/{job_id}/{category}/{filename}` — 下载分析结果
+- `GET /genome/sample/status` — 预生成结果状态
+- `GET /genome/sample/result` — 预生成分析结果
+- `GET /genome/sample/downloads` — 预生成下载列表
+- `GET /genome/sample/charts/{key}/{format}` — 图表 (html/png/svg/json)
+- `GET /genome/sample/tables/{name}/{format}` — 表格 (csv/xlsx)
+- `GET /genome/sample/{category}/{filename}` — 样本结果/元数据文件
+
+### Chat (1, prefix `/api`)
+- `POST /api/chat` — `{ "message": "..." }` → `{ "reply": "...", "type": "...", "data": {...} }`. Intent 从消息中检测，直接查询数据库。支持的 intent: genome_stats, gene_search, chromosome, go, kegg, analysis_results。
+
+## Data Files
+
+All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowsedata\projectdata\` unless overridden by environment variables:
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `GRCG6A_BASE_DIR` | `D:\jbrowsedata\projectdata` | Project root |
+| `GRCG6A_DB_PATH` | `.../grcg6a_nc.db` | SQLite gene DB |
+| `GRCG6A_STATIC_ROOT` | `.../static` | KEGG images |
+| `GRCG6A_RAWDATA_ROOT` | `.../rawdata` | Genome FASTA/GFF files |
+| `GRCG6A_GENOME_OUTPUT` | `.../outputs/jobs` | Analysis job outputs |
+| `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
+| `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
+
+All backend modules import from `config.py` — never hardcode `D:\jbrowsedata\projectdata` directly.
+
+### Registered Routers
+所有路由已在 `main.py` 中注册：
+
+| 路由文件 | 前缀 | 接口数 | 状态 |
+|---|---|---|---|
+| main.py | `/` | 10 | 已注册 |
+| go_kegg_routes.py | `/annotations` | 11 | 已注册 |
+| kegg_image_router.py | `/kegg-images` | 2 | 已注册 |
+| tool_routes.py | `/tools` | 2 | 已注册 |
+| genome_analysis_routes.py | `/genome` | 21 | 已注册 |
+| chat_router.py | `/api` | 1 | 已注册 |
+| **总计** | | **47** | |
+
+### Database Schema (grcg6a_nc.db)
+Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
+
+### Sample Results (pre-generated)
+Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition_bar, assembly_contig_length_bar, assembly_length_histogram, cds_gc123_bar, cds_length_distribution, cds_start_codon_bar, gene_length_distribution, genome_gc_window_line, gff_biotype_bar, gff_feature_type_bar, protein_length_distribution, plus additional charts per job. Interactive HTML via Plotly.
 
 ## Key Patterns
 
-- Mantine components use the `size` prop with `rem()` for responsive sizing (e.g., `p={{ base: 'xl', md: rem(48) }}`)
-- Routes use the `<Routes>` and `<Route>` components from react-router-dom
-- Navigation links use Mantine's `<Button component={Link}>` pattern
-- Theme is customized with `createTheme` (primaryColor: "cyan", defaultRadius: "md")
-- Chat API uses intent detection based on Chinese keywords to route queries
-- Frontend runs on Vite's dev server (typically port 5173)
-- Backend must run separately on port 8000 for API functionality to work
-- Gene IDs use format: `gene-XXXXX` (e.g., `gene-A4GALT`)
-- Search accepts gene_id, gene_symbol, or chromosome region (NC_xxx:start-end)
-- GenePage (`/gene/:geneId`) displays: gene info, transcripts, exons, CDS, proteins, GO annotations, KEGG pathways with local pathway images
+- **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id.
+- **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
+- **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
+- **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state.
+- **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
+- **Genome analysis**: `/genome/analysis/run` submits jobs; `/genome/sample/*` serves pre-generated results without running analysis.
+- **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
 
-## Git Management
+## Git
 
 ```bash
-# Initialize (already done)
-git init
-
-# Commit changes
-git add .
-git commit -m "description"
-
-# View history
-git log --oneline
-
-#回退操作
-git reset --soft HEAD~1    # 回退到上一个提交（保留修改）
-git reset --hard HEAD~1   # 回退到上一个提交（丢弃修改）
-git reset --hard <commit_id>  # 回退到指定提交
-
-# 撤销修改
-git checkout -- <file>
-
-# 推送到远程
-git push origin master
+git branch                    # Current branch
+git log --oneline            # Recent commits
+git add <files>
+git commit -m "message"
+git push origin <branch>
 ```

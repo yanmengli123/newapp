@@ -28,7 +28,7 @@ import {
   IconLink,
   IconEye,
 } from "@tabler/icons-react";
-import type { GenePageResponse, TranscriptResult, GOAnnotationsResponse, KEGGAnnotationsResponse } from "../lib/geneApi";
+import type { GenePageResponse, TranscriptResult, GOAnnotationsResponse, KEGGAnnotationsResponse, KEGGPathway } from "../lib/geneApi";
 import { getGenePage, getChromosome, getGeneGOAnnotations, getGeneKEGGAnnotations } from "../lib/geneApi";
 
 export default function GenePage() {
@@ -84,7 +84,7 @@ export default function GenePage() {
             const transformedKeggData = {
               ...keggData,
               total: keggData.total || keggData.summary?.pathway_count || pathways.length,
-              pathways: pathways.map((p: any) => ({
+              pathways: pathways.map((p: KEGGPathway) => ({
                 ...p,
                 kegg_link: p.official_link || p.kegg_link || ''
               }))

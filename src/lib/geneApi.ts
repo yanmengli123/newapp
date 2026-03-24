@@ -261,7 +261,8 @@ export interface KEGGPathway {
   pathway_id: string;
   pathway_name: string;
   pathway_class: string | null;
-  kegg_link: string;
+  kegg_link?: string;
+  official_link?: string;
 }
 
 export interface KEGGAnnotationsResponse {
@@ -419,3 +420,196 @@ export async function searchDomains(geneId: string): Promise<DomainSearchResult>
   }
   return response.json();
 }
+
+// ========== KEGG Pathways API ==========
+
+export interface KEGGPathwayItem {
+  pathway_id: string;
+  pathway_name: string;
+  pathway_class: string;
+  gene_count: number;
+  official_link: string;
+  image_url: string;
+}
+
+export interface KEGGPathwaysResponse {
+  total: number;
+  items: KEGGPathwayItem[];
+}
+
+export interface KEGGPathwayDetail {
+  pathway_id: string;
+  pathway_name: string;
+  pathway_class: string | null;
+  gene_count: number;
+  genes: Array<{
+    gene_id: string;
+    gene_symbol: string;
+    ncbi_gene_id: string | null;
+    gene_link: string;
+  }>;
+  official_link: string;
+  image_url: string;
+  mapdata_url: string;
+  interactive_url: string;
+}
+
+export interface KEGGPathwayInfo {
+  pathway_id: string;
+  pathway_name: string;
+  image_url: string;
+  official_link: string;
+  local_image_path: string;
+}
+
+export interface KEGGPathwayMapdata {
+  pathway_id: string;
+  pathway_name: string;
+  gene_count: number;
+  hotspots: Array<{
+    gene_id: string;
+    gene_symbol: string;
+    start: number;
+    end: number;
+    seqid: string;
+    strand: string;
+    color: string;
+  }>;
+  source: string;
+}
+
+export interface KEGGPathwayInteractive {
+  pathway_id: string;
+  pathway_name: string;
+  static_image: string;
+  official_link: string;
+  api_data: string;
+  message: string;
+}
+
+// List all KEGG pathways
+export async function getKEGGPathways(): Promise<KEGGPathwaysResponse> {
+  const response = await fetch(`${API_BASE}/annotations/kegg/pathways`);
+  if (!response.ok) {
+    throw new Error(`Failed to get KEGG pathways: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// Get KEGG pathway detail (genes in pathway)
+export async function getKEGGPathwayDetail(pathwayId: string): Promise<KEGGPathwayDetail> {
+  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}`);
+  if (!response.ok) {
+    throw new Error(`Pathway not found: ${pathwayId}`);
+  }
+  return response.json();
+}
+
+// Get KEGG pathway info
+export async function getKEGGPathwayInfo(pathwayId: string): Promise<KEGGPathwayInfo> {
+  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/info`);
+  if (!response.ok) {
+    throw new Error(`Pathway info not found: ${pathwayId}`);
+  }
+  return response.json();
+}
+
+// Get KEGG pathway mapdata (hotspot coordinates)
+export async function getKEGGPathwayMapdata(pathwayId: string): Promise<KEGGPathwayMapdata> {
+  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/mapdata`);
+  if (!response.ok) {
+    throw new Error(`Pathway mapdata not found: ${pathwayId}`);
+  }
+  return response.json();
+}
+
+// Get KEGG pathway interactive data
+export async function getKEGGPathwayInteractive(pathwayId: string): Promise<KEGGPathwayInteractive> {
+  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive`);
+  if (!response.ok) {
+    throw new Error(`Pathway interactive data not found: ${pathwayId}`);
+  }
+  return response.json();
+}
+
+// Build KEGG pathway image URL
+export function buildKEGGPathwayImageUrl(pathwayId: string): string {
+  return `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/image`;
+}
+
+// Build KEGG pathway image URL (kegg-images router)
+export function buildKEGGImageUrl(pathwayId: string): string {
+  return `${API_BASE}/kegg-images/${encodeURIComponent(pathwayId)}.png`;
+}
+
+// Get KEGG image info
+export async function getKEGGImageInfo(pathwayId: string): Promise<{
+  pathway_id: string;
+  image_url: string;
+  local_image_path: string;
+  file_exists: boolean;
+  file_size: number;
+}> {
+  const response = await fetch(`${API_BASE}/kegg-images/${encodeURIComponent(pathwayId)}/info`);
+  if (!response.ok) {
+    throw new Error(`KEGG image info not found: ${pathwayId}`);
+  }
+  return response.json();
+}
+
+// ========== KGML Cache API ==========
+
+export interface KGMLCacheStatus {
+  cache_enabled: boolean;
+  cache_dir: string;
+  cached_count: number;
+  total_size_bytes: number;
+  cached_files: string[];
+}
+
+export async function getKGMLCacheStatus(): Promise<KGMLCacheStatus> {
+  const response = await fetch(`${API_BASE}/annotations/kegg/kgml-cache/status`);
+  if (!response.ok) {
+    throw new Error(`Failed to get KGML cache status: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+export async function refreshKGMLCache(pathwayId?: string): Promise<{
+  success?: boolean;
+  pathway_id?: string;
+  refreshed?: number;
+  total?: number;
+  failed?: string[];
+}> {
+  const url = pathwayId
+    ? `${API_BASE}/annotations/kegg/kgml-cache/refresh/${encodeURIComponent(pathwayId)}`
+    : `${API_BASE}/annotations/kegg/kgml-cache/refresh`;
+  const response = await fetch(url, { method: 'POST' });
+  if (!response.ok) {
+    throw new Error(`KGML cache refresh failed: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// ========== Gene Sequences API ==========
+
+export interface GeneSequencesResponse {
+  gene_id: string;
+  mrna_sequence: string | null;
+  cds_sequence: string | null;
+  protein_sequence: string | null;
+}
+
+export async function getGeneSequences(geneId: string): Promise<GeneSequencesResponse> {
+  const searchResult = await searchGenes(geneId, 1);
+  if (searchResult.items.length > 0) {
+    geneId = searchResult.items[0].gene_id;
+  }
+  const response = await fetch(`${API_BASE}/genes/${encodeURIComponent(geneId)}/sequences`);
+  if (!response.ok) {
+    throw new Error(`Failed to get sequences: ${response.statusText}`);
+  }
+  return response.json();
+}
+

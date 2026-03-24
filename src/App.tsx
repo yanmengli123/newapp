@@ -12,6 +12,13 @@ import HomePage from './pages/HomePage';
 import JBrowsePage from './pages/JBrowsePage';
 import VizPage from './pages/VizPage';
 import ToolsPage from './pages/ToolsPage';
+import GenomeHomePage from './pages/GenomeHomePage';
+import GenomeFilesPage from './pages/GenomeFilesPage';
+import GenomeRunPage from './pages/GenomeRunPage';
+import GenomeJobsPage from './pages/GenomeJobsPage';
+import GenomeJobPage from './pages/GenomeJobPage';
+import GenomeResultPage from './pages/GenomeResultPage';
+import GenomeDownloadsPage from './pages/GenomeDownloadsPage';
 import ChatWidget from './components/chat/ChatWidget';
 
 export default function App() {
@@ -34,6 +41,13 @@ export default function App() {
             <Route path="/gene/:geneId" element={<GenePage />} />
             <Route path="/chromosome/:seqid" element={<ChromosomePage />} />
             <Route path="/tools" element={<ToolsPage />} />
+            <Route path="/genome" element={<GenomeHomePage />} />
+            <Route path="/genome/files" element={<GenomeFilesPage />} />
+            <Route path="/genome/run" element={<GenomeRunPage />} />
+            <Route path="/genome/jobs" element={<GenomeJobsPage />} />
+            <Route path="/genome/jobs/:jobId" element={<GenomeJobPage />} />
+            <Route path="/genome/jobs/:jobId/result" element={<GenomeResultPage />} />
+            <Route path="/genome/jobs/:jobId/downloads" element={<GenomeDownloadsPage />} />
           </Routes>
 
           <Divider my="xl" />

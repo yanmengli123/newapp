@@ -8,10 +8,12 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from config import GRCG6A_HMMER_DB
+
 logger = logging.getLogger(__name__)
 
 # Pfam 数据库路径
-PFAM_DB_PATH = Path("D:/jbrowsedata/projectdata/hmmer_db/Pfam-A.hmm")
+PFAM_DB_PATH = GRCG6A_HMMER_DB
 
 
 class DomainSearchRequest(BaseModel):

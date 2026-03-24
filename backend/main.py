@@ -20,17 +20,13 @@ from fastapi.staticfiles import StaticFiles
 from api.go_kegg_routes import router as go_kegg_router
 from api.go_kegg_routes import attach_annotations_to_gene_page
 from api.tool_routes import router as tool_router
+from api.genome_analysis_routes import router as genome_router
+from api.chat_router import router as chat_router
 
-# ========== 3. 全局配置（只定义一次，避免重复） ==========
-# 数据库路径
-DB_PATH = Path(os.getenv("GRCG6A_DB_PATH", r"D:\jbrowsedata\projectdata\grcg6a_nc.db")).resolve()
+# ========== 3. 全局配置（统一从 config.py 读取） ==========
+from config import GRCG6A_DB_PATH, GRCG6A_STATIC_ROOT, KEGG_IMAGE_DIR
 APP_TITLE = "GRCg6a Gene API"
 APP_VERSION = "0.1.0"
-
-# 静态文件配置
-STATIC_ROOT = Path(os.getenv("GRCG6A_STATIC_ROOT", r"D:\jbrowsedata\projectdata\static")).resolve()
-KEGG_IMAGE_DIR = STATIC_ROOT / "kegg_pathways"
-KEGG_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 # 日志配置（只配置一次）
 logging.basicConfig(
@@ -127,17 +123,17 @@ def order_segments_for_display(segments: list[dict[str, Any]], strand: str) -> l
 # ========== 5. App 生命周期（保留原有） ==========
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if not DB_PATH.exists():
-        raise RuntimeError(f"Database file not found: {DB_PATH}")
+    if not GRCG6A_DB_PATH.exists():
+        raise RuntimeError(f"Database file not found: {GRCG6A_DB_PATH}")
 
-    gff_conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    gff_conn = sqlite3.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
     gff_db = gffutils.FeatureDB(gff_conn, keep_order=True)
-    sql_conn = open_sqlite_ro(DB_PATH)
+    sql_conn = open_sqlite_ro(GRCG6A_DB_PATH)
     sql_write_conn = None
     try:
-        sql_write_conn = open_sqlite_rw(DB_PATH)
+        sql_write_conn = open_sqlite_rw(GRCG6A_DB_PATH)
     except Exception:
-        logger.exception("Failed to open writable SQLite connection for %s", DB_PATH)
+        logger.exception("Failed to open writable SQLite connection for %s", GRCG6A_DB_PATH)
 
     gene_index_by_id: dict[str, dict[str, Any]] = {}
     gene_index_by_symbol: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -195,7 +191,7 @@ app = FastAPI(
 )
 
 # ========== 7. 挂载静态目录（只挂载一次） ==========
-app.mount("/static", StaticFiles(directory=str(STATIC_ROOT)), name="static")
+app.mount("/static", StaticFiles(directory=str(GRCG6A_STATIC_ROOT)), name="static")
 
 # ========== 8. 注册自定义路由（仅保留go_kegg_router） ==========
 app.include_router(go_kegg_router)
@@ -209,6 +205,12 @@ from api.kegg_image_router import kegg_image_router
 
 # 注册新路由（关键！）
 app.include_router(kegg_image_router)
+# 注册基因组分析路由
+app.include_router(genome_router)
+
+# 注册聊天路由
+app.include_router(chat_router)
+
 # ========== 9. CORS 中间件 ==========
 app.add_middleware(
     CORSMiddleware,
@@ -457,7 +459,7 @@ def root(request: Request):
     return {
         "name": APP_TITLE,
         "version": APP_VERSION,
-        "db_path": str(DB_PATH),
+        "db_path": str(GRCG6A_DB_PATH),
         "gene_count": len(state.gene_index_by_id),
         "chromosome_count": len(state.chromosomes),
         "docs": "/docs",
@@ -469,7 +471,7 @@ def health(request: Request):
     row = state.sql.execute("SELECT COUNT(*) AS n FROM chromosome").fetchone()
     return {
         "ok": True,
-        "db_path": str(DB_PATH),
+        "db_path": str(GRCG6A_DB_PATH),
         "chromosome_rows": row["n"],
         "gene_count": len(state.gene_index_by_id),
     }

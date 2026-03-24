@@ -1,14 +1,17 @@
-# D:\jbrowsedata\projectdata\api\kegg_image_router.py
+"""KEGG pathway image serving router."""
+
 from __future__ import annotations
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
 
-# 新建独立路由（避免和原有路由冲突）
+from config import GRCG6A_STATIC_ROOT
+
+# Served at /kegg-images/
 kegg_image_router = APIRouter(prefix="/kegg-images", tags=["kegg-images"])
 
-# 硬编码图片目录（和你的路径一致）
-KEGG_IMAGE_DIR = Path(r"D:\jbrowsedata\projectdata\static\kegg_pathways")
+KEGG_IMAGE_DIR = GRCG6A_STATIC_ROOT / "kegg_pathways"
 
 
 @kegg_image_router.get("/{pathway_id}.png")
@@ -27,7 +30,6 @@ def get_kegg_image_direct(pathway_id: str):
     )
 
 
-# 保留JSON信息接口（可选）
 @kegg_image_router.get("/{pathway_id}/info")
 def get_kegg_image_info(pathway_id: str):
     image_path = KEGG_IMAGE_DIR / f"{pathway_id}.png"

@@ -1,5 +1,5 @@
 import { Box, Button, Container, Group, Text, ThemeIcon, Menu } from "@mantine/core";
-import { IconDna, IconTool, IconBox } from "@tabler/icons-react";
+import { IconDna, IconTool, IconBox, IconChartBar } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
 function HeaderNav() {
@@ -14,6 +14,36 @@ function HeaderNav() {
       <Button variant="subtle" component={Link} to="/jbrowse">
         JBrowse
       </Button>
+      <Menu shadow="md" width={220}>
+        <Menu.Target>
+          <Button variant="subtle" leftSection={<IconChartBar size={16} />}>
+            Genome Analysis
+          </Button>
+        </Menu.Target>
+
+        <Menu.Dropdown>
+          <Menu.Label>Genome Analysis</Menu.Label>
+          <Menu.Item component={Link} to="/genome" leftSection={<IconChartBar size={14} />}>
+            Overview
+          </Menu.Item>
+          <Menu.Item component={Link} to="/genome/files" leftSection={<IconBox size={14} />}>
+            Files
+          </Menu.Item>
+          <Menu.Item component={Link} to="/genome/jobs" leftSection={<IconBox size={14} />}>
+            Jobs
+          </Menu.Item>
+          <Menu.Item component={Link} to="/genome/run" leftSection={<IconBox size={14} />}>
+            Run Analysis
+          </Menu.Item>
+          <Menu.Divider />
+          <Menu.Item component={Link} to="/genome/jobs/sample/result" leftSection={<IconChartBar size={14} />}>
+            Sample Results
+          </Menu.Item>
+          <Menu.Item component={Link} to="/genome/jobs/sample/downloads" leftSection={<IconBox size={14} />}>
+            Sample Downloads
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
       <Menu shadow="md" width={200}>
         <Menu.Target>
           <Button variant="subtle" leftSection={<IconTool size={16} />}>
