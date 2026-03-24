@@ -17,6 +17,7 @@ KEGG_PNG_DIR = GRCG6A_STATIC_ROOT / "kegg_pathways"
 
 def _get_asset_path(pathway_id: str) -> tuple[Path, bool]:
     """从 kegg_pathway_asset 表获取实际 PNG 路径，返回 (Path, exists)"""
+    from config import GRCG6A_STATIC_ROOT
     conn = sqlite3.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     row = conn.execute(
@@ -26,7 +27,11 @@ def _get_asset_path(pathway_id: str) -> tuple[Path, bool]:
     conn.close()
 
     if row and row["png_relpath"]:
-        return Path(row["png_relpath"]), True
+        # png_relpath 格式: "static\kegg_pathways\{id}.png"，相对路径
+        # 拼接 GRCG6A_STATIC_ROOT 的父目录（项目根目录）
+        project_root = GRCG6A_STATIC_ROOT.parent
+        relpath = row["png_relpath"].replace("\\", "/")
+        return project_root / relpath, True
     return KEGG_PNG_DIR / f"{pathway_id}.png", False
 
 

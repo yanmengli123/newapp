@@ -66,7 +66,10 @@ def get_kegg_pathway_image(pathway_id: str):
     conn.close()
 
     if row and row["png_relpath"]:
-        image_path = Path(row["png_relpath"])
+        # png_relpath 格式: "static\kegg_pathways\{id}.png"，相对项目根目录
+        project_root = GRCG6A_STATIC_ROOT.parent
+        relpath = row["png_relpath"].replace("\\", "/")
+        image_path = project_root / relpath
     else:
         image_path = KEGG_PNG_DIR / f"{pathway_id}.png"
 

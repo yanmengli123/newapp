@@ -73,7 +73,7 @@ export default function KeggPathwayCard({ pathway, geneId }: KeggPathwayCardProp
       <KeggInteractiveViewer
         pathwayId={pathway.pathway_id}
         pathwayName={pathway.pathway_name}
-        pngUrl={pathway.png_url || `/static/kegg_pathways/${pathway.pathway_id}.png`}
+        pngUrl={`/kegg-images/${pathway.pathway_id}.png`}
         geneId={geneId}
         opened={viewerOpen}
         onClose={closeViewer}
