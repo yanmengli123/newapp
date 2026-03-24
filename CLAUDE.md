@@ -72,7 +72,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /genes/{gene_id}` — 基因详情
 - `GET /genes/{gene_id}/transcripts` — 转录本
 - `GET /genes/{gene_id}/sequences` — 序列
-- `GET /genes/{gene_id}/page` — 完整基因页面（含GO/KEGG）
+- `GET /genes/{gene_id}/page` — 完整基因页面（**不包含 GO/KEGG 注释**，前端通过 `getGeneKEGGAnnotations` 单独加载）
 
 ### GO/KEGG Annotations (11, prefix `/annotations`)
 - `GET /annotations/go/{gene_id}` — GO 注释
@@ -186,7 +186,7 @@ python scripts/import_kegg_kgml_cache.py --dry-run
 - `genes[]`：含 `kegg_gene_id`、`gene_symbol`、`in_pathway`（是否通路注释基因）
 - `highlighted`：节点是否包含通路注释基因（用于热区着色）
 
-**`/gene/page` KEGG 整合字段**：每条 pathway 含 `png_url`、`kgml_url`、`mapdata_api`、`interactive_api`（来自 kegg_pathway_asset）
+**前端 KEGG 数据加载**：GenePage 通过 `getGeneKEGGAnnotations(geneId)` 调用 `/annotations/kegg/{gene_id}` 获取通路列表，每个 `pathway` 含 `png_url`（`/static/kegg_pathways/`）、`mapdata_api`、`interactive_api`。**注意**：`/annotations/kegg/{gene_id}` 中若 `pathway_class` 为空，会逐个向 KEGG REST API 请求分类，对 MAPK1（29 条通路）等多通路基因接口响应较慢。
 
 ### Sample Results (pre-generated)
 Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition_bar, assembly_contig_length_bar, assembly_length_histogram, cds_gc123_bar, cds_length_distribution, cds_start_codon_bar, gene_length_distribution, genome_gc_window_line, gff_biotype_bar, gff_feature_type_bar, protein_length_distribution, plus additional charts per job. Interactive HTML via Plotly.
