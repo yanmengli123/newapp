@@ -40,3 +40,58 @@
 .read-the-docs {
   color: #888;
 }
+
+/* ============================================
+   KEGG Pathway Interactive Viewer Styles
+   ============================================ */
+
+/* 脉冲动画：高亮节点呼吸灯效果 */
+@keyframes kegg-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+.kegg-pulse-ring {
+  animation: kegg-pulse 1.8s ease-in-out infinite;
+}
+
+/* 容器：防止 SVG overlay 溢出 */
+.kegg-viewer-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* 高亮节点：红色描边 + 半透明填充 */
+.kegg-node-highlighted rect {
+  stroke: #ff4d4f;
+  stroke-width: 2px;
+  fill: rgba(255, 80, 80, 0.2);
+  filter: drop-shadow(0 0 4px rgba(255, 80, 80, 0.5));
+}
+
+/* 普通节点 hover：轻微蓝色描边 */
+.kegg-node-normal:hover rect {
+  stroke: rgba(0, 120, 215, 0.6);
+  stroke-width: 1.5px;
+  fill: rgba(0, 120, 215, 0.08);
+  cursor: pointer;
+}
+
+/* SVG overlay pointer events */
+.kegg-svg-overlay {
+  pointer-events: all;
+}
+
+.kegg-svg-overlay rect {
+  cursor: pointer;
+  transition: stroke 0.15s ease, fill 0.15s ease;
+}

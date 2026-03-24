@@ -12,8 +12,6 @@ import {
   Button,
   Accordion,
   Anchor,
-  Modal,
-  Image,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -25,11 +23,16 @@ import {
   IconSquare,
   IconDna2,
   IconApi,
-  IconLink,
-  IconEye,
 } from "@tabler/icons-react";
-import type { GenePageResponse, TranscriptResult, GOAnnotationsResponse, KEGGAnnotationsResponse, KEGGPathway } from "../lib/geneApi";
+import type {
+  GenePageResponse,
+  TranscriptResult,
+  GOAnnotationsResponse,
+  KEGGAnnotationsResponse,
+  KEGGPathway,
+} from "../lib/geneApi";
 import { getGenePage, getChromosome, getGeneGOAnnotations, getGeneKEGGAnnotations } from "../lib/geneApi";
+import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -41,8 +44,6 @@ export default function GenePage() {
   const [loading, setLoading] = useState(true);
   const [downloadingFasta, setDownloadingFasta] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pathwayModalOpen, setPathwayModalOpen] = useState(false);
-  const [selectedPathway, setSelectedPathway] = useState<{id: string; name: string} | null>(null);
 
   useEffect(() => {
     if (!geneId) return;
@@ -105,12 +106,6 @@ export default function GenePage() {
 
     fetchGene();
   }, [geneId]);
-
-  // Open pathway image modal
-  const viewPathwayImage = useCallback((pathwayId: string, pathwayName: string) => {
-    setSelectedPathway({ id: pathwayId, name: pathwayName });
-    setPathwayModalOpen(true);
-  }, []);
 
   // Download FASTA file
   const downloadFasta = useCallback(async () => {
@@ -539,51 +534,13 @@ export default function GenePage() {
         )}
       </Paper>
 
-      {/* KEGG Pathways */}
-      {keggAnnotations && keggAnnotations.pathways && keggAnnotations.pathways.length > 0 && (
-        <Paper withBorder radius="xl" p="xl">
-          <Group gap="sm" mb="md">
-            <IconLink size={20} color="var(--mantine-color-teal-6)" />
-            <Title order={4}>KEGG Pathways</Title>
-          </Group>
-
-          <Stack gap="sm">
-            {keggAnnotations.pathways.map((pathway) => (
-              <Card key={pathway.pathway_id} withBorder padding="sm" radius="md">
-                <Group justify="space-between">
-                  <Box>
-                    <Text size="sm" fw={500}>
-                      {pathway.pathway_name}
-                    </Text>
-                    <Text size="xs" c="dimmed">
-                      {pathway.pathway_id}
-                    </Text>
-                  </Box>
-                  <Group gap="xs">
-                    <Button
-                      variant="light"
-                      size="xs"
-                      leftSection={<IconEye size={14} />}
-                      onClick={() => viewPathwayImage(pathway.pathway_id, pathway.pathway_name)}
-                    >
-                      View Pathway
-                    </Button>
-                    <Anchor
-                      href={pathway.kegg_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <Badge variant="light" color="teal">
-                        KEGG
-                      </Badge>
-                    </Anchor>
-                  </Group>
-                </Group>
-              </Card>
-            ))}
-          </Stack>
-        </Paper>
-      )}
+      {/* KEGG Pathways (Interactive KGML Viewer) */}
+      {keggAnnotations && (keggAnnotations.pathways?.length || keggAnnotations.items?.length) ? (
+        <KeggPathwaysSection
+          keggAnnotations={keggAnnotations}
+          geneId={data?.gene.gene_id || geneId || ""}
+        />
+      ) : null}
 
       {/* Transcripts */}
       <Paper withBorder radius="xl" p="xl">
@@ -827,49 +784,7 @@ export default function GenePage() {
       </Paper>
 
       {/* KEGG Pathway Image Modal */}
-      <Modal
-        opened={pathwayModalOpen}
-        onClose={() => setPathwayModalOpen(false)}
-        title={selectedPathway?.name || "KEGG Pathway"}
-        size="xl"
-        centered
-      >
-        {selectedPathway && (
-          <Box>
-            <Image
-              src={`http://localhost:8000/kegg-images/${selectedPathway.id}.png`}
-              alt={selectedPathway.name}
-              radius="md"
-              mah={600}
-              style={{ background: '#f8f9fa' }}
-            />
-            <Text c="dimmed" size="xs" mt="xs">
-              If image is not available,{' '}
-              <Anchor
-                href={`https://www.kegg.jp/kegg-bin/show_pathway?map=${selectedPathway.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                view on KEGG website
-              </Anchor>
-            </Text>
-            <Group justify="space-between" mt="md">
-              <Text size="xs" c="dimmed">
-                Pathway ID: {selectedPathway.id}
-              </Text>
-              <Anchor
-                href={`https://www.kegg.jp/kegg-bin/show_pathway?map=${selectedPathway.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="light" size="xs">
-                  Open in KEGG
-                </Button>
-              </Anchor>
-            </Group>
-          </Box>
-        )}
-      </Modal>
+      {/* (已迁移到 KeggInteractiveViewer，通过 KeggPathwaysSection 打开) */}
     </Stack>
   );
 }

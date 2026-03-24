@@ -548,6 +548,9 @@ export interface KEGGPathwayMapdata {
 export interface KEGGPathwayInteractive {
   pathway_id: string;
   pathway_name: string;
+  png_width: number;
+  png_height: number;
+  target_gene?: string;
   static_image: string;
   official_link: string;
   mapdata_api: string;
@@ -597,6 +600,17 @@ export async function getKEGGPathwayMapdata(pathwayId: string): Promise<KEGGPath
 // Get KEGG pathway interactive data
 export async function getKEGGPathwayInteractive(pathwayId: string): Promise<KEGGPathwayInteractive> {
   const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive`);
+  if (!response.ok) {
+    throw new Error(`Pathway interactive data not found: ${pathwayId}`);
+  }
+  return response.json();
+}
+
+/** 带 gene_id 参数，获取目标基因高亮信息 */
+export async function getKEGGPathwayInteractiveForGene(pathwayId: string, geneId: string): Promise<KEGGPathwayInteractive & { target_gene?: string }> {
+  const response = await fetch(
+    `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive?gene_id=${encodeURIComponent(geneId)}`
+  );
   if (!response.ok) {
     throw new Error(`Pathway interactive data not found: ${pathwayId}`);
   }

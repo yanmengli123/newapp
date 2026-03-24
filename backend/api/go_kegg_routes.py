@@ -515,8 +515,8 @@ def get_kegg_pathway_mapdata(pathway_id: str, request: Request):
 
 
 @router.get("/kegg/pathway/{pathway_id}/interactive")
-def get_kegg_pathway_interactive(pathway_id: str, request: Request):
-    """获取通路可交互 HTML 渲染所需的完整数据"""
+def get_kegg_pathway_interactive(pathway_id: str, request: Request, gene_id: str | None = None):
+    """获取通路可交互 HTML 渲染所需的完整数据。gene_id 用于返回目标基因信息。"""
     conn = get_sql(request)
 
     asset_row = conn.execute(
@@ -527,14 +527,27 @@ def get_kegg_pathway_interactive(pathway_id: str, request: Request):
     if not asset_row:
         raise HTTPException(status_code=404, detail=f"Pathway not found: {pathway_id}")
 
+    # 解析目标基因
+    target_gene: str | None = None
+    if gene_id:
+        row = conn.execute(
+            "SELECT gene_symbol FROM gene_xref WHERE gene_id = ?",
+            (gene_id,),
+        ).fetchone()
+        if row:
+            target_gene = row["gene_symbol"]
+
     kgml_file = KEGG_KGML_DIR / f"{pathway_id}.kgml"
-    kgml_content = None
+    kgml_content: str | None = None
     if kgml_file.exists():
         kgml_content = kgml_file.read_text(encoding="utf-8", errors="replace")
 
     return {
         "pathway_id": pathway_id,
         "pathway_name": asset_row["pathway_name"],
+        "png_width": 0,   # 前端从 mapdata 获取实际宽高
+        "png_height": 0,
+        "target_gene": target_gene,
         "static_image": f"/annotations/kegg/pathway/{pathway_id}/image",
         "official_link": kegg_pathway_url(pathway_id),
         "mapdata_api": f"/annotations/kegg/pathway/{pathway_id}/mapdata",
@@ -542,7 +555,7 @@ def get_kegg_pathway_interactive(pathway_id: str, request: Request):
         "info_api": f"/annotations/kegg/pathway/{pathway_id}/info",
         "kgml_available": kgml_content is not None,
         "kgml_preview": kgml_content[:500] + "..." if kgml_content and len(kgml_content) > 500 else kgml_content,
-        "message": "使用 mapdata_api 获取节点坐标进行 SVG/Canvas 叠加渲染",
+        "message": "使用 mapdata_api 获取节点坐标进行 SVG 叠加渲染",
     }
 
 
