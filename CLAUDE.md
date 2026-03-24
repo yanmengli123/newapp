@@ -81,7 +81,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /annotations/kegg/pathway/{pathway_id}` — 通路详情（含成员基因）
 - `GET /annotations/kegg/pathway/{pathway_id}/info` — 通路元信息（来自 kegg_pathway_asset）
 - `GET /annotations/kegg/pathway/{pathway_id}/image` — 通路 PNG 图片
-- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 节点坐标 JSON（含 nodes 数组）
+- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 节点坐标 JSON（含 nodes 数组）；**支持 `?gene_id=` 参数**高亮特定基因在图中的所有出现位置
 - `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML 数据（支持 `?gene_id=` 查询目标基因）
 - `GET /annotations/kegg/kgml-cache/status` — KGML 缓存状态
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
@@ -180,13 +180,21 @@ python scripts/import_kegg_kgml_cache.py --pathway-id gga00010 --replace
 python scripts/import_kegg_kgml_cache.py --dry-run
 ```
 
+**预填充 `pathway_class`**：`backend/scripts/fetch_kegg_pathway_class.py`
+```bash
+# 填充所有空值 pathway_class（195 条，含 9 条 Overview 推导值 + gga04977）
+cd backend && python scripts/fetch_kegg_pathway_class.py
+```
+
 **`/mapdata` 返回格式**（`nodes` 数组，每节点含）：
 - `left/top/right/bottom`：前端可直接用的像素坐标
 - `graphics_type`：rectangle / circle / line 等
 - `genes[]`：含 `kegg_gene_id`、`gene_symbol`、`in_pathway`（是否通路注释基因）
-- `highlighted`：节点是否包含通路注释基因（用于热区着色）
+- `highlighted`：节点是否为当前查询基因的标注（**两层兜底**：① label 模糊匹配基因名 ② kegg_gene_id 映射；两者满足其一即高亮，覆盖 KEGG 同一基因多处出现但部分无数据库映射的情况）
 
-**前端 KEGG 数据加载**：GenePage 通过 `getGeneKEGGAnnotations(geneId)` 调用 `/annotations/kegg/{gene_id}` 获取通路列表，每个 `pathway` 含 `png_url`（`/static/kegg_pathways/`）、`mapdata_api`、`interactive_api`。**注意**：`/annotations/kegg/{gene_id}` 中若 `pathway_class` 为空，会逐个向 KEGG REST API 请求分类，对 MAPK1（29 条通路）等多通路基因接口响应较慢。
+**前端 KEGG 数据加载**：GenePage 通过 `getGeneKEGGAnnotations(geneId)` 调用 `/annotations/kegg/{gene_id}` 获取通路列表，每个 `pathway` 含 `png_url`（`/static/kegg_pathways/`）、`mapdata_api`、`interactive_api`。
+
+> **注意**：`pathway_class` 字段已预填充至全部 195 条通路（`backend/scripts/fetch_kegg_pathway_class.py`），无需实时请求 KEGG REST API，接口响应极快。9 条 Overview 类通路（gga01100 等）的 class 为 `"Metabolism; Global/Overview maps"` 推导值。
 
 ### Sample Results (pre-generated)
 Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition_bar, assembly_contig_length_bar, assembly_length_histogram, cds_gc123_bar, cds_length_distribution, cds_start_codon_bar, gene_length_distribution, genome_gc_window_line, gff_biotype_bar, gff_feature_type_bar, protein_length_distribution, plus additional charts per job. Interactive HTML via Plotly.
@@ -200,7 +208,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
 - **Genome analysis**: `/genome/analysis/run` submits jobs; `/genome/sample/*` serves pre-generated results without running analysis.
 - **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
-- **KEGG Interactive Viewer**: PNG + SVG overlay via `viewBox` matching original image dimensions (`png_width`/`png_height`), `preserveAspectRatio="xMidYMid meet"` for responsive scaling. CSS pulse animation: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }` (defined in `App.css`).
+- **KEGG Interactive Viewer**：PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 传入 geneId 确保只高亮当前基因的所有出现位置。对齐：wrapper `display:inline-block` 由 img 撑开，img `width:100%; height:auto`，SVG `position:absolute; inset:0` 覆盖 img 实测尺寸，`viewBox` 使用 PNG 原始像素坐标，`ResizeObserver` 监听 img 尺寸变化保证全屏/缩放下坐标始终对齐。全屏 `requestFullscreen()` + ESC 退出。highlighted 判断：label 模糊匹配（entry_name 含基因名）+ kegg_gene_id 映射兜底。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
 - **KEGG image paths**: `_get_asset_path()` in `kegg_image_router.py` resolves `png_relpath` using `GRCG6A_STATIC_ROOT.parent` (project root), not filesystem root.
 
 ## Git
