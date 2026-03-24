@@ -152,35 +152,77 @@ def load_gene_go(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
 
 # ========== KEGG Annotations ==========
 
+from functools import lru_cache
+
+@lru_cache(maxsize=500)
 def fetch_kegg_pathway_class(pathway_id: str) -> str | None:
-    """从 KEGG REST API 获取通路分类"""
+    """
+    获取通路分类：库优先 → API 兜底 → 自动回写数据库
+
+    策略：
+    - 优先从 kegg_pathway_asset.pathway_class 读取（已预填充则零 IO）
+    - 为空时请求 KEGG REST API（每个通路只请求一次，lru_cache 保护）
+    - API 请求成功时自动回写 kegg_pathway_asset 表
+    - 预填充脚本可批量预热全部 195 条通路
+
+    KGML 文件不含 CLASS 信息，故必须走 API。
+    """
+    from config import GRCG6A_DB_PATH
+
+    # 1. 查数据库（kegg_pathway_asset）
+    db_conn = sqlite3.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
+    db_conn.row_factory = sqlite3.Row
+    row = db_conn.execute(
+        "SELECT pathway_class FROM kegg_pathway_asset WHERE pathway_id = ?",
+        (pathway_id,),
+    ).fetchone()
+    db_conn.close()
+
+    if row and row["pathway_class"]:
+        return row["pathway_class"]
+
+    # 2. 缓存未命中，请求 KEGG REST API
     url = f"{KEGG_BASE}/get/{pathway_id}"
     try:
-        with urlopen(url, timeout=5) as resp:
+        with urlopen(url, timeout=10) as resp:
             body = resp.read().decode("utf-8", errors="replace")
     except (HTTPError, URLError, Exception):
-        logger.exception("Failed to fetch KEGG pathway class for %s", pathway_id)
+        logger.warning("Failed to fetch KEGG class for %s", pathway_id)
         return None
 
-    current_value: str | None = None
+    # 解析 CLASS 行（支持多行续接）
+    # 格式: CLASS       1. Carbohydrate Metabolism; Energy Metabolism
     collected: list[str] = []
+    in_class = False
     for raw_line in body.splitlines():
         if raw_line.startswith("CLASS"):
-            current_value = raw_line[12:].strip()
-            if current_value:
-                collected.append(current_value)
+            in_class = True
+            value = raw_line[12:].strip()
+            if value:
+                collected.append(value)
             continue
-        if collected and raw_line.startswith("            "):
-            continuation = raw_line.strip()
-            if continuation:
-                collected.append(continuation)
-            continue
-        if collected:
-            break
+        if in_class:
+            if raw_line and raw_line[0] in (" ", "\t"):
+                cont = raw_line.strip()
+                if cont:
+                    collected.append(cont)
+            else:
+                break
 
-    if not collected:
-        return None
-    return " | ".join(collected)
+    pathway_class = " | ".join(collected) if collected else None
+
+    # 3. API 成功 → 回写数据库（避免下次再请求）
+    if pathway_class:
+        db_conn2 = sqlite3.connect(str(GRCG6A_DB_PATH), check_same_thread=False)
+        db_conn2.execute(
+            "UPDATE kegg_pathway_asset SET pathway_class = ? WHERE pathway_id = ?",
+            (pathway_class, pathway_id),
+        )
+        db_conn2.commit()
+        db_conn2.close()
+        logger.info("Cached pathway class for %s: %s", pathway_id, pathway_class[:50])
+
+    return pathway_class
 
 
 def load_gene_kegg(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
@@ -203,7 +245,7 @@ def load_gene_kegg(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
         SELECT DISTINCT
             p.pathway_id,
             p.pathway_name,
-            p.pathway_class,
+            a.pathway_class,
             a.png_url,
             a.png_width,
             a.png_height,
@@ -218,9 +260,8 @@ def load_gene_kegg(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
 
     items: list[dict[str, Any]] = []
     for r in rows:
-        pathway_class = r["pathway_class"]
-        if not pathway_class:
-            pathway_class = fetch_kegg_pathway_class(r["pathway_id"])
+        # 优先从 kegg_pathway_asset 读取；fetch_kegg_pathway_class 会自动补全并缓存
+        pathway_class = r["pathway_class"] or fetch_kegg_pathway_class(r["pathway_id"])
 
         kgml_filename = r["kgml_filename"] or f"{r['pathway_id']}.kgml"
 
