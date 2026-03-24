@@ -47,8 +47,8 @@ export default function KeggInteractiveViewer({
       .finally(() => setLoading(false));
   }, [opened, pathwayId]);
 
-  // 监听 img 渲染到容器后的实际像素尺寸（而非 naturalWidth/naturalHeight）
-  // 关键：wrapper 必须精确等于图片渲染后的像素尺寸，这样 SVG 100%/100% 才与图片像素一一对应
+  // 监听 img 渲染到容器后的实际像素尺寸
+  // 关键：用 getBoundingClientRect() 测量 img 的实际渲染尺寸，而非 wrapper 的 CSS 尺寸
   useEffect(() => {
     const img = imgRef.current;
     if (!img) return;
@@ -109,16 +109,15 @@ export default function KeggInteractiveViewer({
           </Group>
         </Box>
 
-        {/* Viewer area */}
+        {/* Viewer area — 限制最大宽度，图片在内部自适应 */}
         <Box
           style={{
             flex: 1,
             overflow: "auto",
             background: "#f8f9fa",
             borderRadius: 8,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            // 限制最大宽度，图片不会超出容器
+            maxWidth: "100%",
           }}
         >
           {loading && (
@@ -194,13 +193,14 @@ export default function KeggInteractiveViewer({
 // ViewArea — 核心渲染：严格像素对齐的 PNG + SVG overlay
 //
 // 对齐策略（彻底解决 SVG/PNG 缩放不一致问题）：
-// 1. 外层 wrapper 精确等于 img 渲染到容器后的实际像素尺寸（getBoundingClientRect）
-// 2. img 用 width:100% / height:100% 填充 wrapper（精确匹配）
-// 3. SVG 也用 width:100% / height:100% 填充 wrapper（与 img 完全相同缩放）
+// 1. wrapper 不设置固定 width/height，完全由内容（img）撑开
+// 2. img 使用 width:100% + height:auto，自适应容器宽度（保持比例）
+// 3. SVG overlay 用 position:absolute + inset:0 填满 img 实际渲染区域
+//    → SVG 的 width/height = img 的实际渲染像素尺寸（实测）
 // 4. SVG viewBox = PNG 原始像素尺寸（png_width x png_height）
 //    → SVG 内部坐标系 = PNG 原始像素坐标
-//    → 所有 rect 的 x/y/width/height 直接用后端返回的 left/top/width/height
-// 5. wrapper/maxWidth 限制最大宽度，height:auto 保持比例
+//    → 所有 rect 的 x=left, y=top, width, height 直接用后端返回值
+// 5. img 和 SVG 的渲染区域完全相同 → 缩放比例完全一致 → 坐标精确对齐
 // ============================================================
 interface ViewAreaProps {
   mapdata: KEGGPathwayMapdata;
@@ -214,56 +214,49 @@ interface ViewAreaProps {
 function ViewArea({ mapdata, pngUrl, imgRef, renderedSize, hoveredNode, onHover }: ViewAreaProps) {
   const { png_width: pngW, png_height: pngH, nodes } = mapdata;
 
-  // 容器最大宽度，防止溢出（与 img max-width 配合）
-  const MAX_WIDTH = 900;
-
   return (
     <div
       style={{
         position: "relative",
-        // wrapper 精确等于 img 渲染后的尺寸
-        width: renderedSize.w > 0 ? renderedSize.w : pngW,
-        height: renderedSize.h > 0 ? renderedSize.h : pngH,
-        // 超出容器时滚动
-        overflow: "hidden",
-        // 限制最大尺寸
-        maxWidth: MAX_WIDTH,
+        // 不设固定 width/height，完全由 img 内容撑开
+        // img width:100% + height:auto → 自适应容器宽度，保持原图比例
+        display: "inline-block",
         lineHeight: 0,
       }}
     >
-      {/* 底层 PNG 图片：width/height:100% 填充 wrapper */}
+      {/* 底层 PNG 图片：width:100% 自适应，height:auto 保持比例 */}
+      {/* 这里不用 width/height:100%，因为外层没有固定尺寸 */}
       <img
         ref={imgRef}
         src={`http://localhost:8000${pngUrl}`}
         alt={mapdata.pathway_name}
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
           display: "block",
+          width: "100%",        // 填满容器宽度
+          height: "auto",       // 保持原图宽高比
+          // maxWidth 防止超出容器（重要！）
+          maxWidth: "100%",
         }}
         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
       />
 
-      {/* SVG Overlay：与 img 完全重合，像素级对齐 */}
+      {/* SVG Overlay：position:absolute + inset:0 精确覆盖 img 的实际渲染区域 */}
+      {/* 宽高由 img 的实际渲染尺寸决定（实测 renderedSize），与 viewBox 坐标系对应 */}
       <svg
         style={{
           position: "absolute",
           top: 0,
           left: 0,
-          width: "100%",
-          height: "100%",
+          // SVG 宽高 = img 实际渲染像素尺寸
+          width: renderedSize.w > 0 ? renderedSize.w : "100%",
+          height: renderedSize.h > 0 ? renderedSize.h : "auto",
           overflow: "visible",
           background: "transparent",
           // SVG 本身不拦截事件，由内部 <rect> 接管
           pointerEvents: "none",
         }}
-        // viewBox 使用 PNG 原始像素坐标系
-        // 所有 rect 的 x=left, y=top, width, height 直接用后端返回值
         viewBox={`0 0 ${pngW} ${pngH}`}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
       >
         {/* 渲染所有节点（highlighted 只决定样式，不决定是否渲染） */}
         {nodes.map((node) => {
@@ -273,12 +266,13 @@ function ViewArea({ mapdata, pngUrl, imgRef, renderedSize, hoveredNode, onHover 
           const hasLink = Boolean(node.link_url);
 
           // ========== 直接使用后端返回的坐标，不做任何二次计算 ==========
+          // 后端返回的 left/top 已经是绝对像素坐标（基于 PNG 原始尺寸）
           const x = node.left;
           const y = node.top;
           const w = node.width;
           const h = node.height;
 
-          // ========== 样式 ==========
+          // ========== 样式计算 ==========
           // 高亮节点：红色边框 + 半透明红填充 + 脉冲动画
           // 普通节点：几乎全透明填充（确保 pointer-events 生效），hover 时浅蓝描边
           const fillColor = isHighlighted
