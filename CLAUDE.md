@@ -32,18 +32,19 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **Pages** — `src/pages/` (route targets in App.tsx)
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
   - `GeneQueryPage` — Autocomplete gene search
-  - `GenePage` — Gene detail: transcripts, exons, CDS, GO, KEGG
+  - `GenePage` — Gene detail: transcripts, exons, CDS, GO (Accordion折叠卡片), KEGG, Expression (FPKM/TPM表格)
   - `ChromosomePage` — Chromosome view with gene list
   - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis), `src/lib/chatApi.ts` (chat)
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器)
+- **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)
 - **config.py** — Centralized path configuration. All modules import from here; no hardcoded `D:\jbrowsedata\projectdata` paths allowed.
-- **main.py** — FastAPI app, lifespan context (opens gffutils + SQLite), registers all routers
+- **main.py** — FastAPI app, lifespan context (opens gffutils + SQLite + PostgreSQL pool), registers all routers
 - **api/** — Route modules:
   - `go_kegg_routes.py` — Gene/GO/KEGG endpoints (**registered**, prefix `/annotations`)
   - `kegg_image_router.py` — KEGG pathway image serving via `_get_asset_path()` (**registered**, prefix `/kegg-images`)
@@ -62,7 +63,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 
 ## Backend Endpoints
 
-### Core Gene API (10)
+### Core Gene API (11)
 - `GET /` — API 根信息
 - `GET /health` — 健康检查
 - `GET /chromosomes` — 染色体列表
@@ -72,7 +73,8 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /genes/{gene_id}` — 基因详情
 - `GET /genes/{gene_id}/transcripts` — 转录本
 - `GET /genes/{gene_id}/sequences` — 序列
-- `GET /genes/{gene_id}/page` — 完整基因页面（**不包含 GO/KEGG 注释**，前端通过 `getGeneKEGGAnnotations` 单独加载）
+- `GET /genes/{gene_id}/page` — 完整基因页面（含 annotations.go / annotations.kegg / expression）
+- `GET /genes/{gene_id}/expression` — 独立表达数据端点（FPKM + TPM，36 样本）
 
 ### GO/KEGG Annotations (11, prefix `/annotations`)
 - `GET /annotations/go/{gene_id}` — GO 注释
@@ -134,8 +136,53 @@ All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowse
 | `GRCG6A_GENOME_OUTPUT` | `.../outputs/jobs` | Analysis job outputs |
 | `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
 | `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
+| `GRCG6A_PG_DSN` | `postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a` | PostgreSQL 连接字符串 |
+
+**PostgreSQL 启动**（Docker）：
+```bash
+cd backend && docker compose up -d   # 端口 5433，自动初始化 schema
+```
 
 All backend modules import from `config.py` — never hardcode `D:\jbrowsedata\projectdata` directly.
+
+### Dual-Database Architecture
+
+| 数据库 | 用途 | 驱动 |
+|--------|------|------|
+| **SQLite** (gffutils) | GFF 特征、染色体、序列、搜索 | `gffutils` 库，读写 gff 文件 |
+| **PostgreSQL** (Docker 5433) | GO/KEGG 注释、基因表达数据 | `psycopg2` 连接池 |
+
+**设计原因**：gffutils 的区间索引和父子特征管理只能用于 SQLite；GO/KEGG/Expression 是标准关系型数据，用 PostgreSQL 更合适。
+
+**连接管理**：
+```python
+# PostgreSQL：按需从池中借/还
+pg_conn = pg_getconn()    # 从 ThreadedConnectionPool 借
+try:
+    cur.execute("SELECT ...")
+finally:
+    pg_putconn(pg_conn)   # 归还池中
+```
+
+**PG 不可用时自动降级**：GO/KEGG/Expression 端点返回 `status: "pg_unavailable"`，不影响 SQLite 核心功能。
+
+### Gene Expression Response
+
+`GET /genes/{gene_id}/expression` 和 `/genes/{gene_id}/page.expression` 均返回：
+
+```typescript
+interface GeneExpressionResponse {
+  status: "available" | "zero_expression" | "no_data" | "pg_unavailable";
+  samples: ExpressionSample[];  // 36 样本: sample_name/stage/sex/fpkm/tpm
+  summary: {
+    max_fpkm, max_fpkm_sample, max_tpm, max_tpm_sample,
+    mean_fpkm, mean_tpm, expressed_samples, zero_samples,
+    top_stage_fpkm, sex_bias, stage_fpkm_means
+  }
+}
+```
+
+前端 GenePage 根据 `status` 区分处理：`available` 显示完整表格 + 摘要；`zero_expression` 显示黄色警告 + 表格（0值行半透明）；`no_data` 显示灰色提示。
 
 ### Registered Routers
 所有路由已在 `main.py` 中注册：
@@ -148,7 +195,7 @@ All backend modules import from `config.py` — never hardcode `D:\jbrowsedata\p
 | tool_routes.py | `/tools` | 2 | 已注册 |
 | genome_analysis_routes.py | `/genome` | 21 | 已注册 |
 | chat_router.py | `/api` | 1 | 已注册 |
-| **总计** | | **47** | |
+| **总计** | | **48** | |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
