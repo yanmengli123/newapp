@@ -90,12 +90,14 @@ class GenomeFileDiscovery:
         }
 
     def get_file(self, file_type: str) -> Optional[Path]:
-        """Get the path for a specific file type."""
+        """Get the path for a specific file type. Searches data_dir then parent directories."""
         patterns = self.GENOME_FILES.get(file_type, [])
-        for pattern in patterns:
-            file_path = self.data_dir / pattern
-            if file_path.exists():
-                return file_path
+        search_dirs = [self.data_dir, self.data_dir.parent]
+        for search_dir in search_dirs:
+            for pattern in patterns:
+                file_path = search_dir / pattern
+                if file_path.exists():
+                    return file_path
         return None
 
 

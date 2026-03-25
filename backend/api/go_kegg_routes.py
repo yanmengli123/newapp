@@ -268,7 +268,8 @@ def load_gene_kegg(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
             a.png_url,
             a.png_width,
             a.png_height,
-            a.kgml_filename
+            a.kgml_filename,
+            a.node_count
         FROM gene_kegg_pathway p
         LEFT JOIN kegg_pathway_asset a ON p.pathway_id = a.pathway_id
         WHERE p.gene_id = ?
@@ -292,6 +293,7 @@ def load_gene_kegg(conn: sqlite3.Connection, gene_id: str) -> dict[str, Any]:
             "png_url": r["png_url"] or f"/static/kegg_pathways/{r['pathway_id']}.png",
             "png_width": r["png_width"] or 0,
             "png_height": r["png_height"] or 0,
+            "node_count": r["node_count"] or 0,
             "kgml_url": f"/static/kegg_kgml/{kgml_filename}",
             "mapdata_api": f"/annotations/kegg/pathway/{r['pathway_id']}/mapdata",
             "interactive_api": f"/annotations/kegg/pathway/{r['pathway_id']}/interactive",
