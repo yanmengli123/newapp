@@ -563,6 +563,10 @@ def load_gene_expression(pg_conn, gene_id: str) -> dict[str, Any] | None:
     max_fpkm_idx = fpkm_list.index(max_fpkm)
     max_tpm_idx = tpm_list.index(max_tpm)
 
+    # 区分零表达（有行但全为0）vs 有数据
+    has_real_data = len(nonzero_fpkm) > 0
+    status = "available" if has_real_data else "zero_expression"
+
     stage_sums = defaultdict(float)
     stage_counts = defaultdict(int)
     for i, item in enumerate(items):
@@ -582,7 +586,7 @@ def load_gene_expression(pg_conn, gene_id: str) -> dict[str, Any] | None:
         return "Female_higher" if f > m else "Male_higher"
 
     return {
-        "status": "available",
+        "status": status,
         "samples": items,
         "summary": {
             "max_fpkm": round(max_fpkm, 4),

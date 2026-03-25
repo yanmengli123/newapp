@@ -88,6 +88,33 @@ export interface GeneTranscriptsResponse {
   items: TranscriptResult[];
 }
 
+// Gene Expression data
+export interface ExpressionSample {
+  sample_id: number;
+  sample_name: string;
+  stage: string;
+  stage_label: string;
+  sex: string;
+  replicate: number;
+  fpkm: number;
+  tpm: number;
+}
+
+export interface GeneExpressionResponse {
+  status: "available" | "zero_expression" | "no_data" | "pg_unavailable" | string;
+  samples: ExpressionSample[];
+  summary?: {
+    max_fpkm: number;
+    max_fpkm_sample: string | null;
+    max_tpm: number;
+    max_tpm_sample: string | null;
+    mean_fpkm: number;
+    mean_tpm: number;
+    expressed_samples: number;
+    sex_bias: string;
+  };
+}
+
 export interface GenePageResponse {
   gene: GeneResult;
   chromosome: ChromosomeResult;
@@ -97,6 +124,7 @@ export interface GenePageResponse {
     go: GOAnnotationsResponse;
     kegg: KEGGAnnotationsResponse;
   };
+  expression?: GeneExpressionResponse;
 }
 
 // Parse search query to determine search type

@@ -11,7 +11,11 @@ import {
   Divider,
   Button,
   Accordion,
-  Anchor,
+  Table,
+  ScrollArea,
+  Progress,
+  Tooltip,
+  Alert,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -23,6 +27,9 @@ import {
   IconSquare,
   IconDna2,
   IconApi,
+  IconChartBar,
+  IconGenderMale,
+  IconGenderFemale,
 } from "@tabler/icons-react";
 import type {
   GenePageResponse,
@@ -33,6 +40,7 @@ import type {
 } from "../lib/geneApi";
 import { getGenePage, getChromosome, getGeneGOAnnotations, getGeneKEGGAnnotations } from "../lib/geneApi";
 import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
+import GOTermCard from "../components/go/GOTermCard";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -434,105 +442,265 @@ export default function GenePage() {
           <IconApi size={20} color="var(--mantine-color-cyan-6)" />
           <Title order={4}>GO Annotations</Title>
           {loadingAnnotations && <Loader size="xs" />}
+          {goAnnotations?.summary && (
+            <Badge variant="light" color="gray" size="sm">
+              {goAnnotations.summary.total} terms
+            </Badge>
+          )}
         </Group>
 
-        {!goAnnotations || goAnnotations.total === 0 ? (
+        {!goAnnotations || !goAnnotations.items?.length ? (
           <Text c="dimmed" size="sm">No GO annotations available</Text>
         ) : (
-          <Stack gap="md">
-            {/* Extract go_annotations safely */}
-            {(() => {
-              const go = goAnnotations.go_annotations;
-              if (!go) return <Text c="dimmed">No GO annotations available</Text>;
-
-              return (
-                <>
+          <Accordion variant="separated" radius="md" defaultValue="biological_process">
             {/* Biological Process */}
-            {go.biological_process.length > 0 && (
-              <Box>
-                <Text size="sm" fw={500} mb="xs" c="blue">
-                  Biological Process ({go.biological_process.length})
-                </Text>
-                <Group gap="xs">
-                  {go.biological_process.slice(0, 10).map((go) => (
-                    <Anchor
-                      key={go.go_id}
-                      href={`https://amigo.geneontology.org/amigo/term/${go.go_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="xs"
-                    >
-                      <Badge variant="light" color="blue" size="sm">
-                        {go.go_id} {go.go_name}
-                      </Badge>
-                    </Anchor>
-                  ))}
-                  {go.biological_process.length > 10 && (
-                    <Text size="xs" c="dimmed">+{go.biological_process.length - 10} more</Text>
-                  )}
-                </Group>
-              </Box>
+            {goAnnotations.items.filter(i => i.go_namespace === "biological_process").length > 0 && (
+              <Accordion.Item value="biological_process">
+                <Accordion.Control
+                  bg="var(--mantine-color-blue-0)"
+                  style={{ borderRadius: 8 }}
+                >
+                  <Group gap="xs">
+                    <Text size="sm" fw={600} c="blue">Biological Process</Text>
+                    <Badge color="blue" variant="light" size="xs">
+                      {goAnnotations.items.filter(i => i.go_namespace === "biological_process").length}
+                    </Badge>
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="sm">
+                    {goAnnotations.items
+                      .filter(i => i.go_namespace === "biological_process")
+                      .map(item => (
+                        <GOTermCard key={item.go_id} item={item} />
+                      ))}
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
             )}
 
             {/* Molecular Function */}
-            {go.molecular_function.length > 0 && (
-              <Box>
-                <Text size="sm" fw={500} mb="xs" c="green">
-                  Molecular Function ({go.molecular_function.length})
-                </Text>
-                <Group gap="xs">
-                  {go.molecular_function.slice(0, 10).map((go) => (
-                    <Anchor
-                      key={go.go_id}
-                      href={`https://amigo.geneontology.org/amigo/term/${go.go_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="xs"
-                    >
-                      <Badge variant="light" color="green" size="sm">
-                        {go.go_id} {go.go_name}
-                      </Badge>
-                    </Anchor>
-                  ))}
-                  {go.molecular_function.length > 10 && (
-                    <Text size="xs" c="dimmed">+{go.molecular_function.length - 10} more</Text>
-                  )}
-                </Group>
-              </Box>
+            {goAnnotations.items.filter(i => i.go_namespace === "molecular_function").length > 0 && (
+              <Accordion.Item value="molecular_function">
+                <Accordion.Control
+                  bg="var(--mantine-color-green-0)"
+                  style={{ borderRadius: 8 }}
+                >
+                  <Group gap="xs">
+                    <Text size="sm" fw={600} c="green">Molecular Function</Text>
+                    <Badge color="green" variant="light" size="xs">
+                      {goAnnotations.items.filter(i => i.go_namespace === "molecular_function").length}
+                    </Badge>
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="sm">
+                    {goAnnotations.items
+                      .filter(i => i.go_namespace === "molecular_function")
+                      .map(item => (
+                        <GOTermCard key={item.go_id} item={item} />
+                      ))}
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
             )}
 
             {/* Cellular Component */}
-            {go.cellular_component.length > 0 && (
-              <Box>
-                <Text size="sm" fw={500} mb="xs" c="orange">
-                  Cellular Component ({go.cellular_component.length})
-                </Text>
-                <Group gap="xs">
-                  {go.cellular_component.slice(0, 10).map((go) => (
-                    <Anchor
-                      key={go.go_id}
-                      href={`https://amigo.geneontology.org/amigo/term/${go.go_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="xs"
-                    >
-                      <Badge variant="light" color="orange" size="sm">
-                        {go.go_id} {go.go_name}
-                      </Badge>
-                    </Anchor>
-                  ))}
-                  {go.cellular_component.length > 10 && (
-                    <Text size="xs" c="dimmed">+{go.cellular_component.length - 10} more</Text>
-                  )}
-                </Group>
-              </Box>
+            {goAnnotations.items.filter(i => i.go_namespace === "cellular_component").length > 0 && (
+              <Accordion.Item value="cellular_component">
+                <Accordion.Control
+                  bg="var(--mantine-color-orange-0)"
+                  style={{ borderRadius: 8 }}
+                >
+                  <Group gap="xs">
+                    <Text size="sm" fw={600} c="orange">Cellular Component</Text>
+                    <Badge color="orange" variant="light" size="xs">
+                      {goAnnotations.items.filter(i => i.go_namespace === "cellular_component").length}
+                    </Badge>
+                  </Group>
+                </Accordion.Control>
+                <Accordion.Panel>
+                  <Stack gap="sm">
+                    {goAnnotations.items
+                      .filter(i => i.go_namespace === "cellular_component")
+                      .map(item => (
+                        <GOTermCard key={item.go_id} item={item} />
+                      ))}
+                  </Stack>
+                </Accordion.Panel>
+              </Accordion.Item>
             )}
-                </>
-              );
-            })()}
-          </Stack>
+          </Accordion>
         )}
       </Paper>
+
+      {/* Expression (FPKM / TPM) */}
+      {data?.expression ? (
+        <Paper withBorder radius="xl" p="xl">
+          <Group gap="sm" mb="md">
+            <IconChartBar size={20} color="var(--mantine-color-violet-6)" />
+            <Title order={4}>Expression</Title>
+            <Badge variant="light" color="violet" size="sm">
+              {data.expression.samples?.length ?? 0} samples
+            </Badge>
+            {data.expression.status === "available" && data.expression.summary && (
+              <Badge variant="light" color="gray" size="sm">
+                Mean FPKM: {data.expression.summary.mean_fpkm?.toFixed(2) ?? "0.00"}
+              </Badge>
+            )}
+            {data.expression.status === "available" && data.expression.summary && (
+              <Badge
+                variant="light"
+                color={
+                  data.expression.summary.sex_bias === "Female_higher"
+                    ? "pink"
+                    : data.expression.summary.sex_bias === "Male_higher"
+                      ? "blue"
+                      : "gray"
+                }
+                size="sm"
+              >
+                {data.expression.summary.sex_bias?.replace(/_/g, " ") ?? "Unknown"}
+              </Badge>
+            )}
+          </Group>
+
+          {/* No data message */}
+          {data.expression.status === "no_data" && (
+            <Alert
+              color="gray"
+              variant="light"
+              title="No expression data"
+              icon={<IconChartBar size={16} />}
+            >
+              This gene does not have expression profiling data in the current dataset.
+            </Alert>
+          )}
+
+          {/* Zero expression warning */}
+          {data.expression.status === "zero_expression" && (
+            <Alert
+              color="yellow"
+              variant="light"
+              title="Zero expression"
+              mb="md"
+            >
+              All samples show zero expression (FPKM = 0) for this gene — it may not be
+              expressed in the studied developmental stages.
+            </Alert>
+          )}
+
+          {/* Summary stats row — only when available */}
+          {data.expression.status === "available" && data.expression.summary && (
+            <Group gap="xl" mb="md">
+              <Box>
+                <Text size="xs" c="dimmed">Max FPKM</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.max_fpkm?.toFixed(4) ?? "—"}</Text>
+                <Text size="xs" c="dimmed">{data.expression.summary.max_fpkm_sample ?? "—"}</Text>
+              </Box>
+              <Box>
+                <Text size="xs" c="dimmed">Max TPM</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.max_tpm?.toFixed(4) ?? "—"}</Text>
+                <Text size="xs" c="dimmed">{data.expression.summary.max_tpm_sample ?? "—"}</Text>
+              </Box>
+              <Box>
+                <Text size="xs" c="dimmed">Mean FPKM</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.mean_fpkm?.toFixed(4) ?? "—"}</Text>
+              </Box>
+              <Box>
+                <Text size="xs" c="dimmed">Mean TPM</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.mean_tpm?.toFixed(4) ?? "—"}</Text>
+              </Box>
+              <Box>
+                <Text size="xs" c="dimmed">Expressed</Text>
+                <Text size="sm" fw={600}>
+                  {data.expression.summary.expressed_samples ?? 0}/{data.expression.samples?.length ?? 0}
+                </Text>
+              </Box>
+            </Group>
+          )}
+
+          {/* Expression table — only when not no_data */}
+          {data.expression.status !== "no_data" && data.expression.samples && (
+            <ScrollArea>
+              <Table striped highlightOnHover withTableBorder withColumnBorders>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Sample</Table.Th>
+                    <Table.Th>Stage</Table.Th>
+                    <Table.Th>Sex</Table.Th>
+                    <Table.Th style={{ textAlign: "right" }}>FPKM</Table.Th>
+                    <Table.Th style={{ textAlign: "right" }}>TPM</Table.Th>
+                    <Table.Th style={{ minWidth: 120 }}>FPKM Bar</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {data.expression.samples.map(sample => {
+                    const maxFpkm = data.expression!.summary?.max_fpkm || 1;
+                    const fpkmVal = sample.fpkm ?? 0;
+                    const tpmVal = sample.tpm ?? 0;
+                    const pct = maxFpkm > 0 ? Math.min((fpkmVal / maxFpkm) * 100, 100) : 0;
+                    const isZero = fpkmVal === 0;
+                    return (
+                      <Table.Tr key={sample.sample_id} style={isZero ? { opacity: 0.5 } : undefined}>
+                        <Table.Td>
+                          <Text size="sm" fw={500}>{sample.sample_name ?? "—"}</Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Tooltip label={sample.stage_label ?? ""}>
+                            <Badge variant="light" color="gray" size="xs">
+                              {sample.stage ?? "—"}
+                            </Badge>
+                          </Tooltip>
+                        </Table.Td>
+                        <Table.Td>
+                          <Group gap={4}>
+                            {sample.sex === "Male" ? (
+                              <IconGenderMale size={14} color="var(--mantine-color-blue-6)" />
+                            ) : (
+                              <IconGenderFemale size={14} color="var(--mantine-color-pink-6)" />
+                            )}
+                            <Text size="xs" c="dimmed">{sample.sex ?? "—"}</Text>
+                            <Text size="xs" c="dimmed">R{sample.replicate ?? "—"}</Text>
+                          </Group>
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: "right" }}>
+                          <Text
+                            size="sm"
+                            fw={500}
+                            style={{ fontVariantNumeric: "tabular-nums", color: isZero ? "dimmed" : undefined }}
+                          >
+                            {fpkmVal.toFixed(4)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td style={{ textAlign: "right" }}>
+                          <Text
+                            size="sm"
+                            style={{ fontVariantNumeric: "tabular-nums", color: isZero ? "dimmed" : undefined }}
+                          >
+                            {tpmVal.toFixed(4)}
+                          </Text>
+                        </Table.Td>
+                        <Table.Td>
+                          <Tooltip label={`${pct.toFixed(1)}% of max`}>
+                            <Progress
+                              value={pct}
+                              color={isZero ? "gray" : pct > 80 ? "violet" : pct > 30 ? "indigo" : "gray"}
+                              size="sm"
+                              radius="xl"
+                              style={{ minWidth: 100 }}
+                            />
+                          </Tooltip>
+                        </Table.Td>
+                      </Table.Tr>
+                    );
+                  })}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+          )}
+        </Paper>
+      ) : null}
 
       {/* KEGG Pathways (Interactive KGML Viewer) */}
       {keggAnnotations && (keggAnnotations.pathways?.length || keggAnnotations.items?.length) ? (
