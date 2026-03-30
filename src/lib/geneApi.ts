@@ -10,6 +10,22 @@ export interface GeneResult {
   end: number;
   strand: string;
   length: number;
+  // Extended from PostgreSQL gene_xref (ESC schema)
+  gene_type?: string | null;
+  is_canonical?: boolean | null;
+  display_symbol?: string | null;
+  aliases?: GeneAlias[];
+  // Cross-reference IDs (from PostgreSQL gene_xref / gene_kegg)
+  ncbi_gene_id?: string | null;
+  ensembl_gene_id?: string | null;
+  kegg_gene_id?: string | null;
+}
+
+export interface GeneAlias {
+  alias: string;
+  alias_type: string;
+  is_primary: boolean;
+  source: string | null;
 }
 
 export interface GeneSearchResponse {
@@ -89,29 +105,47 @@ export interface GeneTranscriptsResponse {
 }
 
 // Gene Expression data
+// ExpressionSample — normcount from expression_fact (day_deseq2_36 dataset)
 export interface ExpressionSample {
-  sample_id: number;
+  sample_id: string;
   sample_name: string;
   stage: string;
   stage_label: string;
   sex: string;
   replicate: number;
-  fpkm: number;
-  tpm: number;
+  normcount: number;
+}
+
+export interface DatasetMeta {
+  dataset_code: string;
+  dataset_name: string;
+  description: string | null;
+  sample_scope: string | null;
+  normalization_family: string | null;
+}
+
+export interface MetricMeta {
+  metric_code: string;
+  metric_name: string;
+  unit_desc: string | null;
 }
 
 export interface GeneExpressionResponse {
   status: "available" | "zero_expression" | "no_data" | "pg_unavailable" | string;
+  dataset?: DatasetMeta;
+  metric?: MetricMeta;
   samples: ExpressionSample[];
   summary?: {
-    max_fpkm: number;
-    max_fpkm_sample: string | null;
-    max_tpm: number;
-    max_tpm_sample: string | null;
-    mean_fpkm: number;
-    mean_tpm: number;
+    max_normcount: number;
+    max_normcount_sample: string | null;
+    min_normcount: number;
+    mean_normcount: number;
+    std_normcount: number;
     expressed_samples: number;
+    zero_samples: number;
+    top_stage_normcount: string | null;
     sex_bias: string;
+    stage_normcount_means: Record<string, number>;
   };
 }
 
@@ -308,6 +342,7 @@ export interface KEGGPathway {
 export interface KEGGAnnotationsResponse {
   gene_id: string;
   gene_symbol: string;
+  ncbi_gene_id?: string | null;
   kegg_gene_id: string | null;
   summary?: {
     pathway_count: number;
@@ -619,7 +654,7 @@ export async function getKEGGPathwayInfo(pathwayId: string): Promise<KEGGPathway
 // Get KEGG pathway mapdata (hotspot coordinates)
 export async function getKEGGPathwayMapdata(pathwayId: string, geneId?: string): Promise<KEGGPathwayMapdata> {
   const url = `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/mapdata`
-    + (geneId ? `?gene_id=${encodeURIComponent(geneId)}` : "");
+    + (geneId ? `?highlight_gene=${encodeURIComponent(geneId)}` : "");
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Pathway mapdata not found: ${pathwayId}`);
@@ -639,7 +674,7 @@ export async function getKEGGPathwayInteractive(pathwayId: string): Promise<KEGG
 /** 带 gene_id 参数，获取目标基因高亮信息 */
 export async function getKEGGPathwayInteractiveForGene(pathwayId: string, geneId: string): Promise<KEGGPathwayInteractive & { target_gene?: string }> {
   const response = await fetch(
-    `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive?gene_id=${encodeURIComponent(geneId)}`
+    `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive?highlight_gene=${encodeURIComponent(geneId)}`
   );
   if (!response.ok) {
     throw new Error(`Pathway interactive data not found: ${pathwayId}`);

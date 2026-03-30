@@ -7,12 +7,19 @@ from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from config import GRCG6A_SAMPLE_RESULTS
 
 logger = logging.getLogger("grcg6a_fastapi_backend.genome_analysis")
 
 router = APIRouter(prefix="/genome", tags=["Genome Analysis"])
+
+
+class AnalysisRequest(BaseModel):
+    """Optional request body for genome analysis job."""
+    # All fields are optional - defaults are used when omitted
+    pass
 
 
 @router.get("/health")
@@ -49,7 +56,10 @@ async def list_genome_files():
 
 
 @router.post("/analysis/run")
-async def run_analysis(background_tasks: BackgroundTasks):
+async def run_analysis(
+    background_tasks: BackgroundTasks,
+    body: Optional[AnalysisRequest] = None,
+):
     """
     Submit a new genome analysis job.
 
@@ -383,9 +393,8 @@ async def get_chart_json(job_id: str, chart_key: str):
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
     chart_file = Path(job["output_dir"]) / "charts" / f"{chart_key}.json"
-    logger.info(f"Chart JSON request: job_id={job_id}, chart_key={chart_key}, path={chart_file}, exists={chart_file.exists()}")
     if not chart_file.exists():
-        raise HTTPException(status_code=404, detail=f"Chart {chart_key}.json not found at {chart_file}")
+        raise HTTPException(status_code=404, detail=f"Chart {chart_key} not found")
 
     return FileResponse(chart_file, media_type="application/json", filename=f"{chart_key}.json")
 
@@ -400,52 +409,40 @@ async def get_chart_html(job_id: str, chart_key: str):
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
     chart_file = Path(job["output_dir"]) / "charts" / f"{chart_key}.html"
-    logger.info(f"Chart HTML request: job_id={job_id}, chart_key={chart_key}, path={chart_file}, exists={chart_file.exists()}")
     if not chart_file.exists():
-        raise HTTPException(status_code=404, detail=f"Chart {chart_key}.html not found at {chart_file}")
+        raise HTTPException(status_code=404, detail=f"Chart {chart_key} not found")
 
     return FileResponse(chart_file, media_type="text/html", filename=f"{chart_key}.html")
 
 
 # =============================================================================
-# Sample/Demo Results endpoints - Pre-generated results
+# Sample / Pre-generated Results Endpoints
+# Serves content from GRCG6A_SAMPLE_RESULTS without running analysis
 # =============================================================================
-SAMPLE_RESULTS_DIR = GRCG6A_SAMPLE_RESULTS
-
 
 @router.get("/sample/status")
 async def get_sample_status():
-    """
-    Check if pre-generated sample results exist.
+    """Check if pre-generated sample results are available."""
+    results_dir = GRCG6A_SAMPLE_RESULTS
+    charts_dir = results_dir / "charts"
+    chart_count = 0
+    if charts_dir.exists():
+        chart_count = len(list(charts_dir.glob("*.html")))
 
-    Returns whether sample results are available for immediate viewing.
-    """
-    result_file = SAMPLE_RESULTS_DIR / "result" / "analysis_results.json"
-    charts_dir = SAMPLE_RESULTS_DIR / "charts"
     return {
-        "available": SAMPLE_RESULTS_DIR.exists() and result_file.exists(),
-        "has_charts": charts_dir.exists() and len(list(charts_dir.glob("*.png"))) > 0,
-        "chart_count": len(list(charts_dir.glob("*.png"))) if charts_dir.exists() else 0,
-        "results_dir": str(SAMPLE_RESULTS_DIR),
+        "available": results_dir.exists() and (results_dir / "result").exists(),
+        "has_charts": chart_count > 0,
+        "chart_count": chart_count,
+        "results_dir": str(results_dir),
     }
 
 
 @router.get("/sample/result")
 async def get_sample_result():
-    """
-    Get sample analysis results (pre-generated, always available).
-
-    Returns the same format as /jobs/{job_id}/result but uses pre-generated sample data.
-    """
-    if not SAMPLE_RESULTS_DIR.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Sample results not available"
-        )
-
-    result_file = SAMPLE_RESULTS_DIR / "result" / "analysis_results.json"
+    """Get pre-generated analysis results."""
+    result_file = GRCG6A_SAMPLE_RESULTS / "result" / "analysis_results.json"
     if not result_file.exists():
-        raise HTTPException(status_code=404, detail="Sample results file not found")
+        raise HTTPException(status_code=404, detail="Sample results not found")
 
     with open(result_file, "r", encoding="utf-8") as f:
         results = json.load(f)
@@ -460,15 +457,8 @@ async def get_sample_result():
 
 @router.get("/sample/downloads")
 async def get_sample_downloads():
-    """
-    Get sample download index (pre-generated, always available).
-    """
-    if not SAMPLE_RESULTS_DIR.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Sample results not available"
-        )
-
+    """Get download index for pre-generated sample results."""
+    results_dir = GRCG6A_SAMPLE_RESULTS
     downloads = {
         "charts": [],
         "tables": [],
@@ -477,7 +467,7 @@ async def get_sample_downloads():
     }
 
     # Scan charts
-    charts_dir = SAMPLE_RESULTS_DIR / "charts"
+    charts_dir = results_dir / "charts"
     if charts_dir.exists():
         for chart_file in sorted(charts_dir.glob("*.json")):
             chart_key = chart_file.stem
@@ -485,7 +475,7 @@ async def get_sample_downloads():
             for fmt in ["png", "svg", "html", "json"]:
                 fmt_file = charts_dir / f"{chart_key}.{fmt}"
                 if fmt_file.exists():
-                    files[fmt] = f"/genome/sample/charts/{chart_key}.{fmt}"
+                    files[fmt] = f"/genome/sample/charts/{chart_key}/{fmt}"
             if files:
                 downloads["charts"].append({
                     "chart_key": chart_key,
@@ -494,7 +484,7 @@ async def get_sample_downloads():
                 })
 
     # Scan tables
-    tables_dir = SAMPLE_RESULTS_DIR / "tables"
+    tables_dir = results_dir / "tables"
     if tables_dir.exists():
         for table_file in sorted(tables_dir.glob("*.csv")):
             table_name = table_file.stem
@@ -502,7 +492,7 @@ async def get_sample_downloads():
             for fmt in ["csv", "xlsx"]:
                 fmt_file = tables_dir / f"{table_name}.{fmt}"
                 if fmt_file.exists():
-                    files[fmt] = f"/genome/sample/tables/{table_name}.{fmt}"
+                    files[fmt] = f"/genome/sample/tables/{table_name}/{fmt}"
             if files:
                 downloads["tables"].append({
                     "name": table_name,
@@ -511,25 +501,21 @@ async def get_sample_downloads():
                 })
 
     # Scan result
-    result_dir = SAMPLE_RESULTS_DIR / "result"
+    result_dir = results_dir / "result"
     if result_dir.exists():
         for result_file in sorted(result_dir.glob("*.json")):
             downloads["result"].append({
                 "name": result_file.stem,
-                "files": {
-                    "json": f"/genome/sample/result/{result_file.name}"
-                },
+                "files": {"json": f"/genome/sample/result/{result_file.name}"},
             })
 
     # Scan metadata
-    metadata_dir = SAMPLE_RESULTS_DIR / "metadata"
+    metadata_dir = results_dir / "metadata"
     if metadata_dir.exists():
         for meta_file in sorted(metadata_dir.glob("*.json")):
             downloads["metadata"].append({
                 "name": meta_file.stem,
-                "files": {
-                    "json": f"/genome/sample/metadata/{meta_file.name}"
-                },
+                "files": {"json": f"/genome/sample/metadata/{meta_file.name}"},
             })
 
     return {
@@ -540,70 +526,53 @@ async def get_sample_downloads():
     }
 
 
-@router.get("/sample/charts/{chart_key}/{format}")
-async def get_sample_chart(chart_key: str, format: str):
-    """
-    Get sample chart in specified format (html, png, svg, json).
-    """
-    valid_formats = ["html", "png", "svg", "json"]
-    if format not in valid_formats:
-        raise HTTPException(status_code=400, detail=f"Invalid format. Must be one of: {valid_formats}")
-
-    chart_file = SAMPLE_RESULTS_DIR / "charts" / f"{chart_key}.{format}"
-    if not chart_file.exists():
-        raise HTTPException(status_code=404, detail=f"Chart {chart_key}.{format} not found")
-
+@router.get("/sample/charts/{chart_key}/{fmt}")
+async def get_sample_chart(chart_key: str, fmt: str):
+    """Serve a chart file from sample results."""
     media_types = {
+        "html": "text/html",
         "json": "application/json",
         "png": "image/png",
         "svg": "image/svg+xml",
-        "html": "text/html",
     }
+    if fmt not in media_types:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {fmt}")
 
-    return FileResponse(chart_file, media_type=media_types[format], filename=f"{chart_key}.{format}")
+    chart_file = GRCG6A_SAMPLE_RESULTS / "charts" / f"{chart_key}.{fmt}"
+    if not chart_file.exists():
+        raise HTTPException(status_code=404, detail=f"Chart {chart_key}.{fmt} not found")
+
+    return FileResponse(chart_file, media_type=media_types[fmt], filename=f"{chart_key}.{fmt}")
 
 
-@router.get("/sample/tables/{table_name}/{format}")
-async def get_sample_table(table_name: str, format: str):
-    """
-    Get sample table in specified format (csv, xlsx, json).
-    """
-    valid_formats = ["csv", "xlsx", "json"]
-    if format not in valid_formats:
-        raise HTTPException(status_code=400, detail=f"Invalid format. Must be one of: {valid_formats}")
-
-    table_file = SAMPLE_RESULTS_DIR / "tables" / f"{table_name}.{format}"
-    if not table_file.exists():
-        raise HTTPException(status_code=404, detail=f"Table {table_name}.{format} not found")
-
+@router.get("/sample/tables/{table_name}/{fmt}")
+async def get_sample_table(table_name: str, fmt: str):
+    """Serve a table file from sample results."""
     media_types = {
         "csv": "text/csv",
         "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "json": "application/json",
     }
+    if fmt not in media_types:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {fmt}")
 
-    return FileResponse(table_file, media_type=media_types[format], filename=f"{table_name}.{format}")
+    table_file = GRCG6A_SAMPLE_RESULTS / "tables" / f"{table_name}.{fmt}"
+    if not table_file.exists():
+        raise HTTPException(status_code=404, detail=f"Table {table_name}.{fmt} not found")
+
+    return FileResponse(table_file, media_type=media_types[fmt], filename=f"{table_name}.{fmt}")
 
 
 @router.get("/sample/{category}/{filename}")
 async def get_sample_file(category: str, filename: str):
-    """
-    Get sample file (result, metadata).
-    """
-    valid_categories = ["result", "metadata"]
-    if category not in valid_categories:
-        raise HTTPException(status_code=400, detail=f"Invalid category. Must be one of: {valid_categories}")
+    """Serve arbitrary files from sample results (result/, metadata/)."""
+    allowed_categories = {"result", "metadata"}
+    if category not in allowed_categories:
+        raise HTTPException(status_code=403, detail="Category not allowed")
 
-    file_path = SAMPLE_RESULTS_DIR / category / filename
-
+    safe_filename = Path(filename).name
+    file_path = GRCG6A_SAMPLE_RESULTS / category / safe_filename
     if not file_path.exists():
-        raise HTTPException(status_code=404, detail=f"File not found: {filename}")
+        raise HTTPException(status_code=404, detail="File not found")
 
-    ext = file_path.suffix.lower()
-    media_types = {
-        ".json": "application/json",
-        ".csv": "text/csv",
-        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    }
-
-    return FileResponse(file_path, media_type=media_types.get(ext, "application/octet-stream"), filename=filename)
+    return FileResponse(file_path, media_type="application/json", filename=safe_filename)

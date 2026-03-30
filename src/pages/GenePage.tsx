@@ -336,12 +336,55 @@ export default function GenePage() {
                 <IconDna size={28} color="var(--mantine-color-cyan-6)" />
                 <Title order={2}>{gene.gene_symbol || gene.gene_id}</Title>
                 <Badge color="cyan" variant="light">
-                  {gene.biotype || "gene"}
+                  {gene.gene_type || gene.biotype || "gene"}
                 </Badge>
+                {(gene.is_canonical === true) && (
+                  <Badge color="green" variant="filled" size="sm">
+                    Canonical
+                  </Badge>
+                )}
+                {(gene.is_canonical === false) && (
+                  <Badge color="gray" variant="light" size="sm">
+                    Non-canonical
+                  </Badge>
+                )}
               </Group>
               <Text c="dimmed" size="sm" mt={4}>
                 {gene.name || gene.gene_id}
               </Text>
+              {gene.aliases && gene.aliases.length > 0 && (
+                <Group gap={4} mt={4}>
+                  <Text size="xs" c="dimmed">Aliases:</Text>
+                  {gene.aliases.map((alias, i) => (
+                    <Badge
+                      key={i}
+                      size="xs"
+                      variant={alias.is_primary ? "filled" : "light"}
+                      color={alias.is_primary ? "cyan" : "gray"}
+                    >
+                      {alias.alias}{alias.alias_type ? ` (${alias.alias_type})` : ""}
+                    </Badge>
+                  ))}
+                </Group>
+              )}
+              {/* Cross-reference IDs */}
+              <Group gap={4} mt={4}>
+                {gene.ncbi_gene_id && (
+                  <Badge size="xs" variant="outline" color="gray">
+                    NCBI: {gene.ncbi_gene_id}
+                  </Badge>
+                )}
+                {gene.ensembl_gene_id && (
+                  <Badge size="xs" variant="outline" color="gray">
+                    Ensembl: {gene.ensembl_gene_id}
+                  </Badge>
+                )}
+                {gene.kegg_gene_id && (
+                  <Badge size="xs" variant="outline" color="gray">
+                    KEGG: {gene.kegg_gene_id}
+                  </Badge>
+                )}
+              </Group>
             </Box>
             <Group gap="sm">
               <Button
@@ -447,6 +490,16 @@ export default function GenePage() {
               {goAnnotations.summary.total} terms
             </Badge>
           )}
+          {goAnnotations?.ncbi_gene_id && (
+            <Badge variant="outline" color="gray" size="xs">
+              NCBI: {goAnnotations.ncbi_gene_id}
+            </Badge>
+          )}
+          {goAnnotations?.ensembl_gene_id && (
+            <Badge variant="outline" color="gray" size="xs">
+              Ensembl: {goAnnotations.ensembl_gene_id}
+            </Badge>
+          )}
         </Group>
 
         {!goAnnotations || !goAnnotations.items?.length ? (
@@ -534,7 +587,7 @@ export default function GenePage() {
         )}
       </Paper>
 
-      {/* Expression (FPKM / TPM) */}
+      {/* Expression (normcount — DESeq2, day_deseq2_36 dataset) */}
       {data?.expression ? (
         <Paper withBorder radius="xl" p="xl">
           <Group gap="sm" mb="md">
@@ -543,9 +596,36 @@ export default function GenePage() {
             <Badge variant="light" color="violet" size="sm">
               {data.expression.samples?.length ?? 0} samples
             </Badge>
+            {data.expression.metric && (
+              <Badge variant="outline" color="violet" size="sm">
+                {data.expression.metric.metric_name}
+              </Badge>
+            )}
+            {data.expression.metric?.unit_desc && (
+              <Badge variant="light" color="violet" size="sm">
+                {data.expression.metric.unit_desc}
+              </Badge>
+            )}
+            {data.expression.dataset && (
+              <Tooltip label={data.expression.dataset.description ?? ""}>
+                <Badge variant="dot" color="gray" size="sm" style={{ cursor: "help" }}>
+                  {data.expression.dataset.dataset_name}
+                </Badge>
+              </Tooltip>
+            )}
+            {data.expression.dataset?.sample_scope && (
+              <Badge variant="outline" color="gray" size="sm">
+                {data.expression.dataset.sample_scope}
+              </Badge>
+            )}
+            {data.expression.dataset?.normalization_family && (
+              <Badge variant="light" color="gray" size="sm">
+                {data.expression.dataset.normalization_family}
+              </Badge>
+            )}
             {data.expression.status === "available" && data.expression.summary && (
               <Badge variant="light" color="gray" size="sm">
-                Mean FPKM: {data.expression.summary.mean_fpkm?.toFixed(2) ?? "0.00"}
+                Mean: {data.expression.summary.mean_normcount?.toFixed(2) ?? "0.00"}
               </Badge>
             )}
             {data.expression.status === "available" && data.expression.summary && (
@@ -585,31 +665,30 @@ export default function GenePage() {
               title="Zero expression"
               mb="md"
             >
-              All samples show zero expression (FPKM = 0) for this gene — it may not be
+              All samples show zero expression (normcount = 0) for this gene — it may not be
               expressed in the studied developmental stages.
             </Alert>
           )}
 
-          {/* Summary stats row — only when available */}
+          {/* Summary stats row */}
           {data.expression.status === "available" && data.expression.summary && (
             <Group gap="xl" mb="md">
               <Box>
-                <Text size="xs" c="dimmed">Max FPKM</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.max_fpkm?.toFixed(4) ?? "—"}</Text>
-                <Text size="xs" c="dimmed">{data.expression.summary.max_fpkm_sample ?? "—"}</Text>
+                <Text size="xs" c="dimmed">Max NormCount</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.max_normcount?.toFixed(4) ?? "—"}</Text>
+                <Text size="xs" c="dimmed">{data.expression.summary.max_normcount_sample ?? "—"}</Text>
               </Box>
               <Box>
-                <Text size="xs" c="dimmed">Max TPM</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.max_tpm?.toFixed(4) ?? "—"}</Text>
-                <Text size="xs" c="dimmed">{data.expression.summary.max_tpm_sample ?? "—"}</Text>
+                <Text size="xs" c="dimmed">Min NormCount</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.min_normcount?.toFixed(4) ?? "—"}</Text>
               </Box>
               <Box>
-                <Text size="xs" c="dimmed">Mean FPKM</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.mean_fpkm?.toFixed(4) ?? "—"}</Text>
+                <Text size="xs" c="dimmed">Mean NormCount</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.mean_normcount?.toFixed(4) ?? "—"}</Text>
               </Box>
               <Box>
-                <Text size="xs" c="dimmed">Mean TPM</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.mean_tpm?.toFixed(4) ?? "—"}</Text>
+                <Text size="xs" c="dimmed">Std NormCount</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.std_normcount?.toFixed(4) ?? "—"}</Text>
               </Box>
               <Box>
                 <Text size="xs" c="dimmed">Expressed</Text>
@@ -617,10 +696,14 @@ export default function GenePage() {
                   {data.expression.summary.expressed_samples ?? 0}/{data.expression.samples?.length ?? 0}
                 </Text>
               </Box>
+              <Box>
+                <Text size="xs" c="dimmed">Zero Samples</Text>
+                <Text size="sm" fw={600}>{data.expression.summary.zero_samples ?? 0}</Text>
+              </Box>
             </Group>
           )}
 
-          {/* Expression table — only when not no_data */}
+          {/* Expression table */}
           {data.expression.status !== "no_data" && data.expression.samples && (
             <ScrollArea>
               <Table striped highlightOnHover withTableBorder withColumnBorders>
@@ -628,30 +711,30 @@ export default function GenePage() {
                   <Table.Tr>
                     <Table.Th>Sample</Table.Th>
                     <Table.Th>Stage</Table.Th>
+                    <Table.Th>Stage Label</Table.Th>
                     <Table.Th>Sex</Table.Th>
-                    <Table.Th style={{ textAlign: "right" }}>FPKM</Table.Th>
-                    <Table.Th style={{ textAlign: "right" }}>TPM</Table.Th>
-                    <Table.Th style={{ minWidth: 120 }}>FPKM Bar</Table.Th>
+                    <Table.Th style={{ textAlign: "right" }}>NormCount</Table.Th>
+                    <Table.Th style={{ minWidth: 120 }}>Relative Level</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {data.expression.samples.map(sample => {
-                    const maxFpkm = data.expression!.summary?.max_fpkm || 1;
-                    const fpkmVal = sample.fpkm ?? 0;
-                    const tpmVal = sample.tpm ?? 0;
-                    const pct = maxFpkm > 0 ? Math.min((fpkmVal / maxFpkm) * 100, 100) : 0;
-                    const isZero = fpkmVal === 0;
+                    const maxNc = data.expression!.summary?.max_normcount || 1;
+                    const ncVal = sample.normcount ?? 0;
+                    const pct = maxNc > 0 ? Math.min((ncVal / maxNc) * 100, 100) : 0;
+                    const isZero = ncVal === 0;
                     return (
                       <Table.Tr key={sample.sample_id} style={isZero ? { opacity: 0.5 } : undefined}>
                         <Table.Td>
                           <Text size="sm" fw={500}>{sample.sample_name ?? "—"}</Text>
                         </Table.Td>
                         <Table.Td>
-                          <Tooltip label={sample.stage_label ?? ""}>
-                            <Badge variant="light" color="gray" size="xs">
-                              {sample.stage ?? "—"}
-                            </Badge>
-                          </Tooltip>
+                          <Badge variant="light" color="gray" size="xs">
+                            {sample.stage ?? "—"}
+                          </Badge>
+                        </Table.Td>
+                        <Table.Td>
+                          <Text size="xs" c="dimmed">{sample.stage_label ?? "—"}</Text>
                         </Table.Td>
                         <Table.Td>
                           <Group gap={4}>
@@ -670,15 +753,7 @@ export default function GenePage() {
                             fw={500}
                             style={{ fontVariantNumeric: "tabular-nums", color: isZero ? "dimmed" : undefined }}
                           >
-                            {fpkmVal.toFixed(4)}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td style={{ textAlign: "right" }}>
-                          <Text
-                            size="sm"
-                            style={{ fontVariantNumeric: "tabular-nums", color: isZero ? "dimmed" : undefined }}
-                          >
-                            {tpmVal.toFixed(4)}
+                            {ncVal.toFixed(4)}
                           </Text>
                         </Table.Td>
                         <Table.Td>
@@ -707,6 +782,7 @@ export default function GenePage() {
         <KeggPathwaysSection
           keggAnnotations={keggAnnotations}
           geneId={data?.gene.gene_id || geneId || ""}
+          kegg_gene_id={data?.gene.kegg_gene_id}
         />
       ) : null}
 

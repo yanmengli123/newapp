@@ -32,7 +32,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **Pages** — `src/pages/` (route targets in App.tsx)
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
   - `GeneQueryPage` — Autocomplete gene search
-  - `GenePage` — Gene detail: transcripts, exons, CDS, GO (Accordion折叠卡片), KEGG, Expression (FPKM/TPM表格)
+  - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion折叠卡片), KEGG Pathways, Expression (NormCount 表格 + 统计)
   - `ChromosomePage` — Chromosome view with gene list
   - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
@@ -74,7 +74,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /genes/{gene_id}/transcripts` — 转录本
 - `GET /genes/{gene_id}/sequences` — 序列
 - `GET /genes/{gene_id}/page` — 完整基因页面（含 annotations.go / annotations.kegg / expression）
-- `GET /genes/{gene_id}/expression` — 独立表达数据端点（FPKM + TPM，36 样本）
+- `GET /genes/{gene_id}/expression` — 独立表达数据端点（36 样本，默认 day_deseq2_36 + normcount；返回样本级数据和预聚合统计）
 
 ### GO/KEGG Annotations (11, prefix `/annotations`)
 - `GET /annotations/go/{gene_id}` — GO 注释
@@ -83,8 +83,8 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /annotations/kegg/pathway/{pathway_id}` — 通路详情（含成员基因）
 - `GET /annotations/kegg/pathway/{pathway_id}/info` — 通路元信息（来自 kegg_pathway_asset）
 - `GET /annotations/kegg/pathway/{pathway_id}/image` — 通路 PNG 图片
-- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 节点坐标 JSON（含 nodes 数组）；**支持 `?gene_id=` 参数**高亮特定基因在图中的所有出现位置
-- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML 数据（支持 `?gene_id=` 查询目标基因）
+- `GET /annotations/kegg/pathway/{pathway_id}/mapdata` — 节点坐标 JSON（含 nodes 数组）；**支持 `?highlight_gene=` 参数**高亮特定基因在图中的所有出现位置
+- `GET /annotations/kegg/pathway/{pathway_id}/interactive` — 可交互 HTML 数据（支持 `?highlight_gene=` 查询目标基因）
 - `GET /annotations/kegg/kgml-cache/status` — KGML 缓存状态
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
 - `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
@@ -94,8 +94,8 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /kegg-images/{pathway_id}/info` — 图片信息
 
 ### Tools (2, prefix `/tools`)
-- `POST /tools/primer3` — Primer3 PCR 引物设计
-- `POST /tools/domain-search` — HMMER/Pfam 蛋白结构域搜索
+- `GET /tools/primer3` — Primer3 PCR 引物设计（query 参数：`gene_id`, `include_flank`, `product_size_min/max`, `num_primers`）
+- `GET /tools/domain-search` — HMMER/Pfam 蛋白结构域搜索（query 参数：`gene_id`）
 
 ### Genome Analysis (21, prefix `/genome`)
 - `GET /genome/health` — 模块健康检查
@@ -168,28 +168,52 @@ finally:
 
 ### Gene Expression Response
 
-`GET /genes/{gene_id}/expression` 和 `/genes/{gene_id}/page.expression` 均返回：
+`GET /genes/{gene_id}/expression` 和 `/genes/{gene_id}/page.expression` 均返回 DESeq2 Normalized Count 数据：
 
 ```typescript
 interface GeneExpressionResponse {
-  status: "available" | "zero_expression" | "no_data" | "pg_unavailable";
-  samples: ExpressionSample[];  // 36 样本: sample_name/stage/sex/fpkm/tpm
+  status: "available" | "no_data" | "pg_unavailable";
+  dataset: {          // 来自 PG dataset 表
+    dataset_code: string;   // 如 "day_deseq2_36"
+    dataset_name: string;   // 如 "DESeq2 NC — 36 发育阶段样本"
+    description: string;
+    sample_scope: string;   // 如 "development_36"
+    normalization_family: string;  // 如 "deseq2"
+  };
+  metric: {           // 来自 PG expr_metric 表
+    metric_code: string;   // 如 "normcount"
+    metric_name: string;   // 如 "DESeq2 Normalized Count"
+    unit_desc: string;     // 如 "count"
+  };
+  samples: EnrichedSample[];  // 36 样本（可扩展返回 SRR Run/Tissue/Batch/Z-score/Fold-change）
   summary: {
-    max_fpkm, max_fpkm_sample, max_tpm, max_tpm_sample,
-    mean_fpkm, mean_tpm, expressed_samples, zero_samples,
-    top_stage_fpkm, sex_bias, stage_fpkm_means
-  }
+    max_normcount: number;
+    max_normcount_sample: string;
+    min_normcount: number;       // 新增（来自 gene_expression_summary.min_value）
+    mean_normcount: number;
+    std_normcount: number;
+    expressed_samples: number;
+    zero_samples: number;
+    top_stage_normcount: string;
+    sex_bias: string;            // Female_higher / Male_higher / No_difference
+    stage_normcount_means: Record<string, number>;  // 6 阶段均值
+  };
 }
 ```
 
-前端 GenePage 根据 `status` 区分处理：`available` 显示完整表格 + 摘要；`zero_expression` 显示黄色警告 + 表格（0值行半透明）；`no_data` 显示灰色提示。
+**ESC 星型模型可用数据集**（`dataset` 表）：
+| dataset_code | dataset_name | 支持指标 |
+|---|---|---|
+| `day_deseq2_36` | DESeq2 NC — 36 发育阶段样本 | normcount |
+| `raw_ballgown_36` | Ballgown TPM/FPKM — 36 发育阶段样本 | tpm, fpkm |
+| `esc_srr_23` | ESC SRR Runs — 23 个 SRA Runs | tpm, fpkm, normcount |
 
 ### Registered Routers
 所有路由已在 `main.py` 中注册：
 
 | 路由文件 | 前缀 | 接口数 | 状态 |
 |---|---|---|---|
-| main.py | `/` | 10 | 已注册 |
+| main.py | `/` | 11 | 已注册 |
 | go_kegg_routes.py | `/annotations` | 11 | 已注册 |
 | kegg_image_router.py | `/kegg-images` | 2 | 已注册 |
 | tool_routes.py | `/tools` | 2 | 已注册 |
@@ -199,6 +223,25 @@ interface GeneExpressionResponse {
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
+
+### PostgreSQL ESC Schema (Docker 5433, grcg6a database)
+
+**gene_xref 扩展**（ESC）：
+- `gene_alias` — 基因别名（alias_type: legacy_gene_id / loc_id / symbol / ncbi_gene_id 等）
+- `unmapped_feature` — 无法映射的注释（tRNA/miRNA）
+- `gene_xref` 新增字段：`gene_type`, `display_symbol`, `is_canonical`
+
+**表达星型模型**：
+- `dataset` — 数据集定义（3 个：raw_ballgown_36 / day_deseq2_36 / esc_srr_23）
+- `expr_metric` — 指标定义（tpm / fpkm / normcount / raw_count）
+- `dataset_sample` — 数据集-样本关联（SRA Run / stage / sex / replicate / tissue / batch）
+- `expression_sample` — 样本元信息（stage / stage_label / sex / replicate）
+- `expression_fact` — 表达事实表（~3M 行，基因×样本×指标的中心表）
+- `gene_expression_summary` — 预聚合统计（mean/max/min/std / sex_bias / stage_means）
+
+**Staging 表**：
+- `stg_esc_master` — ESC 原始数据（23 SRR Run × 3 种 metric）
+- `stg_day_deseq2` — DESeq2 结果（36 样本宽表）
 
 ### KEGG Asset Tables (from KGML 解析入库)
 | 表名 | 行数 | 说明 |
