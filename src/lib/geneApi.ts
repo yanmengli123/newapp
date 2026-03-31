@@ -104,49 +104,98 @@ export interface GeneTranscriptsResponse {
   items: TranscriptResult[];
 }
 
-// Gene Expression data
-// ExpressionSample — normcount from expression_fact (day_deseq2_36 dataset)
+// Gene Expression data (ESC Star Schema)
+// ExpressionSample — from expression_fact + dataset_sample + stage_dim join
 export interface ExpressionSample {
-  sample_id: string;
+  dataset_sample_id: number;
   sample_name: string;
+  srr_run_id: string | null;
   stage: string;
-  stage_label: string;
+  stage_label: string | null;
+  stage_order: number | null;
   sex: string;
-  replicate: number;
-  normcount: number;
+  sex_code: string | null;
+  replicate: number | null;
+  batch: string | null;
+  tissue: string | null;
+  value: number;
+  z_score?: number | null;
+  log2fc?: number | null;
+  fold_change?: number | null;
 }
 
-export interface DatasetMeta {
+// Dataset metadata from /datasets endpoint
+export interface DatasetInfo {
+  dataset_id: number;
   dataset_code: string;
   dataset_name: string;
-  description: string | null;
   sample_scope: string | null;
   normalization_family: string | null;
+  description: string | null;
+  source_file: string | null;
+  metrics: MetricInfo[];
 }
 
-export interface MetricMeta {
+export interface MetricInfo {
   metric_code: string;
   metric_name: string;
   unit_desc: string | null;
+  is_comparable: boolean;
+  gene_count?: number;
 }
 
 export interface GeneExpressionResponse {
-  status: "available" | "zero_expression" | "no_data" | "pg_unavailable" | string;
-  dataset?: DatasetMeta;
-  metric?: MetricMeta;
+  status: "available" | "no_data" | "pg_unavailable" | string;
+  gene_id?: string;
+  // dataset/metric: when called from gene page (no params), these are strings (codes)
+  // When called with ?expand=all, the structure differs
+  dataset?: string;
+  metric?: string;
   samples: ExpressionSample[];
   summary?: {
-    max_normcount: number;
-    max_normcount_sample: string | null;
-    min_normcount: number;
-    mean_normcount: number;
-    std_normcount: number;
-    expressed_samples: number;
-    zero_samples: number;
-    top_stage_normcount: string | null;
-    sex_bias: string;
-    stage_normcount_means: Record<string, number>;
+    sample_count: number;
+    mean_value: number | null;
+    max_value: number | null;
+    min_value: number | null;
+    std_value: number | null;
+    cv: number | null;
+    expressed_samples: number | null;
+    zero_samples: number | null;
+    top_sample: string | null;
+    top_stage: string | null;
+    sex_bias_label: string | null;
+    sex_bias_ratio: number | null;
+    fold_change_top: number | null;
+    fold_change_bottom: number | null;
+    stage_means?: Record<string, Record<string, number> | number | null> | null;
+    stage_sample_count?: Record<string, number> | null;
   };
+}
+
+// Cross-dataset comparison response (GET /genes/{id}/expression?expand=all)
+export interface GeneExpressionExpandResponse {
+  gene_id: string;
+  cross_comparison: {
+    dataset_count: number;
+    available_datasets: string[];
+    trend_note: string;
+    opposite_trends: boolean | null;
+  };
+  datasets: Array<{
+    dataset_code: string;
+    dataset_name: string;
+    normalization_family: string;
+    sample_count: number;
+    metrics: Array<{
+      metric_code: string;
+      metric_name: string;
+      unit_desc: string;
+      is_comparable: boolean;
+      gene_count?: number;
+      summary?: GeneExpressionResponse["summary"];
+      samples: ExpressionSample[];
+    }>;
+  }>;
 }
 
 export interface GenePageResponse {
@@ -486,9 +535,7 @@ export async function searchDomains(geneId: string): Promise<DomainSearchResult>
   }
 
   const params = new URLSearchParams({ gene_id: geneId });
-  const response = await fetch(`${API_BASE}/tools/domain-search?${params}`, {
-    method: 'POST',
-  });
+  const response = await fetch(`${API_BASE}/tools/domain-search?${params}`);
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.detail || `Failed to search domains: ${response.statusText}`);
@@ -765,3 +812,42 @@ export async function getGeneSequences(geneId: string): Promise<GeneSequencesRes
   return response.json();
 }
 
+// ========== Datasets API ==========
+
+export async function getDatasets(): Promise<{ datasets: DatasetInfo[] }> {
+  const response = await fetch(`${API_BASE}/datasets`);
+  if (!response.ok) {
+    throw new Error(`Failed to get datasets: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+// ========== Expression API ==========
+
+export async function getGeneExpression(
+  geneId: string,
+  options?: {
+    dataset?: string;
+    metric?: string;
+    expand?: boolean;
+  }
+): Promise<GeneExpressionResponse | GeneExpressionExpandResponse> {
+  const searchResult = await searchGenes(geneId, 1);
+  if (searchResult.items.length > 0) {
+    geneId = searchResult.items[0].gene_id;
+  }
+
+  const params = new URLSearchParams();
+  if (options?.dataset) params.set("dataset", options.dataset);
+  if (options?.metric) params.set("metric", options.metric);
+  if (options?.expand) params.set("expand", "true");
+
+  const qs = params.toString();
+  const url = `${API_BASE}/genes/${encodeURIComponent(geneId)}/expression${qs ? `?${qs}` : ""}`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(err.detail || `Failed to get expression: ${response.statusText}`);
+  }
+  return response.json();
+}

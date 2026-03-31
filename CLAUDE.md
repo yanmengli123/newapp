@@ -32,7 +32,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **Pages** — `src/pages/` (route targets in App.tsx)
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
   - `GeneQueryPage` — Autocomplete gene search
-  - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion折叠卡片), KEGG Pathways, Expression (NormCount 表格 + 统计)
+  - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion折叠卡片), KEGG Pathways, **Expression** (6-block 模块: StatsRow/StageChart/LineChart/Table/ComparePanel)
   - `ChromosomePage` — Chromosome view with gene list
   - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
@@ -40,6 +40,13 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis), `src/lib/chatApi.ts` (chat)
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器)
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
+- **Expression components** — `src/components/expression/`: 6-block Expression 模块
+  - `ExpressionHeader` — Dataset/Metric 选择器 + Expand All 切换
+  - `ExpressionStatsRow` — 7 张统计卡片（Max/Min/Mean±Std/CV/Expressed/Top Stage/Sex Bias）
+  - `ExpressionStageChart` — Plotly 分组柱状图（Male/Female + Total Mean 折线，双 Y 轴）
+  - `ExpressionLineChart` — Plotly 折线图（按 stage_order 排序，含 Male/Female 分色）
+  - `ExpressionTable` — 可排序/可筛选/可分页（12/页）/CSV 导出的样本表
+  - `ExpressionComparePanel` — Expand All 跨数据集对比面板（Dataset Tabs + 指标切换）
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)
@@ -74,7 +81,10 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /genes/{gene_id}/transcripts` — 转录本
 - `GET /genes/{gene_id}/sequences` — 序列
 - `GET /genes/{gene_id}/page` — 完整基因页面（含 annotations.go / annotations.kegg / expression）
-- `GET /genes/{gene_id}/expression` — 独立表达数据端点（36 样本，默认 day_deseq2_36 + normcount；返回样本级数据和预聚合统计）
+- `GET /genes/{gene_id}/expression` — 独立表达数据端点（支持 `?dataset=` / `?metric=` / `?expand=true`）
+
+### Datasets (1)
+- `GET /datasets` — 返回所有可用数据集及其指标信息（用于 Expression 模块选择器）
 
 ### GO/KEGG Annotations (11, prefix `/annotations`)
 - `GET /annotations/go/{gene_id}` — GO 注释
@@ -168,36 +178,73 @@ finally:
 
 ### Gene Expression Response
 
-`GET /genes/{gene_id}/expression` 和 `/genes/{gene_id}/page.expression` 均返回 DESeq2 Normalized Count 数据：
+`GET /genes/{gene_id}/expression` 和 `/genes/{gene_id}/page.expression` 均返回表达数据：
 
 ```typescript
 interface GeneExpressionResponse {
-  status: "available" | "no_data" | "pg_unavailable";
-  dataset: {          // 来自 PG dataset 表
-    dataset_code: string;   // 如 "day_deseq2_36"
-    dataset_name: string;   // 如 "DESeq2 NC — 36 发育阶段样本"
-    description: string;
-    sample_scope: string;   // 如 "development_36"
-    normalization_family: string;  // 如 "deseq2"
+  status: "available" | "no_data" | "pg_unavailable" | string;
+  gene_id?: string;
+  dataset?: string;   // e.g. "day_deseq2_36"
+  metric?: string;    // e.g. "normcount"
+  samples: ExpressionSample[];
+  summary?: {
+    sample_count: number;
+    mean_value: number | null;
+    max_value: number | null;
+    min_value: number | null;
+    std_value: number | null;
+    cv: number | null;
+    expressed_samples: number | null;
+    zero_samples: number | null;
+    top_sample: string | null;
+    top_stage: string | null;
+    sex_bias_label: string | null;   // "Female_higher" | "Male_higher" | "No_difference"
+    sex_bias_ratio: number | null;
+    fold_change_top: number | null;
+    fold_change_bottom: number | null;
+    stage_means?: Record<string, { male: number; female: number; mean: number } | number>;
+    stage_sample_count?: Record<string, number>;
   };
-  metric: {           // 来自 PG expr_metric 表
-    metric_code: string;   // 如 "normcount"
-    metric_name: string;   // 如 "DESeq2 Normalized Count"
-    unit_desc: string;     // 如 "count"
+}
+
+interface ExpressionSample {
+  dataset_sample_id: number;
+  sample_name: string;
+  srr_run_id: string | null;
+  stage: string;        // "E0", "E3.5", "E7", ...
+  stage_label: string | null;
+  stage_order: number | null;
+  sex: string;         // "Male" | "Female"
+  sex_code: string | null;
+  replicate: number | null;
+  batch: string | null;
+  tissue: string | null;
+  value: number;
+  z_score: number | null;
+  log2fc: number | null;
+}
+
+// GET /genes/{id}/expression?expand=true → cross-dataset comparison
+interface GeneExpressionExpandResponse {
+  gene_id: string;
+  cross_comparison: {
+    dataset_count: number;
+    available_datasets: string[];
+    trend_note: string;
+    opposite_trends: boolean | null;
   };
-  samples: EnrichedSample[];  // 36 样本（可扩展返回 SRR Run/Tissue/Batch/Z-score/Fold-change）
-  summary: {
-    max_normcount: number;
-    max_normcount_sample: string;
-    min_normcount: number;       // 新增（来自 gene_expression_summary.min_value）
-    mean_normcount: number;
-    std_normcount: number;
-    expressed_samples: number;
-    zero_samples: number;
-    top_stage_normcount: string;
-    sex_bias: string;            // Female_higher / Male_higher / No_difference
-    stage_normcount_means: Record<string, number>;  // 6 阶段均值
-  };
+  datasets: Array<{
+    dataset_code: string;
+    dataset_name: string;
+    normalization_family: string;
+    sample_count: number;
+    metrics: Array<{
+      metric_code: string; metric_name: string; unit_desc: string;
+      is_comparable: boolean; gene_count?: number;
+      summary?: GeneExpressionResponse["summary"];
+      samples: ExpressionSample[];
+    }>;
+  }>;
 }
 ```
 
@@ -213,13 +260,13 @@ interface GeneExpressionResponse {
 
 | 路由文件 | 前缀 | 接口数 | 状态 |
 |---|---|---|---|
-| main.py | `/` | 11 | 已注册 |
+| main.py | `/` | 12 | 已注册 |
 | go_kegg_routes.py | `/annotations` | 11 | 已注册 |
 | kegg_image_router.py | `/kegg-images` | 2 | 已注册 |
 | tool_routes.py | `/tools` | 2 | 已注册 |
 | genome_analysis_routes.py | `/genome` | 21 | 已注册 |
 | chat_router.py | `/api` | 1 | 已注册 |
-| **总计** | | **48** | |
+| **总计** | | **49** | |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
@@ -300,6 +347,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
 - **KEGG Interactive Viewer**：PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 传入 geneId 确保只高亮当前基因的所有出现位置。对齐：wrapper `display:inline-block` 由 img 撑开，img `width:100%; height:auto`，SVG `position:absolute; inset:0` 覆盖 img 实测尺寸，`viewBox` 使用 PNG 原始像素坐标，`ResizeObserver` 监听 img 尺寸变化保证全屏/缩放下坐标始终对齐。全屏 `requestFullscreen()` + ESC 退出。highlighted 判断：label 模糊匹配（entry_name 含基因名）+ kegg_gene_id 映射兜底。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
 - **KEGG image paths**: `_get_asset_path()` in `kegg_image_router.py` resolves `png_relpath` using `GRCG6A_STATIC_ROOT.parent` (project root), not filesystem root.
+- **Plotly charts**: `plotly.js-dist-min` + `react-plotly.js`; types declared in `src/plotly.d.ts` (required because `@types/plotly.js` does not cover the dist bundle).
 
 ## Git
 

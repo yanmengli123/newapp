@@ -11,10 +11,6 @@ import {
   Divider,
   Button,
   Accordion,
-  Table,
-  ScrollArea,
-  Progress,
-  Tooltip,
   Alert,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
@@ -28,8 +24,6 @@ import {
   IconDna2,
   IconApi,
   IconChartBar,
-  IconGenderMale,
-  IconGenderFemale,
 } from "@tabler/icons-react";
 import type {
   GenePageResponse,
@@ -37,10 +31,19 @@ import type {
   GOAnnotationsResponse,
   KEGGAnnotationsResponse,
   KEGGPathway,
+  GeneExpressionResponse,
+  GeneExpressionExpandResponse,
+  DatasetInfo,
 } from "../lib/geneApi";
-import { getGenePage, getChromosome, getGeneGOAnnotations, getGeneKEGGAnnotations } from "../lib/geneApi";
+import { getGenePage, getChromosome, getGeneGOAnnotations, getGeneKEGGAnnotations, getGeneExpression, getDatasets } from "../lib/geneApi";
 import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
+import ExpressionHeader from "../components/expression/ExpressionHeader";
+import ExpressionStatsRow from "../components/expression/ExpressionStatsRow";
+import ExpressionStageChart from "../components/expression/ExpressionStageChart";
+import ExpressionLineChart from "../components/expression/ExpressionLineChart";
+import ExpressionTable from "../components/expression/ExpressionTable";
+import ExpressionComparePanel from "../components/expression/ExpressionComparePanel";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -52,6 +55,15 @@ export default function GenePage() {
   const [loading, setLoading] = useState(true);
   const [downloadingFasta, setDownloadingFasta] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Expression module state
+  const [selectedDataset, setSelectedDataset] = useState<string>("day_deseq2_36");
+  const [selectedMetric, setSelectedMetric] = useState<string>("normcount");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [currentExpr, setCurrentExpr] = useState<GeneExpressionResponse | null>(null);
+  const [expandData, setExpandData] = useState<GeneExpressionExpandResponse | null>(null);
+  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
+  const [loadingExpression, setLoadingExpression] = useState(false);
 
   useEffect(() => {
     if (!geneId) return;
@@ -99,6 +111,21 @@ export default function GenePage() {
               }))
             };
             setKeggAnnotations(transformedKeggData);
+          }
+
+          // Initialize expression from page data
+          if (result.expression && result.expression.status === "available") {
+            setCurrentExpr(result.expression);
+            setSelectedDataset(result.expression.dataset || "day_deseq2_36");
+            setSelectedMetric(result.expression.metric || "normcount");
+          }
+
+          // Load available datasets
+          try {
+            const dsResult = await getDatasets();
+            setAvailableDatasets(dsResult.datasets || []);
+          } catch {
+            // ignore
           }
         } catch (annErr) {
           console.error('Failed to load annotations:', annErr);
@@ -253,6 +280,86 @@ export default function GenePage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [data]);
+
+  // Fetch expression for a specific dataset/metric
+  const fetchExpression = useCallback(async (ds: string, metric: string) => {
+    if (!geneId) return;
+    setLoadingExpression(true);
+    try {
+      const result = await getGeneExpression(geneId, { dataset: ds, metric });
+      if (result && "samples" in result) {
+        setCurrentExpr(result as GeneExpressionResponse);
+      }
+    } catch (err) {
+      console.error("Failed to fetch expression:", err);
+    } finally {
+      setLoadingExpression(false);
+    }
+  }, [geneId]);
+
+  // Fetch expand-all data
+  const fetchExpand = useCallback(async () => {
+    if (!geneId) return;
+    setLoadingExpression(true);
+    try {
+      const result = await getGeneExpression(geneId, { expand: true });
+      if (result && "cross_comparison" in result) {
+        setExpandData(result as GeneExpressionExpandResponse);
+        // Seed availableDatasets from expand response
+        if ((result as GeneExpressionExpandResponse).datasets) {
+          const derived: DatasetInfo[] = (result as GeneExpressionExpandResponse).datasets.map((d) => ({
+            dataset_id: 0,
+            dataset_code: d.dataset_code,
+            dataset_name: d.dataset_name,
+            sample_scope: null,
+            normalization_family: d.normalization_family,
+            description: null,
+            source_file: null,
+            metrics: d.metrics.map((m) => ({
+              metric_code: m.metric_code,
+              metric_name: m.metric_name,
+              unit_desc: m.unit_desc,
+              is_comparable: m.is_comparable,
+              gene_count: m.gene_count,
+            })),
+          }));
+          setAvailableDatasets((prev) =>
+            prev.length === 0 ? derived : prev
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch expand expression:", err);
+    } finally {
+      setLoadingExpression(false);
+    }
+  }, [geneId]);
+
+  const handleToggleExpand = useCallback(() => {
+    setIsExpanded((prev) => {
+      if (!prev) fetchExpand();
+      return !prev;
+    });
+  }, [fetchExpand]);
+
+  const handleDatasetChange = useCallback((ds: string) => {
+    setSelectedDataset(ds);
+    const dsInfo = availableDatasets.find((d) => d.dataset_code === ds);
+    const defaultMetric = dsInfo?.metrics[0]?.metric_code || "normcount";
+    setSelectedMetric(defaultMetric);
+    fetchExpression(ds, defaultMetric);
+  }, [availableDatasets, fetchExpression]);
+
+  const handleMetricChange = useCallback((m: string) => {
+    setSelectedMetric(m);
+    fetchExpression(selectedDataset, m);
+  }, [selectedDataset, fetchExpression]);
+
+  const handleCompareSelect = useCallback((ds: string, m: string) => {
+    setSelectedDataset(ds);
+    setSelectedMetric(m);
+    fetchExpression(ds, m);
+  }, [fetchExpression]);
 
   // Download all Proteins as FASTA (with info only - no actual sequence from API)
   const downloadProteinsFasta = useCallback((transcript: TranscriptResult) => {
@@ -587,193 +694,81 @@ export default function GenePage() {
         )}
       </Paper>
 
-      {/* Expression (normcount — DESeq2, day_deseq2_36 dataset) */}
+      {/* Expression Module (ESC Star Schema) */}
       {data?.expression ? (
         <Paper withBorder radius="xl" p="xl">
-          <Group gap="sm" mb="md">
-            <IconChartBar size={20} color="var(--mantine-color-violet-6)" />
-            <Title order={4}>Expression</Title>
-            <Badge variant="light" color="violet" size="sm">
-              {data.expression.samples?.length ?? 0} samples
-            </Badge>
-            {data.expression.metric && (
-              <Badge variant="outline" color="violet" size="sm">
-                {data.expression.metric.metric_name}
-              </Badge>
-            )}
-            {data.expression.metric?.unit_desc && (
-              <Badge variant="light" color="violet" size="sm">
-                {data.expression.metric.unit_desc}
-              </Badge>
-            )}
-            {data.expression.dataset && (
-              <Tooltip label={data.expression.dataset.description ?? ""}>
-                <Badge variant="dot" color="gray" size="sm" style={{ cursor: "help" }}>
-                  {data.expression.dataset.dataset_name}
-                </Badge>
-              </Tooltip>
-            )}
-            {data.expression.dataset?.sample_scope && (
-              <Badge variant="outline" color="gray" size="sm">
-                {data.expression.dataset.sample_scope}
-              </Badge>
-            )}
-            {data.expression.dataset?.normalization_family && (
-              <Badge variant="light" color="gray" size="sm">
-                {data.expression.dataset.normalization_family}
-              </Badge>
-            )}
-            {data.expression.status === "available" && data.expression.summary && (
-              <Badge variant="light" color="gray" size="sm">
-                Mean: {data.expression.summary.mean_normcount?.toFixed(2) ?? "0.00"}
-              </Badge>
-            )}
-            {data.expression.status === "available" && data.expression.summary && (
-              <Badge
-                variant="light"
-                color={
-                  data.expression.summary.sex_bias === "Female_higher"
-                    ? "pink"
-                    : data.expression.summary.sex_bias === "Male_higher"
-                      ? "blue"
-                      : "gray"
+          <Stack gap="md">
+            <ExpressionHeader
+              selectedDataset={selectedDataset}
+              selectedMetric={selectedMetric}
+              onDatasetChange={handleDatasetChange}
+              onMetricChange={handleMetricChange}
+              availableDatasets={availableDatasets}
+              loading={loadingExpression}
+              isExpanded={isExpanded}
+              onToggleExpand={handleToggleExpand}
+              sampleCount={currentExpr?.samples?.length ?? data.expression.samples?.length ?? 0}
+              summary={currentExpr?.summary ?? data.expression.summary}
+            />
+
+            {/* Expand All: Cross-Dataset Compare Panel */}
+            {isExpanded && expandData ? (
+              <ExpressionComparePanel
+                expandData={expandData}
+                onSelectDataset={handleCompareSelect}
+                onLoadingChange={setLoadingExpression}
+              />
+            ) : (
+              <>
+                {/* No data */}
+                {(currentExpr?.status === "no_data" || (!currentExpr && data.expression.status === "no_data")) && (
+                  <Alert color="gray" variant="light" title="No expression data" icon={<IconChartBar size={16} />}>
+                    This gene does not have expression profiling data in the current dataset.
+                  </Alert>
+                )}
+
+                {/* PG unavailable */}
+                {(currentExpr?.status === "pg_unavailable" || (!currentExpr && data.expression.status === "pg_unavailable")) && (
+                  <Alert color="yellow" variant="light" title="Database unavailable" icon={<IconChartBar size={16} />}>
+                    Expression data is temporarily unavailable. Please try again later.
+                  </Alert>
+                )}
+
+                {/* Stats Row — only when summary exists */}
+                {(currentExpr?.status === "available" || data.expression.status === "available") &&
+                  (currentExpr?.summary || data.expression.summary) && (
+                    <>
+                      <ExpressionStatsRow
+                        summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                        sampleCount={currentExpr?.samples?.length ?? data.expression.samples?.length ?? 0}
+                      />
+
+                      {/* Charts: Stage + Line side by side */}
+                      <Group grow align="flex-start" gap="md">
+                        <ExpressionStageChart
+                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                          dataset={selectedDataset}
+                          metric={selectedMetric}
+                        />
+                        <ExpressionLineChart
+                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                          dataset={selectedDataset}
+                          metric={selectedMetric}
+                        />
+                      </Group>
+
+                      {/* Sample Table */}
+                      <ExpressionTable
+                        samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                        summary={currentExpr?.summary ?? data.expression.summary}
+                        dataset={selectedDataset}
+                      />
+                    </>
+                  )
                 }
-                size="sm"
-              >
-                {data.expression.summary.sex_bias?.replace(/_/g, " ") ?? "Unknown"}
-              </Badge>
+              </>
             )}
-          </Group>
-
-          {/* No data message */}
-          {data.expression.status === "no_data" && (
-            <Alert
-              color="gray"
-              variant="light"
-              title="No expression data"
-              icon={<IconChartBar size={16} />}
-            >
-              This gene does not have expression profiling data in the current dataset.
-            </Alert>
-          )}
-
-          {/* Zero expression warning */}
-          {data.expression.status === "zero_expression" && (
-            <Alert
-              color="yellow"
-              variant="light"
-              title="Zero expression"
-              mb="md"
-            >
-              All samples show zero expression (normcount = 0) for this gene — it may not be
-              expressed in the studied developmental stages.
-            </Alert>
-          )}
-
-          {/* Summary stats row */}
-          {data.expression.status === "available" && data.expression.summary && (
-            <Group gap="xl" mb="md">
-              <Box>
-                <Text size="xs" c="dimmed">Max NormCount</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.max_normcount?.toFixed(4) ?? "—"}</Text>
-                <Text size="xs" c="dimmed">{data.expression.summary.max_normcount_sample ?? "—"}</Text>
-              </Box>
-              <Box>
-                <Text size="xs" c="dimmed">Min NormCount</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.min_normcount?.toFixed(4) ?? "—"}</Text>
-              </Box>
-              <Box>
-                <Text size="xs" c="dimmed">Mean NormCount</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.mean_normcount?.toFixed(4) ?? "—"}</Text>
-              </Box>
-              <Box>
-                <Text size="xs" c="dimmed">Std NormCount</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.std_normcount?.toFixed(4) ?? "—"}</Text>
-              </Box>
-              <Box>
-                <Text size="xs" c="dimmed">Expressed</Text>
-                <Text size="sm" fw={600}>
-                  {data.expression.summary.expressed_samples ?? 0}/{data.expression.samples?.length ?? 0}
-                </Text>
-              </Box>
-              <Box>
-                <Text size="xs" c="dimmed">Zero Samples</Text>
-                <Text size="sm" fw={600}>{data.expression.summary.zero_samples ?? 0}</Text>
-              </Box>
-            </Group>
-          )}
-
-          {/* Expression table */}
-          {data.expression.status !== "no_data" && data.expression.samples && (
-            <ScrollArea>
-              <Table striped highlightOnHover withTableBorder withColumnBorders>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Sample</Table.Th>
-                    <Table.Th>Stage</Table.Th>
-                    <Table.Th>Stage Label</Table.Th>
-                    <Table.Th>Sex</Table.Th>
-                    <Table.Th style={{ textAlign: "right" }}>NormCount</Table.Th>
-                    <Table.Th style={{ minWidth: 120 }}>Relative Level</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {data.expression.samples.map(sample => {
-                    const maxNc = data.expression!.summary?.max_normcount || 1;
-                    const ncVal = sample.normcount ?? 0;
-                    const pct = maxNc > 0 ? Math.min((ncVal / maxNc) * 100, 100) : 0;
-                    const isZero = ncVal === 0;
-                    return (
-                      <Table.Tr key={sample.sample_id} style={isZero ? { opacity: 0.5 } : undefined}>
-                        <Table.Td>
-                          <Text size="sm" fw={500}>{sample.sample_name ?? "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Badge variant="light" color="gray" size="xs">
-                            {sample.stage ?? "—"}
-                          </Badge>
-                        </Table.Td>
-                        <Table.Td>
-                          <Text size="xs" c="dimmed">{sample.stage_label ?? "—"}</Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Group gap={4}>
-                            {sample.sex === "Male" ? (
-                              <IconGenderMale size={14} color="var(--mantine-color-blue-6)" />
-                            ) : (
-                              <IconGenderFemale size={14} color="var(--mantine-color-pink-6)" />
-                            )}
-                            <Text size="xs" c="dimmed">{sample.sex ?? "—"}</Text>
-                            <Text size="xs" c="dimmed">R{sample.replicate ?? "—"}</Text>
-                          </Group>
-                        </Table.Td>
-                        <Table.Td style={{ textAlign: "right" }}>
-                          <Text
-                            size="sm"
-                            fw={500}
-                            style={{ fontVariantNumeric: "tabular-nums", color: isZero ? "dimmed" : undefined }}
-                          >
-                            {ncVal.toFixed(4)}
-                          </Text>
-                        </Table.Td>
-                        <Table.Td>
-                          <Tooltip label={`${pct.toFixed(1)}% of max`}>
-                            <Progress
-                              value={pct}
-                              color={isZero ? "gray" : pct > 80 ? "violet" : pct > 30 ? "indigo" : "gray"}
-                              size="sm"
-                              radius="xl"
-                              style={{ minWidth: 100 }}
-                            />
-                          </Tooltip>
-                        </Table.Td>
-                      </Table.Tr>
-                    );
-                  })}
-                </Table.Tbody>
-              </Table>
-            </ScrollArea>
-          )}
+          </Stack>
         </Paper>
       ) : null}
 
