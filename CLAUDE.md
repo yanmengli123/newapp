@@ -33,20 +33,23 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
   - `GeneQueryPage` — Autocomplete gene search
   - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion折叠卡片), KEGG Pathways, **Expression** (6-block 模块: StatsRow/StageChart/LineChart/Table/ComparePanel)
+    - **Data loading**: Four-layer concept — (1) Load main page via `getGenePage(geneId, false)` (no sequences), (2) Hydrate expression from `response.expression`, (3) Annotations consumed directly from `response.annotations` (no separate API calls), (4) Sequences loaded on-demand via `getGenePage(geneId, true)`
   - `ChromosomePage` — Chromosome view with gene list
   - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis), `src/lib/chatApi.ts` (chat)
-- **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器)
+  - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `http://localhost:8000`). Never hardcode URLs in components.
+  - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
+- **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
 - **Expression components** — `src/components/expression/`: 6-block Expression 模块
   - `ExpressionHeader` — Dataset/Metric 选择器 + Expand All 切换
   - `ExpressionStatsRow` — 7 张统计卡片（Max/Min/Mean±Std/CV/Expressed/Top Stage/Sex Bias）
   - `ExpressionStageChart` — Plotly 分组柱状图（Male/Female + Total Mean 折线，双 Y 轴）
-  - `ExpressionLineChart` — Plotly 折线图（按 stage_order 排序，含 Male/Female 分色）
-  - `ExpressionTable` — 可排序/可筛选/可分页（12/页）/CSV 导出的样本表
-  - `ExpressionComparePanel` — Expand All 跨数据集对比面板（Dataset Tabs + 指标切换）
+  - `ExpressionLineChart` — Plotly 折线图（按 stage_order 排序，含 Male/Female 分色）. "All Samples" trace is weakened (dashed/dim) to make Male/Female lines stand out.
+  - `ExpressionTable` — 可排序/可筛选/可分页（12/页）/CSV 导出（导出发filtered结果）/SortIcon 提取到组件外避免每次渲染重建
+  - `ExpressionComparePanel` — Expand All 跨数据集对比面板（Dataset Tabs + 指标切换）. Maintains local `activeTab`/`localMetric` state; syncs with parent via `selectedDataset`/`selectedMetric` props and calls `onSelectDataset()` on user interactions.
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)
@@ -174,7 +177,7 @@ finally:
     pg_putconn(pg_conn)   # 归还池中
 ```
 
-**PG 不可用时自动降级**：GO/KEGG/Expression 端点返回 `status: "pg_unavailable"`，不影响 SQLite 核心功能。
+**PG 不可用时自动降级**：GO/KEGG/Expression 端点返回 `status: "unavailable"`，不影响 SQLite 核心功能。GenePage 统一检查 `status === 'unavailable'` 即可捕获所有降级场景。
 
 ### Gene Expression Response
 
@@ -182,7 +185,7 @@ finally:
 
 ```typescript
 interface GeneExpressionResponse {
-  status: "available" | "no_data" | "pg_unavailable" | string;
+  status: "available" | "no_data" | "unavailable";
   gene_id?: string;
   dataset?: string;   // e.g. "day_deseq2_36"
   metric?: string;    // e.g. "normcount"
@@ -324,10 +327,15 @@ cd backend && python scripts/fetch_kegg_pathway_class.py
 ```
 
 **`/mapdata` 返回格式**（`nodes` 数组，每节点含）：
-- `left/top/right/bottom`：前端可直接用的像素坐标
+- `left/top/right/bottom`：前端可直接用的像素坐标（KGML 中心点已转换）
+- `url`：节点跳转链接（`https://www.kegg.jp/entry/{kegg_gene_id}`）
 - `graphics_type`：rectangle / circle / line 等
-- `genes[]`：含 `kegg_gene_id`、`gene_symbol`、`in_pathway`（是否通路注释基因）
-- `highlighted`：节点是否为当前查询基因的标注（**两层兜底**：① label 模糊匹配基因名 ② kegg_gene_id 映射；两者满足其一即高亮，覆盖 KEGG 同一基因多处出现但部分无数据库映射的情况）
+- `highlighted`：节点是否为当前查询基因（kegg_gene_id 精确匹配）
+- `image_width/image_height`：来自 `kegg_pathway_asset` 表的 PNG 原始像素尺寸
+- `node_count`：节点总数（backend 返回字段，frontend 类型别名 `total_nodes`）
+- **无 `genes` 数组** — mapdata 节点是 per-gene 的，每个 hotspot 一个节点
+
+> **注意**：`/mapdata` 响应中字段名与 `KEGGPathwayNode` 类型不同 — 使用 `KEGGPathwayMapdataNode` 类型。
 
 **前端 KEGG 数据加载**：GenePage 通过 `getGeneKEGGAnnotations(geneId)` 调用 `/annotations/kegg/{gene_id}` 获取通路列表，每个 `pathway` 含 `png_url`（`/static/kegg_pathways/`）、`mapdata_api`、`interactive_api`。
 
@@ -338,16 +346,18 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 
 ## Key Patterns
 
-- **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id.
+- **API Client**: All backend calls go through `src/lib/apiClient.ts`. Never hardcode URLs — use `apiFetch<T>(path)` which prefixes `API_BASE` automatically. All API functions in `geneApi.ts`/`genomeApi.ts`/`chatApi.ts` use `apiFetch` internally.
+- **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id. Use `resolveGeneId()` to canonicalize before API calls — geneApi functions call this internally, components should NOT call search separately.
 - **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
 - **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
 - **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state.
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
 - **Genome analysis**: `/genome/analysis/run` submits jobs; `/genome/sample/*` serves pre-generated results without running analysis.
 - **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
-- **KEGG Interactive Viewer**：PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 传入 geneId 确保只高亮当前基因的所有出现位置。对齐：wrapper `display:inline-block` 由 img 撑开，img `width:100%; height:auto`，SVG `position:absolute; inset:0` 覆盖 img 实测尺寸，`viewBox` 使用 PNG 原始像素坐标，`ResizeObserver` 监听 img 尺寸变化保证全屏/缩放下坐标始终对齐。全屏 `requestFullscreen()` + ESC 退出。highlighted 判断：label 模糊匹配（entry_name 含基因名）+ kegg_gene_id 映射兜底。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
+- **Expression Status**: Three states only — `'available'`, `'no_data'`, `'unavailable'`. Check `status === 'available'` before rendering charts/tables. Never check for `'pg_unavailable'`.
+- **KEGG Interactive Viewer**：`KeggInteractiveViewer` 使用 Drawer + CSS fullscreen（`size="100%"` 切换）实现全屏。PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 高亮基因。`viewBox="0 0 ${pngW} ${pngH}"` 使用后端原始像素坐标，`ResizeObserver` 监听 img 尺寸变化。点击节点 `window.open(node.url)` 跳转 KEGG。highlighted 判断：kegg_gene_id 精确匹配。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
 - **KEGG image paths**: `_get_asset_path()` in `kegg_image_router.py` resolves `png_relpath` using `GRCG6A_STATIC_ROOT.parent` (project root), not filesystem root.
-- **Plotly charts**: `plotly.js-dist-min` + `react-plotly.js`; types declared in `src/plotly.d.ts` (required because `@types/plotly.js` does not cover the dist bundle).
+- **Plotly charts**: `plotly.js-dist-min` + `react-plotly.js`; types declared in `src/plotly.d.ts` (required because `@types/plotly.js` does not cover the dist bundle). Expression chart components use `any[]` for trace/layout/config to avoid type conflicts; keep eslint-disable annotations nearby if adding new traces.
 
 ## Git
 

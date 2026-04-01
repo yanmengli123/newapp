@@ -28,14 +28,11 @@ import {
 import type {
   GenePageResponse,
   TranscriptResult,
-  GOAnnotationsResponse,
-  KEGGAnnotationsResponse,
-  KEGGPathway,
   GeneExpressionResponse,
   GeneExpressionExpandResponse,
   DatasetInfo,
 } from "../lib/geneApi";
-import { getGenePage, getChromosome, getGeneGOAnnotations, getGeneKEGGAnnotations, getGeneExpression, getDatasets } from "../lib/geneApi";
+import { getGenePage, getChromosome, getGeneExpression, getDatasets } from "../lib/geneApi";
 import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
 import ExpressionHeader from "../components/expression/ExpressionHeader";
@@ -49,98 +46,68 @@ export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
   const [data, setData] = useState<GenePageResponse | null>(null);
   const [chromosomeGeneCount, setChromosomeGeneCount] = useState<number | null>(null);
-  const [goAnnotations, setGoAnnotations] = useState<GOAnnotationsResponse | null>(null);
-  const [keggAnnotations, setKeggAnnotations] = useState<KEGGAnnotationsResponse | null>(null);
-  const [loadingAnnotations, setLoadingAnnotations] = useState(false);
+  // Annotations now come from page response - no separate loading needed
   const [loading, setLoading] = useState(true);
   const [downloadingFasta, setDownloadingFasta] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   // Expression module state
-  const [selectedDataset, setSelectedDataset] = useState<string>("day_deseq2_36");
-  const [selectedMetric, setSelectedMetric] = useState<string>("normcount");
+  const [selectedDataset, setSelectedDataset] = useState<string>('day_deseq2_36');
+  const [selectedMetric, setSelectedMetric] = useState<string>('normcount');
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentExpr, setCurrentExpr] = useState<GeneExpressionResponse | null>(null);
   const [expandData, setExpandData] = useState<GeneExpressionExpandResponse | null>(null);
   const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
   const [loadingExpression, setLoadingExpression] = useState(false);
 
+  // ========== Layer 1: Load main page data (no sequences) ==========
   useEffect(() => {
     if (!geneId) return;
 
-    const fetchGene = async () => {
+    const loadGenePage = async () => {
       setLoading(true);
-      setError(null);
+      setPageError(null);
       try {
-        // Fetch with sequences for full details
-        const result = await getGenePage(geneId, true);
+        // Default: no sequences. Load them on demand.
+        const result = await getGenePage(geneId, false);
         setData(result);
 
-        // Fetch chromosome details to get gene_count
+        // Chromosome details
         const chromData = await getChromosome(result.gene.seqid);
         setChromosomeGeneCount(chromData.gene_count);
 
-        // Fetch GO and KEGG annotations
-        setLoadingAnnotations(true);
+        // Annotations come from page response - no separate API calls needed
+        // Initialize expression from page data
+        if (result.expression && result.expression.status === 'available') {
+          setCurrentExpr(result.expression);
+          setSelectedDataset(result.expression.dataset || 'day_deseq2_36');
+          setSelectedMetric(result.expression.metric || 'normcount');
+        }
+
+        // Load available datasets
         try {
-          const [goData, keggData] = await Promise.all([
-            getGeneGOAnnotations(geneId),
-            getGeneKEGGAnnotations(geneId).catch(() => null)
-          ]);
-
-          // Transform GO data from API format to component format
-          const transformedGoData = {
-            ...goData,
-            go_annotations: {
-              biological_process: goData.items?.filter(item => item.go_namespace === 'biological_process') || [],
-              molecular_function: goData.items?.filter(item => item.go_namespace === 'molecular_function') || [],
-              cellular_component: goData.items?.filter(item => item.go_namespace === 'cellular_component') || [],
-            }
-          };
-          setGoAnnotations(transformedGoData);
-
-          // Transform KEGG data from API format to component format
-          if (keggData) {
-            const pathways = keggData.items || keggData.pathways || [];
-            const transformedKeggData = {
-              ...keggData,
-              total: keggData.total || keggData.summary?.pathway_count || pathways.length,
-              pathways: pathways.map((p: KEGGPathway) => ({
-                ...p,
-                kegg_link: p.official_link || p.kegg_link || ''
-              }))
-            };
-            setKeggAnnotations(transformedKeggData);
-          }
-
-          // Initialize expression from page data
-          if (result.expression && result.expression.status === "available") {
-            setCurrentExpr(result.expression);
-            setSelectedDataset(result.expression.dataset || "day_deseq2_36");
-            setSelectedMetric(result.expression.metric || "normcount");
-          }
-
-          // Load available datasets
-          try {
-            const dsResult = await getDatasets();
-            setAvailableDatasets(dsResult.datasets || []);
-          } catch {
-            // ignore
-          }
-        } catch (annErr) {
-          console.error('Failed to load annotations:', annErr);
-        } finally {
-          setLoadingAnnotations(false);
+          const dsResult = await getDatasets();
+          setAvailableDatasets(dsResult.datasets || []);
+        } catch {
+          // ignore
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load gene");
+        setPageError(err instanceof Error ? err.message : 'Failed to load gene page');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchGene();
+    loadGenePage();
   }, [geneId]);
+
+  // ========== Layer 2: Hydrate page state (called after data loads) ==========
+  // No-op - UI state initialized via useState above
+  // Separation of concerns: data fetching vs UI state
+
+  // ========== Layer 3: Reserved for sequence loading on demand ==========
+  // Note: sequences can be loaded on demand when user expands a transcript
+  // Currently sequences come from the full page load if include_sequences=true
 
   // Download FASTA file
   const downloadFasta = useCallback(async () => {
@@ -409,10 +376,10 @@ export default function GenePage() {
     );
   }
 
-  if (error || !data) {
+  if (pageError || !data) {
     return (
       <Paper withBorder radius="xl" p="xl">
-        <Text c="red">Error: {error || "Gene not found"}</Text>
+        <Text c="red">Error: {pageError || "Gene not found"}</Text>
         <Link to="/">
           <Text c="cyan" mt="md">
             ← Back to Home
@@ -591,30 +558,29 @@ export default function GenePage() {
         <Group gap="sm" mb="md">
           <IconApi size={20} color="var(--mantine-color-cyan-6)" />
           <Title order={4}>GO Annotations</Title>
-          {loadingAnnotations && <Loader size="xs" />}
-          {goAnnotations?.summary && (
+          {data.annotations?.go?.summary && (
             <Badge variant="light" color="gray" size="sm">
-              {goAnnotations.summary.total} terms
+              {data.annotations.go.summary.total} terms
             </Badge>
           )}
-          {goAnnotations?.ncbi_gene_id && (
+          {data.annotations?.go?.ncbi_gene_id && (
             <Badge variant="outline" color="gray" size="xs">
-              NCBI: {goAnnotations.ncbi_gene_id}
+              NCBI: {data.annotations.go.ncbi_gene_id}
             </Badge>
           )}
-          {goAnnotations?.ensembl_gene_id && (
+          {data.annotations?.go?.ensembl_gene_id && (
             <Badge variant="outline" color="gray" size="xs">
-              Ensembl: {goAnnotations.ensembl_gene_id}
+              Ensembl: {data.annotations.go.ensembl_gene_id}
             </Badge>
           )}
         </Group>
 
-        {!goAnnotations || !goAnnotations.items?.length ? (
+        {!data.annotations?.go || !data.annotations.go.items?.length ? (
           <Text c="dimmed" size="sm">No GO annotations available</Text>
         ) : (
           <Accordion variant="separated" radius="md" defaultValue="biological_process">
             {/* Biological Process */}
-            {goAnnotations.items.filter(i => i.go_namespace === "biological_process").length > 0 && (
+            {data.annotations.go.items.filter(i => i.go_namespace === "biological_process").length > 0 && (
               <Accordion.Item value="biological_process">
                 <Accordion.Control
                   bg="var(--mantine-color-blue-0)"
@@ -623,13 +589,13 @@ export default function GenePage() {
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="blue">Biological Process</Text>
                     <Badge color="blue" variant="light" size="xs">
-                      {goAnnotations.items.filter(i => i.go_namespace === "biological_process").length}
+                      {data.annotations.go.items.filter(i => i.go_namespace === "biological_process").length}
                     </Badge>
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {goAnnotations.items
+                    {data.annotations.go.items
                       .filter(i => i.go_namespace === "biological_process")
                       .map(item => (
                         <GOTermCard key={item.go_id} item={item} />
@@ -640,7 +606,7 @@ export default function GenePage() {
             )}
 
             {/* Molecular Function */}
-            {goAnnotations.items.filter(i => i.go_namespace === "molecular_function").length > 0 && (
+            {data.annotations.go.items.filter(i => i.go_namespace === "molecular_function").length > 0 && (
               <Accordion.Item value="molecular_function">
                 <Accordion.Control
                   bg="var(--mantine-color-green-0)"
@@ -649,13 +615,13 @@ export default function GenePage() {
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="green">Molecular Function</Text>
                     <Badge color="green" variant="light" size="xs">
-                      {goAnnotations.items.filter(i => i.go_namespace === "molecular_function").length}
+                      {data.annotations.go.items.filter(i => i.go_namespace === "molecular_function").length}
                     </Badge>
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {goAnnotations.items
+                    {data.annotations.go.items
                       .filter(i => i.go_namespace === "molecular_function")
                       .map(item => (
                         <GOTermCard key={item.go_id} item={item} />
@@ -666,7 +632,7 @@ export default function GenePage() {
             )}
 
             {/* Cellular Component */}
-            {goAnnotations.items.filter(i => i.go_namespace === "cellular_component").length > 0 && (
+            {data.annotations.go.items.filter(i => i.go_namespace === "cellular_component").length > 0 && (
               <Accordion.Item value="cellular_component">
                 <Accordion.Control
                   bg="var(--mantine-color-orange-0)"
@@ -675,13 +641,13 @@ export default function GenePage() {
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="orange">Cellular Component</Text>
                     <Badge color="orange" variant="light" size="xs">
-                      {goAnnotations.items.filter(i => i.go_namespace === "cellular_component").length}
+                      {data.annotations.go.items.filter(i => i.go_namespace === "cellular_component").length}
                     </Badge>
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {goAnnotations.items
+                    {data.annotations.go.items
                       .filter(i => i.go_namespace === "cellular_component")
                       .map(item => (
                         <GOTermCard key={item.go_id} item={item} />
@@ -717,6 +683,8 @@ export default function GenePage() {
                 expandData={expandData}
                 onSelectDataset={handleCompareSelect}
                 onLoadingChange={setLoadingExpression}
+                selectedDataset={selectedDataset}
+                selectedMetric={selectedMetric}
               />
             ) : (
               <>
@@ -727,8 +695,8 @@ export default function GenePage() {
                   </Alert>
                 )}
 
-                {/* PG unavailable */}
-                {(currentExpr?.status === "pg_unavailable" || (!currentExpr && data.expression.status === "pg_unavailable")) && (
+                {/* unavailable */}
+                {(currentExpr?.status === 'unavailable' || (!currentExpr && data.expression.status === 'unavailable')) && (
                   <Alert color="yellow" variant="light" title="Database unavailable" icon={<IconChartBar size={16} />}>
                     Expression data is temporarily unavailable. Please try again later.
                   </Alert>
@@ -773,9 +741,9 @@ export default function GenePage() {
       ) : null}
 
       {/* KEGG Pathways (Interactive KGML Viewer) */}
-      {keggAnnotations && (keggAnnotations.pathways?.length || keggAnnotations.items?.length) ? (
+      {data.annotations?.kegg && (data.annotations.kegg.pathways?.length || data.annotations.kegg.items?.length) ? (
         <KeggPathwaysSection
-          keggAnnotations={keggAnnotations}
+          keggAnnotations={data.annotations.kegg}
           geneId={data?.gene.gene_id || geneId || ""}
           kegg_gene_id={data?.gene.kegg_gene_id}
         />

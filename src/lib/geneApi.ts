@@ -1,4 +1,7 @@
-const API_BASE = 'http://localhost:8000';
+import { API_BASE, apiFetch, resolveGeneId } from './apiClient';
+
+// Re-export for convenience
+export { API_BASE };
 
 export interface GeneResult {
   gene_id: string;
@@ -144,11 +147,11 @@ export interface MetricInfo {
   gene_count?: number;
 }
 
+export type ExpressionStatus = 'available' | 'no_data' | 'unavailable';
+
 export interface GeneExpressionResponse {
-  status: "available" | "no_data" | "pg_unavailable" | string;
+  status: ExpressionStatus;
   gene_id?: string;
-  // dataset/metric: when called from gene page (no params), these are strings (codes)
-  // When called with ?expand=all, the structure differs
   dataset?: string;
   metric?: string;
   samples: ExpressionSample[];
@@ -192,11 +195,14 @@ export interface GeneExpressionExpandResponse {
       unit_desc: string;
       is_comparable: boolean;
       gene_count?: number;
-      summary?: GeneExpressionResponse["summary"];
+      summary?: GeneExpressionResponse['summary'];
       samples: ExpressionSample[];
     }>;
   }>;
 }
+
+export type AnnotationsStatus = 'available' | 'unavailable';
+export type AnnotationsError = 'service_unavailable' | 'load_failed' | null;
 
 export interface GenePageResponse {
   gene: GeneResult;
@@ -207,6 +213,8 @@ export interface GenePageResponse {
     go: GOAnnotationsResponse;
     kegg: KEGGAnnotationsResponse;
   };
+  annotations_status?: AnnotationsStatus;
+  annotations_error?: AnnotationsError;
   expression?: GeneExpressionResponse;
 }
 
@@ -250,70 +258,31 @@ export function parseSearchQuery(query: string): {
 
 // API functions
 export async function searchGenes(q: string, limit = 8): Promise<GeneSearchResponse> {
-  const response = await fetch(`${API_BASE}/search/genes?q=${encodeURIComponent(q)}&limit=${limit}`);
-  if (!response.ok) {
-    throw new Error(`Search failed: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<GeneSearchResponse>(`/search/genes?q=${encodeURIComponent(q)}&limit=${limit}`);
 }
 
 export async function getGene(geneId: string): Promise<GeneDetail> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-
-  const response = await fetch(`${API_BASE}/genes/${encodeURIComponent(geneId)}`);
-  if (!response.ok) {
-    throw new Error(`Gene not found: ${response.statusText}`);
-  }
-  return response.json();
+  const resolved = await resolveGeneId(geneId);
+  return apiFetch<GeneDetail>(`/genes/${encodeURIComponent(resolved)}`);
 }
 
 export async function getGeneTranscripts(geneId: string): Promise<GeneTranscriptsResponse> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-
-  const response = await fetch(`${API_BASE}/genes/${encodeURIComponent(geneId)}/transcripts`);
-  if (!response.ok) {
-    throw new Error(`Failed to get transcripts: ${response.statusText}`);
-  }
-  return response.json();
+  const resolved = await resolveGeneId(geneId);
+  return apiFetch<GeneTranscriptsResponse>(`/genes/${encodeURIComponent(resolved)}/transcripts`);
 }
 
 export async function getGenePage(geneId: string, includeSequences = false): Promise<GenePageResponse> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-
-  const url = `${API_BASE}/genes/${encodeURIComponent(geneId)}/page${includeSequences ? '?include_sequences=true' : ''}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Gene page not found: ${response.statusText}`);
-  }
-  return response.json();
+  const resolved = await resolveGeneId(geneId);
+  const qs = includeSequences ? '?include_sequences=true' : '';
+  return apiFetch<GenePageResponse>(`/genes/${encodeURIComponent(resolved)}/page${qs}`);
 }
 
 export async function getChromosomes(): Promise<ChromosomeResult[]> {
-  const response = await fetch(`${API_BASE}/chromosomes`);
-  if (!response.ok) {
-    throw new Error(`Failed to get chromosomes: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<ChromosomeResult[]>('/chromosomes');
 }
 
 export async function getChromosome(seqid: string): Promise<ChromosomeDetail> {
-  const response = await fetch(`${API_BASE}/chromosomes/${encodeURIComponent(seqid)}`);
-  if (!response.ok) {
-    throw new Error(`Chromosome not found: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<ChromosomeDetail>(`/chromosomes/${encodeURIComponent(seqid)}`);
 }
 
 export async function getChromosomeGenes(
@@ -329,15 +298,10 @@ export async function getChromosomeGenes(
   limit: number;
   items: GeneResult[];
 }> {
-  let url = `${API_BASE}/chromosomes/${encodeURIComponent(seqid)}/genes?limit=${limit}&offset=${offset}`;
+  let url = `/chromosomes/${encodeURIComponent(seqid)}/genes?limit=${limit}&offset=${offset}`;
   if (start !== undefined) url += `&start=${start}`;
   if (end !== undefined) url += `&end=${end}`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to get genes: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch(url);
 }
 
 // GO Annotation types
@@ -403,23 +367,14 @@ export interface KEGGAnnotationsResponse {
 
 // GO/KEGG API functions
 export async function getGeneGOAnnotations(geneId: string): Promise<GOAnnotationsResponse> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-
-  const response = await fetch(`${API_BASE}/annotations/go/${encodeURIComponent(geneId)}`);
-  if (!response.ok) {
-    throw new Error(`Failed to get GO annotations: ${response.statusText}`);
-  }
-  const data = await response.json();
+  const resolved = await resolveGeneId(geneId);
+  const data = await apiFetch<GOAnnotationsResponse>(`/annotations/go/${encodeURIComponent(resolved)}`);
 
   // Transform items into grouped go_annotations
   if (data.items && data.items.length > 0) {
-    const biological_process = data.items.filter((item: GOAnnotation) => item.go_namespace === 'biological_process');
-    const molecular_function = data.items.filter((item: GOAnnotation) => item.go_namespace === 'molecular_function');
-    const cellular_component = data.items.filter((item: GOAnnotation) => item.go_namespace === 'cellular_component');
+    const biological_process = data.items.filter((item) => item.go_namespace === 'biological_process');
+    const molecular_function = data.items.filter((item) => item.go_namespace === 'molecular_function');
+    const cellular_component = data.items.filter((item) => item.go_namespace === 'cellular_component');
 
     data.go_annotations = {
       biological_process,
@@ -432,17 +387,8 @@ export async function getGeneGOAnnotations(geneId: string): Promise<GOAnnotation
 }
 
 export async function getGeneKEGGAnnotations(geneId: string): Promise<KEGGAnnotationsResponse> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-
-  const response = await fetch(`${API_BASE}/annotations/kegg/${encodeURIComponent(geneId)}`);
-  if (!response.ok) {
-    throw new Error(`Failed to get KEGG annotations: ${response.statusText}`);
-  }
-  return response.json();
+  const resolved = await resolveGeneId(geneId);
+  return apiFetch<KEGGAnnotationsResponse>(`/annotations/kegg/${encodeURIComponent(resolved)}`);
 }
 
 // ========== Tools API ==========
@@ -503,44 +449,23 @@ export async function designPrimers(
   productSizeMax = 300,
   numPrimers = 5
 ): Promise<Primer3Result> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
+  const resolved = await resolveGeneId(geneId);
 
   const params = new URLSearchParams({
-    gene_id: geneId,
+    gene_id: resolved,
     include_flank: includeFlank.toString(),
     product_size_min: productSizeMin.toString(),
     product_size_max: productSizeMax.toString(),
     num_primers: numPrimers.toString(),
   });
 
-  const response = await fetch(`${API_BASE}/tools/primer3?${params}`, {
-    method: 'POST',
-  });
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to design primers: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<Primer3Result>(`/tools/primer3?${params}`, { method: 'POST' });
 }
 
 export async function searchDomains(geneId: string): Promise<DomainSearchResult> {
-  // First search for the gene to get the correct gene_id format
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-
-  const params = new URLSearchParams({ gene_id: geneId });
-  const response = await fetch(`${API_BASE}/tools/domain-search?${params}`);
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.detail || `Failed to search domains: ${response.statusText}`);
-  }
-  return response.json();
+  const resolved = await resolveGeneId(geneId);
+  const params = new URLSearchParams({ gene_id: resolved });
+  return apiFetch<DomainSearchResult>(`/tools/domain-search?${params}`);
 }
 
 // ========== KEGG Pathways API ==========
@@ -619,40 +544,48 @@ export interface KEGGPathwayInfo {
   updated_at: string;
 }
 
-export interface KEGGPathwayNodeGene {
-  kegg_gene_id: string;
-  gene_symbol: string | null;
-  in_pathway: boolean;
-}
-
-export interface KEGGPathwayNode {
+// KEGGPathwayMapdata node — matches backend /mapdata response
+// Backend: url, image_width, image_height, node_count, no genes array
+export interface KEGGPathwayMapdataNode {
+  node_id: string;
   entry_id: string;
   entry_type: string;
+  kegg_gene_id: string;
   label: string;
+  url: string;           // Backend uses 'url' (not 'link_url')
   graphics_type: string;
   x: number;
   y: number;
   width: number;
   height: number;
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-  genes: KEGGPathwayNodeGene[];
+  left: number;         // left = x - width/2 (KGML coords are center-based)
+  top: number;           // top = y - height/2
+  right: number;         // right = left + width
+  bottom: number;        // bottom = top + height
   highlighted: boolean;
-  link_url: string;
 }
 
 export interface KEGGPathwayMapdata {
   pathway_id: string;
   pathway_name: string;
-  png_width: number;
-  png_height: number;
-  total_nodes: number;
-  highlighted_nodes: number;
-  pathway_gene_count: number;
-  nodes: KEGGPathwayNode[];
-  source: string;
+  png_url?: string;       // from parse_kgml_hotspots
+  kegg_url?: string;
+  node_count?: number;    // backend uses 'node_count'
+  image_width?: number;   // backend uses 'image_width' (not 'png_width')
+  image_height?: number;   // backend uses 'image_height' (not 'png_height')
+  total_nodes?: number;   // frontend alias for node_count
+  highlighted_nodes?: number;
+  pathway_gene_count?: number;
+  nodes: KEGGPathwayMapdataNode[];
+  source?: string;
+  // highlight info
+  target_gene?: {
+    ncbi_gene_id: string;
+    kegg_gene_id: string;
+    symbol: string;
+    highlighted_count: number;
+  };
+  highlight_ncbi?: string;
 }
 
 export interface KEGGPathwayInteractive {
@@ -673,60 +606,38 @@ export interface KEGGPathwayInteractive {
 
 // List all KEGG pathways
 export async function getKEGGPathways(): Promise<KEGGPathwaysResponse> {
-  const response = await fetch(`${API_BASE}/annotations/kegg/pathways`);
-  if (!response.ok) {
-    throw new Error(`Failed to get KEGG pathways: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<KEGGPathwaysResponse>('/annotations/kegg/pathways');
 }
 
 // Get KEGG pathway detail (genes in pathway)
 export async function getKEGGPathwayDetail(pathwayId: string): Promise<KEGGPathwayDetail> {
-  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}`);
-  if (!response.ok) {
-    throw new Error(`Pathway not found: ${pathwayId}`);
-  }
-  return response.json();
+  return apiFetch<KEGGPathwayDetail>(`/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}`);
 }
 
 // Get KEGG pathway info
 export async function getKEGGPathwayInfo(pathwayId: string): Promise<KEGGPathwayInfo> {
-  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/info`);
-  if (!response.ok) {
-    throw new Error(`Pathway info not found: ${pathwayId}`);
-  }
-  return response.json();
+  return apiFetch<KEGGPathwayInfo>(`/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/info`);
 }
 
 // Get KEGG pathway mapdata (hotspot coordinates)
 export async function getKEGGPathwayMapdata(pathwayId: string, geneId?: string): Promise<KEGGPathwayMapdata> {
-  const url = `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/mapdata`
-    + (geneId ? `?highlight_gene=${encodeURIComponent(geneId)}` : "");
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Pathway mapdata not found: ${pathwayId}`);
-  }
-  return response.json();
+  const qs = geneId ? `?highlight_gene=${encodeURIComponent(geneId)}` : '';
+  return apiFetch<KEGGPathwayMapdata>(`/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/mapdata${qs}`);
 }
 
 // Get KEGG pathway interactive data
 export async function getKEGGPathwayInteractive(pathwayId: string): Promise<KEGGPathwayInteractive> {
-  const response = await fetch(`${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive`);
-  if (!response.ok) {
-    throw new Error(`Pathway interactive data not found: ${pathwayId}`);
-  }
-  return response.json();
+  return apiFetch<KEGGPathwayInteractive>(`/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive`);
 }
 
 /** 带 gene_id 参数，获取目标基因高亮信息 */
-export async function getKEGGPathwayInteractiveForGene(pathwayId: string, geneId: string): Promise<KEGGPathwayInteractive & { target_gene?: string }> {
-  const response = await fetch(
-    `${API_BASE}/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive?highlight_gene=${encodeURIComponent(geneId)}`
+export async function getKEGGPathwayInteractiveForGene(
+  pathwayId: string,
+  geneId: string
+): Promise<KEGGPathwayInteractive & { target_gene?: string }> {
+  return apiFetch<KEGGPathwayInteractive & { target_gene?: string }>(
+    `/annotations/kegg/pathway/${encodeURIComponent(pathwayId)}/interactive?highlight_gene=${encodeURIComponent(geneId)}`
   );
-  if (!response.ok) {
-    throw new Error(`Pathway interactive data not found: ${pathwayId}`);
-  }
-  return response.json();
 }
 
 // Build KEGG pathway image URL
@@ -749,11 +660,7 @@ export async function getKEGGImageInfo(pathwayId: string): Promise<{
   width: number;
   height: number;
 }> {
-  const response = await fetch(`${API_BASE}/kegg-images/${encodeURIComponent(pathwayId)}/info`);
-  if (!response.ok) {
-    throw new Error(`KEGG image info not found: ${pathwayId}`);
-  }
-  return response.json();
+  return apiFetch(`/kegg-images/${encodeURIComponent(pathwayId)}/info`);
 }
 
 // ========== KGML Cache API ==========
@@ -767,11 +674,7 @@ export interface KGMLCacheStatus {
 }
 
 export async function getKGMLCacheStatus(): Promise<KGMLCacheStatus> {
-  const response = await fetch(`${API_BASE}/annotations/kegg/kgml-cache/status`);
-  if (!response.ok) {
-    throw new Error(`Failed to get KGML cache status: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<KGMLCacheStatus>('/annotations/kegg/kgml-cache/status');
 }
 
 export async function refreshKGMLCache(pathwayId?: string): Promise<{
@@ -782,13 +685,9 @@ export async function refreshKGMLCache(pathwayId?: string): Promise<{
   failed?: string[];
 }> {
   const url = pathwayId
-    ? `${API_BASE}/annotations/kegg/kgml-cache/refresh/${encodeURIComponent(pathwayId)}`
-    : `${API_BASE}/annotations/kegg/kgml-cache/refresh`;
-  const response = await fetch(url, { method: 'POST' });
-  if (!response.ok) {
-    throw new Error(`KGML cache refresh failed: ${response.statusText}`);
-  }
-  return response.json();
+    ? `/annotations/kegg/kgml-cache/refresh/${encodeURIComponent(pathwayId)}`
+    : '/annotations/kegg/kgml-cache/refresh';
+  return apiFetch(url, { method: 'POST' });
 }
 
 // ========== Gene Sequences API ==========
@@ -801,25 +700,14 @@ export interface GeneSequencesResponse {
 }
 
 export async function getGeneSequences(geneId: string): Promise<GeneSequencesResponse> {
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
-  const response = await fetch(`${API_BASE}/genes/${encodeURIComponent(geneId)}/sequences`);
-  if (!response.ok) {
-    throw new Error(`Failed to get sequences: ${response.statusText}`);
-  }
-  return response.json();
+  const resolved = await resolveGeneId(geneId);
+  return apiFetch<GeneSequencesResponse>(`/genes/${encodeURIComponent(resolved)}/sequences`);
 }
 
 // ========== Datasets API ==========
 
 export async function getDatasets(): Promise<{ datasets: DatasetInfo[] }> {
-  const response = await fetch(`${API_BASE}/datasets`);
-  if (!response.ok) {
-    throw new Error(`Failed to get datasets: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch<{ datasets: DatasetInfo[] }>('/datasets');
 }
 
 // ========== Expression API ==========
@@ -832,22 +720,13 @@ export async function getGeneExpression(
     expand?: boolean;
   }
 ): Promise<GeneExpressionResponse | GeneExpressionExpandResponse> {
-  const searchResult = await searchGenes(geneId, 1);
-  if (searchResult.items.length > 0) {
-    geneId = searchResult.items[0].gene_id;
-  }
+  const resolved = await resolveGeneId(geneId);
 
   const params = new URLSearchParams();
-  if (options?.dataset) params.set("dataset", options.dataset);
-  if (options?.metric) params.set("metric", options.metric);
-  if (options?.expand) params.set("expand", "true");
+  if (options?.dataset) params.set('dataset', options.dataset);
+  if (options?.metric) params.set('metric', options.metric);
+  if (options?.expand) params.set('expand', 'true');
 
   const qs = params.toString();
-  const url = `${API_BASE}/genes/${encodeURIComponent(geneId)}/expression${qs ? `?${qs}` : ""}`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(err.detail || `Failed to get expression: ${response.statusText}`);
-  }
-  return response.json();
+  return apiFetch(`/genes/${encodeURIComponent(resolved)}/expression${qs ? `?${qs}` : ''}`);
 }

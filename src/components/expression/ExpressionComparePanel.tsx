@@ -18,19 +18,31 @@ interface ExpressionComparePanelProps {
   expandData: GeneExpressionExpandResponse;
   onSelectDataset: (ds: string, m: string) => void;
   onLoadingChange: (loading: boolean) => void;
+  // Parent sync props - panel syncs its local state to these
+  selectedDataset?: string;
+  selectedMetric?: string;
 }
 
 export default function ExpressionComparePanel({
   expandData,
   onSelectDataset,
+  selectedDataset,
+  selectedMetric,
 }: ExpressionComparePanelProps) {
   const { cross_comparison, datasets } = expandData;
 
-  const [activeTab, setActiveTab] = useState<string>(datasets[0]?.dataset_code ?? "");
+  // Initialize from parent sync props if provided, otherwise from first dataset
+  const [activeTab, setActiveTab] = useState<string>(
+    selectedDataset ?? datasets[0]?.dataset_code ?? ""
+  );
+  const [localMetric, setLocalMetric] = useState<string>(
+    selectedMetric ?? datasets[0]?.metrics[0]?.metric_code ?? "normcount"
+  );
 
-  // 当前选中数据集
+  // Current dataset and metric
   const currentDs = datasets.find((d) => d.dataset_code === activeTab) ?? datasets[0];
-  const currentMetric = currentDs?.metrics[0];
+  const currentMetricObj = currentDs?.metrics.find((m) => m.metric_code === localMetric)
+    ?? currentDs?.metrics[0];
 
   if (!currentDs) return null;
 
@@ -66,7 +78,9 @@ export default function ExpressionComparePanel({
             setActiveTab(v);
             const ds = datasets.find((d) => d.dataset_code === v);
             if (ds) {
-              onSelectDataset(v, ds.metrics[0]?.metric_code ?? "normcount");
+              const newMetric = ds.metrics[0]?.metric_code ?? "normcount";
+              setLocalMetric(newMetric);
+              onSelectDataset(v, newMetric);
             }
           }}
           variant="pills"
@@ -100,12 +114,15 @@ export default function ExpressionComparePanel({
               <Box
                 key={m.metric_code}
                 style={{ cursor: "pointer" }}
-                onClick={() => onSelectDataset(activeTab, m.metric_code)}
+                onClick={() => {
+                  setLocalMetric(m.metric_code);
+                  onSelectDataset(activeTab, m.metric_code);
+                }}
               >
                 <Text
                   size="xs"
-                  fw={m.metric_code === currentMetric?.metric_code ? 700 : 400}
-                  c={m.metric_code === currentMetric?.metric_code ? "violet" : "dimmed"}
+                  fw={m.metric_code === localMetric ? 700 : 400}
+                  c={m.metric_code === localMetric ? "violet" : "dimmed"}
                 >
                   {m.metric_name}
                 </Text>
@@ -115,23 +132,23 @@ export default function ExpressionComparePanel({
         )}
 
         {/* Summary + Charts */}
-        {currentMetric && currentMetric.summary && currentMetric.samples && (
+        {currentMetricObj && currentMetricObj.summary && currentMetricObj.samples && (
           <Stack gap="xs">
             <ExpressionStatsRow
-              summary={currentMetric.summary}
+              summary={currentMetricObj.summary}
               sampleCount={currentDs.sample_count}
             />
             <Group grow align="flex-start" gap="xs">
               <ExpressionStageChart
-                summary={currentMetric.summary}
+                summary={currentMetricObj.summary}
                 dataset={currentDs.dataset_code}
-                metric={currentMetric.metric_code}
+                metric={currentMetricObj.metric_code}
               />
             </Group>
             <ExpressionLineChart
-              samples={currentMetric.samples}
+              samples={currentMetricObj.samples}
               dataset={currentDs.dataset_code}
-              metric={currentMetric.metric_code}
+              metric={currentMetricObj.metric_code}
             />
           </Stack>
         )}

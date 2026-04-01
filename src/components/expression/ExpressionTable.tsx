@@ -35,6 +35,16 @@ const STAGE_ORDER: StageOrderMap = {
   E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8,
 };
 
+// Extracted SortIcon to avoid recreation on each render
+function SortIcon({ k, sortKey, sortDir }: { k: SortKey; sortKey: SortKey; sortDir: SortDir }) {
+  if (sortKey !== k) return <IconSortAscending size={10} color="var(--mantine-color-gray-5)" />;
+  return sortDir === "asc" ? (
+    <IconSortAscending size={10} color="var(--mantine-color-violet-6)" />
+  ) : (
+    <IconSortDescending size={10} color="var(--mantine-color-violet-6)" />
+  );
+}
+
 function exportCSV(samples: ExpressionSample[], dataset: string) {
   const headers = [
     "Sample Name",
@@ -149,15 +159,6 @@ export default function ExpressionTable({ samples, summary, dataset }: Expressio
     }
   }
 
-  function SortIcon({ k }: { k: SortKey }) {
-    if (sortKey !== k) return <IconSortAscending size={10} color="var(--mantine-color-gray-5)" />;
-    return sortDir === "asc" ? (
-      <IconSortAscending size={10} color="var(--mantine-color-violet-6)" />
-    ) : (
-      <IconSortDescending size={10} color="var(--mantine-color-violet-6)" />
-    );
-  }
-
   return (
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
@@ -194,17 +195,17 @@ export default function ExpressionTable({ samples, summary, dataset }: Expressio
             <Text size="xs" c="dimmed">
               {filtered.length} / {samples.length} samples
             </Text>
-            <Tooltip label="Export CSV">
+            <Tooltip label={`Export ${filtered.length} samples (filtered)`}>
               <Badge
                 variant="light"
                 color="gray"
                 size="sm"
                 style={{ cursor: "pointer", userSelect: "none" }}
-                onClick={() => exportCSV(samples, dataset)}
+                onClick={() => exportCSV(filtered, dataset)}
               >
                 <Group gap={4}>
                   <IconDownload size={10} />
-                  CSV
+                  CSV ({filtered.length})
                 </Group>
               </Badge>
             </Tooltip>
@@ -217,27 +218,27 @@ export default function ExpressionTable({ samples, summary, dataset }: Expressio
             <Table.Thead>
               <Table.Tr>
                 <Table.Th style={{ minWidth: 160, cursor: "pointer" }} onClick={() => toggleSort("sample_name")}>
-                  <Group gap={4}><SortIcon k="sample_name" />Sample</Group>
+                  <Group gap={4}><SortIcon k="sample_name" sortKey={sortKey} sortDir={sortDir} />Sample</Group>
                 </Table.Th>
                 <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("stage")}>
-                  <Group gap={4}><SortIcon k="stage" />Stage</Group>
+                  <Group gap={4}><SortIcon k="stage" sortKey={sortKey} sortDir={sortDir} />Stage</Group>
                 </Table.Th>
                 <Table.Th>SRR Run</Table.Th>
                 <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("sex")}>
-                  <Group gap={4}><SortIcon k="sex" />Sex</Group>
+                  <Group gap={4}><SortIcon k="sex" sortKey={sortKey} sortDir={sortDir} />Sex</Group>
                 </Table.Th>
                 <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("replicate")}>
-                  <Group gap={4}><SortIcon k="replicate" />Rep</Group>
+                  <Group gap={4}><SortIcon k="replicate" sortKey={sortKey} sortDir={sortDir} />Rep</Group>
                 </Table.Th>
                 <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("value")}>
-                  <Group gap={4} justify="flex-end"><SortIcon k="value" />Value</Group>
+                  <Group gap={4} justify="flex-end"><SortIcon k="value" sortKey={sortKey} sortDir={sortDir} />Value</Group>
                 </Table.Th>
                 <Table.Th style={{ minWidth: 120 }}>Relative Level</Table.Th>
                 <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("z_score")}>
-                  <Group gap={4} justify="flex-end"><SortIcon k="z_score" />Z-Score</Group>
+                  <Group gap={4} justify="flex-end"><SortIcon k="z_score" sortKey={sortKey} sortDir={sortDir} />Z-Score</Group>
                 </Table.Th>
                 <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("log2fc")}>
-                  <Group gap={4} justify="flex-end"><SortIcon k="log2fc" />Log2FC</Group>
+                  <Group gap={4} justify="flex-end"><SortIcon k="log2fc" sortKey={sortKey} sortDir={sortDir} />Log2FC</Group>
                 </Table.Th>
               </Table.Tr>
             </Table.Thead>

@@ -1,10 +1,9 @@
 import { Card, Group, Box, Text, Button, Badge, Anchor, Modal, Image } from "@mantine/core";
 import { IconEye, IconFocus2, IconDownload } from "@tabler/icons-react";
 import type { KEGGPathway } from "../../lib/geneApi";
+import { API_BASE } from "../../lib/apiClient";
 import { useDisclosure } from "@mantine/hooks";
 import KeggInteractiveViewer from "./KeggInteractiveViewer";
-
-const IMG_BASE = "http://localhost:8000";
 
 interface KeggPathwayCardProps {
   pathway: KEGGPathway;
@@ -15,7 +14,7 @@ export default function KeggPathwayCard({ pathway, geneId }: KeggPathwayCardProp
   const [viewerOpen, { open: openViewer, close: closeViewer }] = useDisclosure(false);
   const [imgOpen, { open: openImg, close: closeImg }] = useDisclosure(false);
 
-  const imgUrl = `${IMG_BASE}/kegg-images/${pathway.pathway_id}.png`;
+  const imgUrl = `${API_BASE}/kegg-images/${pathway.pathway_id}.png`;
 
   const handleDownload = () => {
     const a = document.createElement("a");

@@ -69,40 +69,39 @@ export default function ExpressionStageChart({
     );
   }
 
-  const traces = [
+  const traces: any[] = [
     {
       x: stages,
       y: maleValues,
       name: "Male",
-      type: "bar" as const,
+      type: "bar",
       marker: { color: "#228BE6", opacity: 0.85 },
       text: maleValues.map((v) => v.toFixed(2)),
-      textposition: "outside" as const,
+      textposition: "outside",
       textfont: { size: 9, color: "#228BE6" },
     },
     {
       x: stages,
       y: femaleValues,
       name: "Female",
-      type: "bar" as const,
+      type: "bar",
       marker: { color: "#E64980", opacity: 0.85 },
       text: femaleValues.map((v) => v.toFixed(2)),
-      textposition: "outside" as const,
+      textposition: "outside",
       textfont: { size: 9, color: "#E64980" },
     },
     {
       x: stages,
       y: meanValues,
       name: "Total Mean",
-      type: "scatter" as const,
-      mode: "lines+markers" as const,
-      line: { color: "#7950F2", width: 2, dash: "dot" as const },
+      type: "scatter",
+      mode: "lines+markers",
+      line: { color: "#7950F2", width: 2, dash: "dot" },
       marker: { color: "#7950F2", size: 7 },
-      yaxis: "y2" as const,
+      yaxis: "y2",
     },
   ];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const layout: any = {
     barmode: "group",
     margin: { t: 8, b: 48, l: 56, r: 16 },
@@ -127,9 +126,9 @@ export default function ExpressionStageChart({
       gridcolor: "#f8f8f8",
     },
     legend: {
-      orientation: "h" as const,
+      orientation: "h",
       x: 0.5,
-      xanchor: "center" as const,
+      xanchor: "center",
       y: -0.22,
       font: { size: 9 },
     },
@@ -137,7 +136,7 @@ export default function ExpressionStageChart({
     paper_bgcolor: "white",
     plot_bgcolor: "white",
     showlegend: true,
-    hovermode: "x unified" as const,
+    hovermode: "x unified",
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

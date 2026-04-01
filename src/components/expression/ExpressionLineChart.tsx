@@ -49,16 +49,17 @@ export default function ExpressionLineChart({
   const maleIdx = sorted.map((s, i) => (s.sex === "Male" ? i : -1)).filter((i) => i >= 0);
   const femaleIdx = sorted.map((s, i) => (s.sex === "Female" ? i : -1)).filter((i) => i >= 0);
 
+  // Build traces - "All Samples" trace is weakened (dashed, thin, dim) to make Male/Female stand out
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const traces: any[] = [
     {
       x: xLabels,
       y: values,
-      type: "scatter" as const,
-      mode: "lines+markers" as const,
+      type: "scatter",
+      mode: "lines+markers",
       name: "All Samples",
-      line: { color: "#7950F2", width: 1.5 },
-      marker: { color: "#7950F2", size: 5, opacity: 0.7 },
+      line: { color: "#7950F2", width: 0.8, dash: "dot" },
+      marker: { color: "#7950F2", size: 4, opacity: 0.45 },
       text: sorted.map((s) => `${s.sample_name ?? s.stage}\n${s.value.toFixed(3)}`),
       hoverinfo: "text+x",
     },
@@ -69,25 +70,25 @@ export default function ExpressionLineChart({
     traces.push({
       x: maleIdx.map((i) => xLabels[i]),
       y: maleIdx.map((i) => values[i]),
-      type: "scatter" as const,
-      mode: "lines+markers" as const,
+      type: "scatter",
+      mode: "lines+markers",
       name: "Male",
       line: { color: "#228BE6", width: 2 },
       marker: { color: "#228BE6", size: 6 },
       text: maleIdx.map((i) => `${sorted[i].sample_name}: ${values[i].toFixed(3)}`),
       hoverinfo: "text+x",
-    } as any);
+    });
     traces.push({
       x: femaleIdx.map((i) => xLabels[i]),
       y: femaleIdx.map((i) => values[i]),
-      type: "scatter" as const,
-      mode: "lines+markers" as const,
+      type: "scatter",
+      mode: "lines+markers",
       name: "Female",
       line: { color: "#E64980", width: 2 },
       marker: { color: "#E64980", size: 6 },
       text: femaleIdx.map((i) => `${sorted[i].sample_name}: ${values[i].toFixed(3)}`),
       hoverinfo: "text+x",
-    } as any);
+    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
