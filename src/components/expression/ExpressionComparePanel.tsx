@@ -46,6 +46,26 @@ export default function ExpressionComparePanel({
     selectedMetric ?? datasets[0]?.metrics[0]?.metric_code ?? "normcount"
   );
 
+  // Keep activeTab in sync when parent selectedDataset changes
+  useEffect(() => {
+    if (selectedDataset && selectedDataset !== activeTab) {
+      setActiveTab(selectedDataset);
+      // Also sync metric to parent's selection (default to first metric of new dataset)
+      const ds = datasets.find((d) => d.dataset_code === selectedDataset);
+      const newMetric = selectedMetric ?? ds?.metrics[0]?.metric_code ?? "normcount";
+      if (newMetric !== localMetric) {
+        setLocalMetric(newMetric);
+      }
+    }
+  }, [selectedDataset, selectedMetric, activeTab, localMetric, datasets]);
+
+  // Keep localMetric in sync when parent selectedMetric changes (same dataset)
+  useEffect(() => {
+    if (selectedMetric && selectedMetric !== localMetric) {
+      setLocalMetric(selectedMetric);
+    }
+  }, [selectedMetric, localMetric]);
+
   // Current dataset and metric
   const currentDs = datasets.find((d) => d.dataset_code === activeTab) ?? datasets[0];
   const currentMetricObj = currentDs?.metrics.find((m) => m.metric_code === localMetric)
