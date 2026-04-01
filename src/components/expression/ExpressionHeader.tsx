@@ -22,7 +22,7 @@ interface ExpressionHeaderProps {
 const DATASET_LABELS: Record<string, string> = {
   day_deseq2_36: "DESeq2 NC — 36 发育阶段",
   raw_ballgown_36: "Ballgown TPM/FPKM — 36 发育阶段",
-  esc_srr_23: "ESC SRR Runs — 23 SRA",
+  esc_srr_23: "ESC SRR Runs — 23 个 SRA Runs",
 };
 
 const METRIC_LABELS: Record<string, string> = {

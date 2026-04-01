@@ -7,7 +7,7 @@ import {
   Text,
   ThemeIcon,
 } from "@mantine/core";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { IconChartBar, IconTrendingUp } from "@tabler/icons-react";
 import type { GeneExpressionExpandResponse } from "../../lib/geneApi";
 import ExpressionStageChart from "./ExpressionStageChart";
@@ -18,9 +18,16 @@ interface ExpressionComparePanelProps {
   expandData: GeneExpressionExpandResponse;
   onSelectDataset: (ds: string, m: string) => void;
   onLoadingChange: (loading: boolean) => void;
-  // Parent sync props - panel syncs its local state to these
+  // Parent sync props — panel syncs its local state to these
   selectedDataset?: string;
   selectedMetric?: string;
+}
+
+// Normalize sex string to canonical form (handles both "Male"/"Female" and "M"/"F")
+function normalizeSex(s: string | null | undefined): "Male" | "Female" | null {
+  if (s === "Male" || s === "M" || s === "m") return "Male";
+  if (s === "Female" || s === "F" || s === "f") return "Female";
+  return null;
 }
 
 export default function ExpressionComparePanel({
@@ -98,7 +105,7 @@ export default function ExpressionComparePanel({
                 }
               >
                 <Group gap={4}>
-                  <Text size="xs">{ds.dataset_code}</Text>
+                  <Text size="xs">{ds.dataset_name}</Text>
                   <Text size="xs" c="dimmed">({ds.sample_count} samples)</Text>
                 </Group>
               </Tabs.Tab>
