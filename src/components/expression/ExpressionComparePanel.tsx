@@ -48,7 +48,6 @@ export default function ExpressionComparePanel({
       const ds = datasets.find((d) => d.dataset_code === selectedDataset);
       const newMetric = selectedMetric ?? ds?.metrics[0]?.metric_code ?? "normcount";
       if (newMetric !== localMetric) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing controlled component state from parent props
         setLocalMetric(newMetric);
       }
     }

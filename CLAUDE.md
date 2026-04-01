@@ -305,19 +305,19 @@ Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`
 - `kegg_pathway_node`: `entry_id`, `entry_type`, `entry_name`, `graphics_type`, `x/y/width/height`, `left_x/top_y/right_x/bottom_y`, `raw_names`, `link_url`
 - `kegg_pathway_node_gene`: `node_id`（关联 node）, `kegg_gene_id`（格式 `gga:NNNNNN`）, `gene_symbol`
 
-**导入脚本**：`D:\jbrowsedata\projectdata\scripts\import_kegg_kgml_cache.py`
+**导入脚本**：`backend/scripts/import_kegg_kgml_cache.py`
 ```bash
 # 初始化表结构
-sqlite3 grcg6a_nc.db < scripts/kegg_schema.sql
+sqlite3 grcg6a_nc.db < backend/scripts/kegg_schema.sql
 
 # 批量导入（PNG=kegg_pathways, KGML=kegg_kgml）
-python scripts/import_kegg_kgml_cache.py --db grcg6a_nc.db --png-dir static/kegg_pathways --kgml-dir static/kegg_kgml --replace
+python backend/scripts/import_kegg_kgml_cache.py --db grcg6a_nc.db --png-dir static/kegg_pathways --kgml-dir static/kegg_kgml --replace
 
 # 单通路
-python scripts/import_kegg_kgml_cache.py --pathway-id gga00010 --replace
+python backend/scripts/import_kegg_kgml_cache.py --pathway-id gga00010 --replace
 
 # 干跑（不写入）
-python scripts/import_kegg_kgml_cache.py --dry-run
+python backend/scripts/import_kegg_kgml_cache.py --dry-run
 ```
 
 **预填充 `pathway_class`**：`backend/scripts/fetch_kegg_pathway_class.py`
