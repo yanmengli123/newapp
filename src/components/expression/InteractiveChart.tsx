@@ -51,14 +51,17 @@ export default function InteractiveChart({
   config,
   onExportCsv,
   normalHeight = 220,
-  fullscreenHeight = 480,
+  fullscreenHeight = 520,
 }: InteractiveChartProps) {
   const plotRef = useRef<any>(null);
+  const fullscreenChartRef = useRef<any>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   const downloadPng = useCallback(() => {
-    PlotlyModule.toImage(plotRef.current, {
+    // Prefer the fullscreen chart ref if available, otherwise fall back to normal chart
+    const target = fullscreen ? fullscreenChartRef.current : plotRef.current;
+    PlotlyModule.toImage(target, {
       format: "png",
       width: 1600,
       height: 1200,
@@ -68,10 +71,11 @@ export default function InteractiveChart({
       a.download = `expression_${datasetCode}_${title.replace(/\s+/g, "_")}.png`;
       a.click();
     });
-  }, [datasetCode, title]);
+  }, [datasetCode, title, fullscreen]);
 
   const downloadSvg = useCallback(() => {
-    PlotlyModule.toImage(plotRef.current, {
+    const target = fullscreen ? fullscreenChartRef.current : plotRef.current;
+    PlotlyModule.toImage(target, {
       format: "svg",
       width: 1600,
       height: 1200,
@@ -81,7 +85,7 @@ export default function InteractiveChart({
       a.download = `expression_${datasetCode}_${title.replace(/\s+/g, "_")}.svg`;
       a.click();
     });
-  }, [datasetCode, title]);
+  }, [datasetCode, title, fullscreen]);
 
   const handleCsvExport = useCallback(() => {
     onExportCsv?.(`expression_${datasetCode}.csv`);
@@ -155,7 +159,7 @@ export default function InteractiveChart({
             </Group>
           </Group>
 
-          {/* Chart */}
+          {/* Normal chart */}
           <Box w="100%" style={{ cursor: isHovered ? "crosshair" : "default" }}>
             <Plot
               ref={plotRef}
@@ -176,24 +180,26 @@ export default function InteractiveChart({
         position="right"
         size="100%"
         withCloseButton
-        title={
-          <Text size="sm" fw={600}>{title}</Text>
-        }
+        title={<Text size="sm" fw={600}>{title}</Text>}
         styles={{
-          body: { padding: 0, height: "calc(100vh - 60px)", overflow: "auto" },
+          body: { padding: 0, overflow: "hidden" },
           header: { padding: "8px 16px", borderBottom: "1px solid var(--mantine-color-gray-3)" },
         }}
       >
-        <Box p="md" style={{ height: "100%" }}>
-          <Plot
-            data={traces}
-            layout={fullscreenLayout}
-            config={fullscreenConfig}
-            style={{ width: "100%", height: fullscreenHeight }}
-            useResizeHandler
-          />
-          {/* Action bar in fullscreen */}
-          <Group justify="center" gap="md" mt="md">
+        {/* Fullscreen chart — fixed height, full width, no inner box wrapping */}
+        <Box style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <Box style={{ flex: 1, overflow: "auto", padding: 16 }}>
+            <Plot
+              ref={fullscreenChartRef}
+              data={traces}
+              layout={fullscreenLayout}
+              config={fullscreenConfig}
+              style={{ width: "100%", height: fullscreenHeight }}
+              useResizeHandler
+            />
+          </Box>
+          {/* Action bar */}
+          <Group justify="center" gap="lg" py="sm" style={{ borderTop: "1px solid var(--mantine-color-gray-3)" }}>
             <ActionIcon variant="light" color="gray" size="lg" onClick={downloadPng}>
               <Tooltip label="Download PNG"><IconPhoto size={18} /></Tooltip>
             </ActionIcon>
@@ -211,3 +217,4 @@ export default function InteractiveChart({
     </>
   );
 }
+
