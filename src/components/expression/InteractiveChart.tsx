@@ -21,8 +21,6 @@ import {
 } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
-// downloadImage is in the full plotly.js bundle, not plotly.js-dist-min
-import Plotly from "plotly.js";
 
 const Plot = createPlotlyComponent(PlotlyModule);
 
@@ -60,20 +58,28 @@ export default function InteractiveChart({
   const [isHovered, setIsHovered] = useState(false);
 
   const downloadPng = useCallback(() => {
-    Plotly.downloadImage(plotRef.current, {
+    PlotlyModule.toImage(plotRef.current, {
       format: "png",
       width: 1600,
       height: 1200,
-      filename: `expression_${datasetCode}_${title.replace(/\s+/g, "_")}`,
+    }).then((dataUrl: string) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `expression_${datasetCode}_${title.replace(/\s+/g, "_")}.png`;
+      a.click();
     });
   }, [datasetCode, title]);
 
   const downloadSvg = useCallback(() => {
-    Plotly.downloadImage(plotRef.current, {
+    PlotlyModule.toImage(plotRef.current, {
       format: "svg",
       width: 1600,
       height: 1200,
-      filename: `expression_${datasetCode}_${title.replace(/\s+/g, "_")}`,
+    }).then((dataUrl: string) => {
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `expression_${datasetCode}_${title.replace(/\s+/g, "_")}.svg`;
+      a.click();
     });
   }, [datasetCode, title]);
 

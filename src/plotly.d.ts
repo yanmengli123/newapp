@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare module "plotly.js-dist-min" {
-  export default any;
+  // plotly.js-dist-min is a UMD bundle — treat as any so we can call toImage/downloadImage
+  const Plotly: any;
+  export default Plotly;
+  export function toImage(root: any, opts: any): Promise<string>;
+  export function downloadImage(root: any, opts: any): Promise<string>;
 }
 
 declare module "react-plotly.js/factory" {
-  import { ComponentType, ComponentClass } from "react";
+  import { ComponentClass } from "react";
   interface PlotParams {
     data: any[];
     layout?: any;
