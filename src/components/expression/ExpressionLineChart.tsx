@@ -1,9 +1,7 @@
-import { Box, Paper, Stack, Text } from "@mantine/core";
-import * as PlotlyModule from "plotly.js-dist-min";
-import createPlotlyComponent from "react-plotly.js/factory";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Paper, Text } from "@mantine/core";
 import type { ExpressionSample } from "../../lib/geneApi";
-
-const Plot = createPlotlyComponent(PlotlyModule);
+import InteractiveChart from "./InteractiveChart";
 
 interface ExpressionLineChartProps {
   samples: ExpressionSample[];
@@ -11,30 +9,92 @@ interface ExpressionLineChartProps {
   metric: string;
 }
 
-// Sort samples by stage_order, then sex, then replicate
-type StageOrderMap = { [key: string]: number };
-const STAGE_ORDER: StageOrderMap = {
-  E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8,
+function isValidNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+const DATASET_DISPLAY_NAMES: Record<string, string> = {
+  day_deseq2_36: "DESeq2 NC — 36 发育阶段样本",
+  raw_ballgown_36: "Ballgown TPM/FPKM — 36 发育阶段样本",
+  esc_srr_23: "ESC SRR Runs — 23 个 SRA Runs",
 };
 
+function getDatasetDisplayName(code: string): string {
+  return DATASET_DISPLAY_NAMES[code] ?? code;
+}
+
+function normalizeSex(sex: string | null | undefined): "Male" | "Female" | null {
+  if (sex === "Male" || sex === "M" || sex === "m") return "Male";
+  if (sex === "Female" || sex === "F" || sex === "f") return "Female";
+  return null;
+}
+
+function safeLabel(s: ExpressionSample): string {
+  if (!s) return "?";
+  const stage = s.stage && s.stage.trim() ? s.stage.trim() : "?";
+  const sexEnum = normalizeSex(s.sex);
+  const sexChar = sexEnum === "Male" ? "M" : sexEnum === "Female" ? "F" : "?";
+  const rep =
+    s.replicate != null && Number.isFinite(s.replicate) && s.replicate > 0
+      ? `R${s.replicate}`
+      : "";
+  return rep ? `${stage}(${sexChar}${rep})` : `${stage}`;
+}
+
 function sortSamples(samples: ExpressionSample[]): ExpressionSample[] {
+  const STAGE_ORDER: { [k: string]: number } = {
+    E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8,
+  };
   return [...samples].sort((a, b) => {
-    const sa = a.stage_order ?? STAGE_ORDER[a.stage] ?? 99;
-    const sb = b.stage_order ?? STAGE_ORDER[b.stage] ?? 99;
+    const sa = a.stage_order ?? STAGE_ORDER[a.stage ?? ""] ?? 99;
+    const sb = b.stage_order ?? STAGE_ORDER[b.stage ?? ""] ?? 99;
     if (sa !== sb) return sa - sb;
-    const sexA = a.sex === "Male" ? 0 : 1;
-    const sexB = b.sex === "Male" ? 0 : 1;
+    const sexA = a.sex === "Male" ? 0 : a.sex === "Female" ? 1 : 2;
+    const sexB = b.sex === "Male" ? 0 : b.sex === "Female" ? 1 : 2;
     if (sexA !== sexB) return sexA - sexB;
     return (a.replicate ?? 0) - (b.replicate ?? 0);
   });
 }
 
 function buildXLabels(samples: ExpressionSample[]): string[] {
-  return samples.map((s) => {
-    const rep = s.replicate != null ? `R${s.replicate}` : "";
-    const sex = s.sex === "Male" ? "M" : s.sex === "Female" ? "F" : "?";
-    return `${s.stage}${rep !== "" ? `(${sex}${rep})` : ""}`;
-  });
+  return samples.map((s) => safeLabel(s));
+}
+
+function exportCsv(samples: ExpressionSample[], dataset: string) {
+  const headers = [
+    "Sample Name",
+    "Stage",
+    "Stage Label",
+    "Sex",
+    "Replicate",
+    "SRR Run",
+    "Batch",
+    "Tissue",
+    "Value",
+    "Z-Score",
+    "Log2FC",
+  ];
+  const rows = samples.map((s) => [
+    s.sample_name ?? "",
+    s.stage ?? "",
+    s.stage_label ?? "",
+    s.sex ?? "",
+    s.replicate?.toString() ?? "",
+    s.srr_run_id ?? "",
+    s.batch ?? "",
+    s.tissue ?? "",
+    s.value.toString(),
+    s.z_score?.toString() ?? "",
+    s.log2fc?.toString() ?? "",
+  ]);
+  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `expression_profile_${dataset}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function ExpressionLineChart({
@@ -42,15 +102,21 @@ export default function ExpressionLineChart({
   dataset,
   metric,
 }: ExpressionLineChartProps) {
+  if (!samples || samples.length === 0) {
+    return (
+      <Paper withBorder p="md" radius="md">
+        <Text size="xs" c="dimmed">Expression profile: no data available</Text>
+      </Paper>
+    );
+  }
+
   const sorted = sortSamples(samples);
   const xLabels = buildXLabels(sorted);
-  const values = sorted.map((s) => s.value);
+  const values = sorted.map((s) => (isValidNumber(s.value) ? s.value : null));
 
-  const maleIdx = sorted.map((s, i) => (s.sex === "Male" ? i : -1)).filter((i) => i >= 0);
-  const femaleIdx = sorted.map((s, i) => (s.sex === "Female" ? i : -1)).filter((i) => i >= 0);
+  const maleIdx = sorted.map((s, idx) => (normalizeSex(s.sex) === "Male" ? idx : -1)).filter((i) => i >= 0);
+  const femaleIdx = sorted.map((s, idx) => (normalizeSex(s.sex) === "Female" ? idx : -1)).filter((i) => i >= 0);
 
-  // Build traces - "All Samples" trace is weakened (dashed, thin, dim) to make Male/Female stand out
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const traces: any[] = [
     {
       x: xLabels,
@@ -60,12 +126,11 @@ export default function ExpressionLineChart({
       name: "All Samples",
       line: { color: "#7950F2", width: 0.8, dash: "dot" },
       marker: { color: "#7950F2", size: 4, opacity: 0.45 },
-      text: sorted.map((s) => `${s.sample_name ?? s.stage}\n${s.value.toFixed(3)}`),
+      text: sorted.map((s) => `${s.sample_name ?? s.stage ?? "?"}\n${isValidNumber(s.value) ? s.value.toFixed(3) : "?"}`),
       hoverinfo: "text+x",
     },
   ];
 
-  // Add separate male/female traces if we have both
   if (maleIdx.length > 0 && femaleIdx.length > 0) {
     traces.push({
       x: maleIdx.map((i) => xLabels[i]),
@@ -75,7 +140,7 @@ export default function ExpressionLineChart({
       name: "Male",
       line: { color: "#228BE6", width: 2 },
       marker: { color: "#228BE6", size: 6 },
-      text: maleIdx.map((i) => `${sorted[i].sample_name}: ${values[i].toFixed(3)}`),
+      text: maleIdx.map((i) => `${sorted[i].sample_name ?? "?"}: ${isValidNumber(values[i]) ? values[i].toFixed(3) : "?"}`),
       hoverinfo: "text+x",
     });
     traces.push({
@@ -86,12 +151,11 @@ export default function ExpressionLineChart({
       name: "Female",
       line: { color: "#E64980", width: 2 },
       marker: { color: "#E64980", size: 6 },
-      text: femaleIdx.map((i) => `${sorted[i].sample_name}: ${values[i].toFixed(3)}`),
+      text: femaleIdx.map((i) => `${sorted[i].sample_name ?? "?"}: ${isValidNumber(values[i]) ? values[i].toFixed(3) : "?"}`),
       hoverinfo: "text+x",
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const layout: any = {
     margin: { t: 8, b: 52, l: 56, r: 16 },
     xaxis: {
@@ -121,29 +185,22 @@ export default function ExpressionLineChart({
     hovermode: "closest" as const,
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const config: any = {
     displayModeBar: false,
     responsive: true,
     locale: "en",
   };
 
+  const chartTitle = `Expression Profile — ${getDatasetDisplayName(dataset)}`;
+
   return (
-    <Paper withBorder p="md" radius="md">
-      <Stack gap="xs">
-        <Text size="xs" fw={600} c="dimmed">
-          Expression Profile — {dataset}
-        </Text>
-        <Box w="100%">
-          <Plot
-            data={traces}
-            layout={layout}
-            config={config}
-            style={{ width: "100%", height: 220 }}
-            useResizeHandler
-          />
-        </Box>
-      </Stack>
-    </Paper>
+    <InteractiveChart
+      title={chartTitle}
+      datasetCode={dataset}
+      traces={traces}
+      layout={layout}
+      config={config}
+      onExportCsv={() => exportCsv(sorted, dataset)}
+    />
   );
 }

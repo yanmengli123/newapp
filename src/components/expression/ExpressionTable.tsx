@@ -26,6 +26,13 @@ interface ExpressionTableProps {
 
 type SortKey = "sample_name" | "stage" | "sex" | "replicate" | "value" | "z_score" | "log2fc";
 type SortDir = "asc" | "desc";
+// Normalize sex string to canonical form
+function normalizeSex(s: string | null | undefined): "Male" | "Female" | null {
+  if (s === "Male" || s === "M" || s === "m") return "Male";
+  if (s === "Female" || s === "F" || s === "f") return "Female";
+  return null;
+}
+
 type SexFilter = "all" | "M" | "F";
 
 const PAGE_SIZE = 12;
@@ -118,9 +125,10 @@ export default function ExpressionTable({ samples, summary, dataset }: Expressio
       list = list.filter((s) => s.stage === stageFilter);
     }
     if (sexFilter !== "all") {
-      list = list.filter((s) =>
-        sexFilter === "M" ? s.sex === "Male" : s.sex === "Female"
-      );
+      list = list.filter((s) => {
+        const canon = normalizeSex(s.sex);
+        return sexFilter === "M" ? canon === "Male" : canon === "Female";
+      });
     }
     list.sort((a, b) => {
       let av: number | string | null | undefined;
@@ -273,9 +281,9 @@ export default function ExpressionTable({ samples, summary, dataset }: Expressio
                       </Table.Td>
                       <Table.Td>
                         <Group gap={4}>
-                          {sample.sex === "Male" ? (
+                          {normalizeSex(sample.sex) === "Male" ? (
                             <IconGenderMale size={13} color="var(--mantine-color-blue-6)" />
-                          ) : sample.sex === "Female" ? (
+                          ) : normalizeSex(sample.sex) === "Female" ? (
                             <IconGenderFemale size={13} color="var(--mantine-color-pink-6)" />
                           ) : null}
                           <Text size="xs">{sample.sex ?? "—"}</Text>

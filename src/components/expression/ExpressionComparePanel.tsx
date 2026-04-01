@@ -23,13 +23,6 @@ interface ExpressionComparePanelProps {
   selectedMetric?: string;
 }
 
-// Normalize sex string to canonical form (handles both "Male"/"Female" and "M"/"F")
-function normalizeSex(s: string | null | undefined): "Male" | "Female" | null {
-  if (s === "Male" || s === "M" || s === "m") return "Male";
-  if (s === "Female" || s === "F" || s === "f") return "Female";
-  return null;
-}
-
 export default function ExpressionComparePanel({
   expandData,
   onSelectDataset,
@@ -49,19 +42,23 @@ export default function ExpressionComparePanel({
   // Keep activeTab in sync when parent selectedDataset changes
   useEffect(() => {
     if (selectedDataset && selectedDataset !== activeTab) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing controlled component state from parent props
       setActiveTab(selectedDataset);
       // Also sync metric to parent's selection (default to first metric of new dataset)
       const ds = datasets.find((d) => d.dataset_code === selectedDataset);
       const newMetric = selectedMetric ?? ds?.metrics[0]?.metric_code ?? "normcount";
       if (newMetric !== localMetric) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing controlled component state from parent props
         setLocalMetric(newMetric);
       }
     }
+    // activeTab/localMetric in deps so effect re-runs if those change mid-sync
   }, [selectedDataset, selectedMetric, activeTab, localMetric, datasets]);
 
   // Keep localMetric in sync when parent selectedMetric changes (same dataset)
   useEffect(() => {
     if (selectedMetric && selectedMetric !== localMetric) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing controlled component state from parent props
       setLocalMetric(selectedMetric);
     }
   }, [selectedMetric, localMetric]);

@@ -1,9 +1,7 @@
-import { Box, Paper, Stack, Text } from "@mantine/core";
-import * as PlotlyModule from "plotly.js-dist-min";
-import createPlotlyComponent from "react-plotly.js/factory";
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Paper, Text } from "@mantine/core";
 import type { GeneExpressionResponse } from "../../lib/geneApi";
-
-const Plot = createPlotlyComponent(PlotlyModule);
+import InteractiveChart from "./InteractiveChart";
 
 interface ExpressionStageChartProps {
   summary: GeneExpressionResponse["summary"];
@@ -11,22 +9,36 @@ interface ExpressionStageChartProps {
   metric: string;
 }
 
-// stage_means: Record<string, Record<string, number> | number | null>
-// Each stage key → { male: number, female: number, mean: number } | number
+// Human-readable dataset name map (matches /datasets API response)
+const DATASET_DISPLAY_NAMES: Record<string, string> = {
+  day_deseq2_36: "DESeq2 NC — 36 发育阶段样本",
+  raw_ballgown_36: "Ballgown TPM/FPKM — 36 发育阶段样本",
+  esc_srr_23: "ESC SRR Runs — 23 个 SRA Runs",
+};
+
+function getDatasetDisplayName(code: string): string {
+  return DATASET_DISPLAY_NAMES[code] ?? code;
+}
+
+function isValidNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
 function resolveStageMeans(
-  stageMeans: Record<string, Record<string, number> | number | null> | null
+  stageMeans: Record<string, Record<string, number> | number | null> | null | undefined
 ): {
   stages: string[];
   maleValues: number[];
   femaleValues: number[];
   meanValues: number[];
 } {
-  if (!stageMeans) return { stages: [], maleValues: [], femaleValues: [], meanValues: [] };
+  if (!stageMeans || typeof stageMeans !== "object") {
+    return { stages: [], maleValues: [], femaleValues: [], meanValues: [] };
+  }
 
-  // Sort stages by chronological order
   const STAGE_ORDER = ["E0", "E3.5", "E7", "E11", "E14", "E18.5", "P0", "Adult"];
 
-  const entries = Object.entries(stageMeans);
+  const entries = Object.entries(stageMeans as Record<string, unknown>);
   entries.sort(([a], [b]) => {
     const ai = STAGE_ORDER.indexOf(a);
     const bi = STAGE_ORDER.indexOf(b);
@@ -39,19 +51,48 @@ function resolveStageMeans(
   const meanValues: number[] = [];
 
   for (const [stage, val] of entries) {
+    if (!stage) continue;
+
     stages.push(stage);
-    if (typeof val === "object" && val !== null) {
-      maleValues.push(val["male"] ?? 0);
-      femaleValues.push(val["female"] ?? 0);
-      meanValues.push(val["mean"] ?? 0);
+
+    if (val != null && typeof val === "object") {
+      const obj = val as Record<string, unknown>;
+      maleValues.push(isValidNumber(obj["male"]) ? (obj["male"] as number) : 0);
+      femaleValues.push(isValidNumber(obj["female"]) ? (obj["female"] as number) : 0);
+      const meanVal = isValidNumber(obj["mean"])
+        ? (obj["mean"] as number)
+        : Object.values(obj).find(isValidNumber) ?? 0;
+      meanValues.push(meanVal);
+    } else if (isValidNumber(val)) {
+      maleValues.push(0);
+      femaleValues.push(0);
+      meanValues.push(val);
     } else {
       maleValues.push(0);
       femaleValues.push(0);
-      meanValues.push(typeof val === "number" ? val : 0);
+      meanValues.push(0);
     }
   }
 
   return { stages, maleValues, femaleValues, meanValues };
+}
+
+function exportCsv(stages: string[], maleValues: number[], femaleValues: number[], meanValues: number[], dataset: string) {
+  const headers = ["Stage", "Male", "Female", "Total Mean"];
+  const rows = stages.map((s, i) => [
+    s,
+    maleValues[i]?.toFixed(4) ?? "",
+    femaleValues[i]?.toFixed(4) ?? "",
+    meanValues[i]?.toFixed(4) ?? "",
+  ]);
+  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `expression_stage_means_${dataset}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function ExpressionStageChart({
@@ -61,7 +102,13 @@ export default function ExpressionStageChart({
 }: ExpressionStageChartProps) {
   const { stages, maleValues, femaleValues, meanValues } = resolveStageMeans(summary?.stage_means ?? null);
 
-  if (stages.length === 0) {
+  const hasData = stages.length > 0 && (
+    maleValues.some(v => v > 0) ||
+    femaleValues.some(v => v > 0) ||
+    meanValues.some(v => v > 0)
+  );
+
+  if (!hasData) {
     return (
       <Paper withBorder p="md" radius="md">
         <Text size="xs" c="dimmed">Stage means chart: no data available</Text>
@@ -72,27 +119,27 @@ export default function ExpressionStageChart({
   const traces: any[] = [
     {
       x: stages,
-      y: maleValues,
+      y: maleValues.map(v => isValidNumber(v) ? v : 0),
       name: "Male",
       type: "bar",
       marker: { color: "#228BE6", opacity: 0.85 },
-      text: maleValues.map((v) => v.toFixed(2)),
+      text: maleValues.map(v => (isValidNumber(v) ? v : 0).toFixed(2)),
       textposition: "outside",
       textfont: { size: 9, color: "#228BE6" },
     },
     {
       x: stages,
-      y: femaleValues,
+      y: femaleValues.map(v => isValidNumber(v) ? v : 0),
       name: "Female",
       type: "bar",
       marker: { color: "#E64980", opacity: 0.85 },
-      text: femaleValues.map((v) => v.toFixed(2)),
+      text: femaleValues.map(v => (isValidNumber(v) ? v : 0).toFixed(2)),
       textposition: "outside",
       textfont: { size: 9, color: "#E64980" },
     },
     {
       x: stages,
-      y: meanValues,
+      y: meanValues.map(v => isValidNumber(v) ? v : 0),
       name: "Total Mean",
       type: "scatter",
       mode: "lines+markers",
@@ -139,29 +186,22 @@ export default function ExpressionStageChart({
     hovermode: "x unified",
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const config: any = {
     displayModeBar: false,
     responsive: true,
     locale: "en",
   };
 
+  const chartTitle = `Stage Means — ${getDatasetDisplayName(dataset)}`;
+
   return (
-    <Paper withBorder p="md" radius="md">
-      <Stack gap="xs">
-        <Text size="xs" fw={600} c="dimmed">
-          Stage Means — {dataset}
-        </Text>
-        <Box w="100%">
-          <Plot
-            data={traces}
-            layout={layout}
-            config={config}
-            style={{ width: "100%", height: 220 }}
-            useResizeHandler
-          />
-        </Box>
-      </Stack>
-    </Paper>
+    <InteractiveChart
+      title={chartTitle}
+      datasetCode={dataset}
+      traces={traces}
+      layout={layout}
+      config={config}
+      onExportCsv={() => exportCsv(stages, maleValues, femaleValues, meanValues, dataset)}
+    />
   );
 }
