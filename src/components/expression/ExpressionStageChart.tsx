@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Paper, Text } from "@mantine/core";
+import { Box, Paper, Stack, Text } from "@mantine/core";
+import * as PlotlyModule from "plotly.js-dist-min";
+import createPlotlyComponent from "react-plotly.js/factory";
 import type { GeneExpressionResponse } from "../../lib/geneApi";
-import InteractiveChart from "./InteractiveChart";
+
+const Plot = createPlotlyComponent(PlotlyModule);
 
 interface ExpressionStageChartProps {
   summary: GeneExpressionResponse["summary"];
@@ -9,7 +12,6 @@ interface ExpressionStageChartProps {
   metric: string;
 }
 
-// Human-readable dataset name map (matches /datasets API response)
 const DATASET_DISPLAY_NAMES: Record<string, string> = {
   day_deseq2_36: "DESeq2 NC — 36 发育阶段样本",
   raw_ballgown_36: "Ballgown TPM/FPKM — 36 发育阶段样本",
@@ -52,7 +54,6 @@ function resolveStageMeans(
 
   for (const [stage, val] of entries) {
     if (!stage) continue;
-
     stages.push(stage);
 
     if (val != null && typeof val === "object") {
@@ -75,24 +76,6 @@ function resolveStageMeans(
   }
 
   return { stages, maleValues, femaleValues, meanValues };
-}
-
-function exportCsv(stages: string[], maleValues: number[], femaleValues: number[], meanValues: number[], dataset: string) {
-  const headers = ["Stage", "Male", "Female", "Total Mean"];
-  const rows = stages.map((s, i) => [
-    s,
-    maleValues[i]?.toFixed(4) ?? "",
-    femaleValues[i]?.toFixed(4) ?? "",
-    meanValues[i]?.toFixed(4) ?? "",
-  ]);
-  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `expression_stage_means_${dataset}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export default function ExpressionStageChart({
@@ -192,16 +175,22 @@ export default function ExpressionStageChart({
     locale: "en",
   };
 
-  const chartTitle = `Stage Means — ${getDatasetDisplayName(dataset)}`;
-
   return (
-    <InteractiveChart
-      title={chartTitle}
-      datasetCode={dataset}
-      traces={traces}
-      layout={layout}
-      config={config}
-      onExportCsv={() => exportCsv(stages, maleValues, femaleValues, meanValues, dataset)}
-    />
+    <Paper withBorder p="md" radius="md">
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed">
+          Stage Means — {getDatasetDisplayName(dataset)}
+        </Text>
+        <Box w="100%">
+          <Plot
+            data={traces}
+            layout={layout}
+            config={config}
+            style={{ width: "100%", height: 220 }}
+            useResizeHandler
+          />
+        </Box>
+      </Stack>
+    </Paper>
   );
 }

@@ -1,10 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 declare module "plotly.js-dist-min" {
-  // plotly.js-dist-min is a UMD bundle — treat as any so we can call toImage/downloadImage
+  // plotly.js-dist-min is a UMD bundle that exports Plotly as default
   const Plotly: any;
   export default Plotly;
-  export function toImage(root: any, opts: any): Promise<string>;
-  export function downloadImage(root: any, opts: any): Promise<string>;
 }
 
 declare module "react-plotly.js/factory" {

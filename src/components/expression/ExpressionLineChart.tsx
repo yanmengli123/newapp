@@ -1,7 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Paper, Text } from "@mantine/core";
+import { Box, Paper, Stack, Text } from "@mantine/core";
+import * as PlotlyModule from "plotly.js-dist-min";
+import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
-import InteractiveChart from "./InteractiveChart";
+
+const Plot = createPlotlyComponent(PlotlyModule);
 
 interface ExpressionLineChartProps {
   samples: ExpressionSample[];
@@ -58,43 +61,6 @@ function sortSamples(samples: ExpressionSample[]): ExpressionSample[] {
 
 function buildXLabels(samples: ExpressionSample[]): string[] {
   return samples.map((s) => safeLabel(s));
-}
-
-function exportCsv(samples: ExpressionSample[], dataset: string) {
-  const headers = [
-    "Sample Name",
-    "Stage",
-    "Stage Label",
-    "Sex",
-    "Replicate",
-    "SRR Run",
-    "Batch",
-    "Tissue",
-    "Value",
-    "Z-Score",
-    "Log2FC",
-  ];
-  const rows = samples.map((s) => [
-    s.sample_name ?? "",
-    s.stage ?? "",
-    s.stage_label ?? "",
-    s.sex ?? "",
-    s.replicate?.toString() ?? "",
-    s.srr_run_id ?? "",
-    s.batch ?? "",
-    s.tissue ?? "",
-    s.value.toString(),
-    s.z_score?.toString() ?? "",
-    s.log2fc?.toString() ?? "",
-  ]);
-  const csv = [headers, ...rows].map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `expression_profile_${dataset}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export default function ExpressionLineChart({
@@ -191,16 +157,22 @@ export default function ExpressionLineChart({
     locale: "en",
   };
 
-  const chartTitle = `Expression Profile — ${getDatasetDisplayName(dataset)}`;
-
   return (
-    <InteractiveChart
-      title={chartTitle}
-      datasetCode={dataset}
-      traces={traces}
-      layout={layout}
-      config={config}
-      onExportCsv={() => exportCsv(sorted, dataset)}
-    />
+    <Paper withBorder p="md" radius="md">
+      <Stack gap="xs">
+        <Text size="xs" fw={600} c="dimmed">
+          Expression Profile — {getDatasetDisplayName(dataset)}
+        </Text>
+        <Box w="100%">
+          <Plot
+            data={traces}
+            layout={layout}
+            config={config}
+            style={{ width: "100%", height: 220 }}
+            useResizeHandler
+          />
+        </Box>
+      </Stack>
+    </Paper>
   );
 }
