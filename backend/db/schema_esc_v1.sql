@@ -199,7 +199,32 @@ CREATE TABLE IF NOT EXISTS stg_day_deseq2 (
     updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── I. gene_expression_summary ──────────────────────────────────────────────
+-- ── I. stage_dim ──────────────────────────────────────────────────────────────
+-- Canonical developmental stage dimension table.
+-- All datasets (day_deseq2_36, esc_srr_23, etc.) join via dataset_sample.stage → stage_code.
+-- Replaces per-dataset stage_label/stage_order duplication.
+CREATE TABLE IF NOT EXISTS stage_dim (
+    stage_code   TEXT PRIMARY KEY,   -- E0, E3.5, E4.5, E5.5, E6.5, E18.5
+    stage_order  INTEGER NOT NULL,   -- 1..6 (developmental sequence)
+    stage_label  TEXT NOT NULL,      -- 'Embryo Day 0 (Fertilized egg)', 'Embryo Day 3.5', ...
+    short_label  TEXT,
+    is_active    BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+INSERT INTO stage_dim (stage_code, stage_order, stage_label, short_label) VALUES
+    ('E0',   1, 'Embryo Day 0 (Fertilized egg)', 'E0'),
+    ('E3.5', 2, 'Embryo Day 3.5', 'E3.5'),
+    ('E4.5', 3, 'Embryo Day 4.5', 'E4.5'),
+    ('E5.5', 4, 'Embryo Day 5.5', 'E5.5'),
+    ('E6.5', 5, 'Embryo Day 6.5', 'E6.5'),
+    ('E18.5', 6, 'Embryo Day 18.5', 'E18.5')
+ON CONFLICT (stage_code) DO UPDATE SET
+    stage_order = EXCLUDED.stage_order,
+    stage_label = EXCLUDED.stage_label,
+    short_label = EXCLUDED.short_label,
+    updated_at  = NOW();
+
+-- ── J. gene_expression_summary ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS gene_expression_summary (
     gene_id        TEXT NOT NULL,
     dataset_code   TEXT NOT NULL,
@@ -212,11 +237,44 @@ CREATE TABLE IF NOT EXISTS gene_expression_summary (
     top_sample     TEXT,
     top_stage      TEXT,
     sex_bias       TEXT,
+    cv             DOUBLE PRECISION,
+    expressed_samples INTEGER,
+    zero_samples   INTEGER,
+    top_sample     TEXT,
+    top_stage      TEXT,
+    sex_bias_label TEXT,
+    sex_bias_ratio DOUBLE PRECISION,
+    fold_change_top    DOUBLE PRECISION,
+    fold_change_bottom DOUBLE PRECISION,
     stage_means    JSONB,
+    stage_sample_count JSONB,
     updated_at      TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (gene_id, dataset_code, metric_code)
 );
 CREATE INDEX IF NOT EXISTS idx_ges_gene ON gene_expression_summary(gene_id);
 CREATE INDEX IF NOT EXISTS idx_ges_ds   ON gene_expression_summary(dataset_code);
+
+-- ── Phase 9: Deprecation markers ───────────────────────────────────────────────
+-- v_gene_expression_wide and v_gene_expression_development are Phase 8 legacy
+-- compatibility snapshots. They are NOT used by any API runtime route or
+-- service layer. Safe to drop after v1.0 release.
+-- NOTE: Views must exist before COMMENT ON VIEW runs. If they were never created
+-- in this database, skip the two COMMENT ON VIEW lines below.
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_views WHERE viewname = 'v_gene_expression_wide') THEN
+        COMMENT ON VIEW v_gene_expression_wide IS
+            'DEPRECATED: legacy wide-table compatibility snapshot; not used by API runtime';
+    END IF;
+    IF EXISTS (SELECT FROM pg_views WHERE viewname = 'v_gene_expression_development') THEN
+        COMMENT ON VIEW v_gene_expression_development IS
+            'DEPRECATED: legacy developmental-stage aggregation; not used by API runtime';
+    END IF;
+END $$;
+
+-- dataset.metric_codes is a display field only.
+-- The authoritative capability registry is mv_dataset_metric.
+COMMENT ON COLUMN dataset.metric_codes IS
+    'DEPRECATED from logic: use mv_dataset_metric for (dataset, metric) capability checks';
 
 COMMIT;

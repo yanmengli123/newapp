@@ -68,7 +68,7 @@ def design_primers(
     return result
 
 
-@router.post("/domain-search")
+@router.get("/domain-search")
 def search_domains(
     request: Request,
     gene_id: str = Query(..., description="基因 ID，如 gene-A4GALT"),

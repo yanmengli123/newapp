@@ -5,9 +5,9 @@ GRCg6a SQLite → PostgreSQL 迁移脚本
 用法:
   python scripts/migrate_to_postgresql.py --dry-run          # 干跑（不写入）
   python scripts/migrate_to_postgresql.py --truncate-first  # 先清空 PG 表再迁移
-  python scripts/migrate_to_postgresql.py                  # 标准迁移（幂等追加）
+  python scripts/migrate_to_postgresql.py                    # 标准迁移（幂等追加）
+  python scripts/migrate_to_postgresql.py --reset-identity   # 仅重置 identity sequences
   python scripts/migrate_to_postgresql.py --stats           # 仅打印行数统计
-  python scripts/migrate_to_postgresql.py --step 6          # 仅执行第6步（kegg_pathway_asset）
 """
 from __future__ import annotations
 
@@ -22,27 +22,24 @@ import psycopg2.extras
 import sqlite3
 
 # ─────────────────────────────────────────────
-# 全局配置（从 backend/config.py 读取相同路径）
+# 全局配置
 # ─────────────────────────────────────────────
-SQLITE_DB = Path(os.getenv(
-    "GRCG6A_DB_PATH",
-    r"D:\jbrowsedata\projectdata\grcg6a_nc.db"
-)).resolve()
-
-# PostgreSQL DSN（默认连接 docker-compose 暴露的 5433 端口）
+SQLITE_DB = Path(os.getenv("GRCG6A_DB_PATH", "./grcg6a_nc.db")).resolve()
 PG_DSN = os.getenv(
     "DATABASE_URL",
-    "postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a"
+    "postgresql://grcuser:grcpassword@localhost:5432/grcg6a",
 )
 
-BATCH_SIZE = 2000
-CHUNK_SIZE = 2000
+BATCH_SIZE = 2000   # fetchmany 每次从 SQLite 读取的行数
+CHUNK_SIZE = 2000   # execute_values 每次写入 PG 的行数
 
 
 # ─────────────────────────────────────────────
 # 辅助函数
 # ─────────────────────────────────────────────
-def log(msg: str, /):
+def log(msg: str, /, verbose_only: bool = False):
+    if verbose_only:
+        return
     print(f"  {msg}")
 
 
@@ -63,7 +60,14 @@ def get_pg_row_count(pg_conn, table: str) -> int:
         return cur.fetchone()[0]
 
 
+def pg_execute(pg_conn, sql: str, params=None):
+    with pg_conn.cursor() as cur:
+        cur.execute(sql, params)
+    pg_conn.commit()
+
+
 def pg_truncate(pg_conn, table: str):
+    """截断表"""
     with pg_conn.cursor() as cur:
         cur.execute(f'TRUNCATE TABLE {table} CASCADE')
     pg_conn.commit()
@@ -71,6 +75,7 @@ def pg_truncate(pg_conn, table: str):
 
 
 def fetchmany_stream(sqlite_conn: sqlite3.Connection, sql: str, params=None):
+    """流式读取 SQLite，yield dict row"""
     cur = sqlite_conn.execute(sql, params or ())
     while True:
         rows = cur.fetchmany(BATCH_SIZE)
@@ -81,6 +86,10 @@ def fetchmany_stream(sqlite_conn: sqlite3.Connection, sql: str, params=None):
 
 
 def execute_values_stream(pg_conn, sql: str, stream, col_names: tuple[str, ...], page_size=CHUNK_SIZE):
+    """
+    从 stream (iterable of dict) 中批量写入 PostgreSQL。
+    sql 必须是 VALUES 形式，列名由 col_names 指定。
+    """
     buf = []
     total = 0
     for row in stream:
@@ -102,6 +111,7 @@ def execute_values_stream(pg_conn, sql: str, stream, col_names: tuple[str, ...],
 # ─────────────────────────────────────────────
 
 def migrate_chromosome(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 1: chromosome"""
     step_header(1, "chromosome")
     cnt = get_sqlite_row_count(sqlite_conn, "chromosome")
     print(f"  SQLite rows: {cnt}")
@@ -122,6 +132,7 @@ def migrate_chromosome(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_gene_xref(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 2: gene_xref"""
     step_header(2, "gene_xref")
     cnt = get_sqlite_row_count(sqlite_conn, "gene_xref")
     print(f"  SQLite rows: {cnt}")
@@ -134,7 +145,10 @@ def migrate_gene_xref(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
     cols = ("gene_id", "gene_symbol", "ncbi_gene_id", "ensembl_gene_id",
             "ensembl_transcript_id", "seqid", "gene_start", "gene_end",
             "gene_strand", "gene_biotype")
-    sql = f"INSERT INTO gene_xref ({','.join(cols)}) VALUES %s ON CONFLICT (gene_id) DO NOTHING"
+    sql = f"""INSERT INTO gene_xref
+        ({','.join(cols)})
+        VALUES %s
+        ON CONFLICT (gene_id) DO NOTHING"""
     total = execute_values_stream(
         pg_conn, sql,
         fetchmany_stream(
@@ -152,7 +166,8 @@ def migrate_gene_xref(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_go_term(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
-    step_header(3, "go_term (from gene_go)")
+    """Step 3: go_term（从 gene_go 提取唯一 go_id）"""
+    step_header(3, "go_term")
     cnt = get_sqlite_row_count(sqlite_conn, "gene_go")
     print(f"  gene_go rows: {cnt}")
     if dry_run:
@@ -163,6 +178,7 @@ def migrate_go_term(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
     cols = ("go_id", "go_name", "go_namespace", "go_definition")
     sql = f"INSERT INTO go_term ({','.join(cols)}) VALUES %s ON CONFLICT (go_id) DO NOTHING"
+    # 从 gene_go 提取唯一 go_id（go_namespace 存储为原始值，不做 REPLACE）
     unique_go_sql = """SELECT DISTINCT
             gg.go_id, gg.go_name, gg.go_namespace,
             COALESCE(MAX(gg.go_definition) OVER (PARTITION BY gg.go_id), '') AS go_def
@@ -176,11 +192,14 @@ def migrate_go_term(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_gene_go(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 4: gene_go（仅含 gene_id/go_id/evidence_code/source，不含 go_name 等）"""
     step_header(4, "gene_go")
+    # 检查 go_term 是否有数据（防止 FK 失败）
     go_term_cnt = get_pg_row_count(pg_conn, "go_term")
     print(f"  go_term rows in PG: {go_term_cnt}")
     if go_term_cnt == 0:
-        print("  [WARN] go_term is empty! Run step 3 first.")
+        print("  [WARN] go_term is empty! gene_go depends on go_term — skipping. "
+              "Run step 3 first.")
         return
 
     cnt = get_sqlite_row_count(sqlite_conn, "gene_go")
@@ -193,17 +212,22 @@ def migrate_gene_go(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
     cols = ("gene_id", "go_id", "evidence_code", "source")
     sql = f"""INSERT INTO gene_go (gene_id, go_id, evidence_code, source)
-        VALUES %s ON CONFLICT (gene_id, go_id, evidence_code) DO NOTHING"""
+        VALUES %s
+        ON CONFLICT (gene_id, go_id, evidence_code)
+        DO NOTHING"""
+    # 去重：按 gene_id/go_id/evidence_code 聚合
     dedup_sql = """SELECT DISTINCT
             gene_id, go_id,
             NULLIF(TRIM(evidence_code), '') AS evidence_code,
             NULLIF(TRIM(source), '') AS source
-        FROM gene_go WHERE go_id IS NOT NULL AND go_id != ''"""
+        FROM gene_go
+        WHERE go_id IS NOT NULL AND go_id != ''"""
     total = execute_values_stream(pg_conn, sql, fetchmany_stream(sqlite_conn, dedup_sql), cols)
     print(f"  Inserted (deduped): {total}")
 
 
 def migrate_gene_kegg(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 5: gene_kegg"""
     step_header(5, "gene_kegg")
     cnt = get_sqlite_row_count(sqlite_conn, "gene_kegg")
     print(f"  SQLite rows: {cnt}")
@@ -224,6 +248,7 @@ def migrate_gene_kegg(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_kegg_pathway_asset(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 6: kegg_pathway_asset"""
     step_header(6, "kegg_pathway_asset")
     cnt = get_sqlite_row_count(sqlite_conn, "kegg_pathway_asset")
     print(f"  SQLite rows: {cnt}")
@@ -256,6 +281,7 @@ def migrate_kegg_pathway_asset(sqlite_conn, pg_conn, dry_run: bool, truncate: bo
 
 
 def migrate_gene_kegg_pathway(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 7: gene_kegg_pathway"""
     step_header(7, "gene_kegg_pathway")
     cnt = get_sqlite_row_count(sqlite_conn, "gene_kegg_pathway")
     print(f"  SQLite rows: {cnt}")
@@ -279,7 +305,8 @@ def migrate_gene_kegg_pathway(sqlite_conn, pg_conn, dry_run: bool, truncate: boo
 
 
 def migrate_kegg_pathway_node(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
-    step_header(8, "kegg_pathway_node (保留原整数 ID)")
+    """Step 8: kegg_pathway_node（保留原整数 ID）"""
+    step_header(8, "kegg_pathway_node")
     cnt = get_sqlite_row_count(sqlite_conn, "kegg_pathway_node")
     print(f"  SQLite rows: {cnt}")
     if dry_run:
@@ -288,6 +315,7 @@ def migrate_kegg_pathway_node(sqlite_conn, pg_conn, dry_run: bool, truncate: boo
     if truncate:
         pg_truncate(pg_conn, "kegg_pathway_node")
 
+    # 保留原 id（INTEGER GENERATED BY DEFAULT AS IDENTITY 允许显式插入）
     cols = ("id", "pathway_id", "entry_id", "entry_type", "entry_name",
             "graphics_type", "x", "y", "width", "height",
             "left_x", "top_y", "right_x", "bottom_y",
@@ -307,6 +335,7 @@ def migrate_kegg_pathway_node(sqlite_conn, pg_conn, dry_run: bool, truncate: boo
     )
     print(f"  Inserted: {total}")
 
+    # 重置 identity sequence 为实际最大值
     if total > 0:
         max_id = sqlite_conn.execute("SELECT MAX(id) FROM kegg_pathway_node").fetchone()[0]
         with pg_conn.cursor() as cur:
@@ -316,6 +345,7 @@ def migrate_kegg_pathway_node(sqlite_conn, pg_conn, dry_run: bool, truncate: boo
 
 
 def migrate_kegg_pathway_node_gene(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 9: kegg_pathway_node_gene"""
     step_header(9, "kegg_pathway_node_gene")
     cnt = get_sqlite_row_count(sqlite_conn, "kegg_pathway_node_gene")
     print(f"  SQLite rows: {cnt}")
@@ -331,7 +361,8 @@ def migrate_kegg_pathway_node_gene(sqlite_conn, pg_conn, dry_run: bool, truncate
         pg_conn, sql,
         fetchmany_stream(
             sqlite_conn,
-            "SELECT pathway_id, node_id, kegg_gene_id, gene_symbol FROM kegg_pathway_node_gene"
+            """SELECT pathway_id, node_id, kegg_gene_id, gene_symbol
+               FROM kegg_pathway_node_gene"""
         ),
         cols,
     )
@@ -339,6 +370,7 @@ def migrate_kegg_pathway_node_gene(sqlite_conn, pg_conn, dry_run: bool, truncate
 
 
 def migrate_transcript_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 10: transcript_seq"""
     step_header(10, "transcript_seq")
     cnt = get_sqlite_row_count(sqlite_conn, "transcript_seq")
     print(f"  SQLite rows: {cnt}")
@@ -348,8 +380,10 @@ def migrate_transcript_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
     if truncate:
         pg_truncate(pg_conn, "transcript_seq")
 
-    cols = ("transcript_acc", "transcript_id", "gene_id", "seqid", "length", "description", "seq")
+    cols = ("transcript_acc", "transcript_id", "gene_id",
+            "seqid", "length", "description", "seq")
     sql = f"INSERT INTO transcript_seq ({','.join(cols)}) VALUES %s ON CONFLICT (transcript_acc) DO NOTHING"
+    # 过滤掉 gene_id 不存在于 gene_xref 的行（数据质量修复）
     query = """SELECT t.transcript_acc, t.transcript_id, t.gene_id,
                       t.seqid, t.length, t.description, t.seq
                FROM transcript_seq t
@@ -363,6 +397,7 @@ def migrate_transcript_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_cds_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 11: cds_seq"""
     step_header(11, "cds_seq")
     cnt = get_sqlite_row_count(sqlite_conn, "cds_seq")
     print(f"  SQLite rows: {cnt}")
@@ -383,6 +418,7 @@ def migrate_cds_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_protein_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
+    """Step 12: protein_seq"""
     step_header(12, "protein_seq")
     cnt = get_sqlite_row_count(sqlite_conn, "protein_seq")
     print(f"  SQLite rows: {cnt}")
@@ -403,7 +439,8 @@ def migrate_protein_seq(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
 
 
 def migrate_expression_sample(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
-    step_header(13, "expression_sample (保留原 ID)")
+    """Step 13: expression_sample（保留原 id，重置 PG identity）"""
+    step_header(13, "expression_sample")
     cnt = get_sqlite_row_count(sqlite_conn, "expression_sample")
     print(f"  SQLite rows: {cnt}")
     if dry_run:
@@ -424,6 +461,7 @@ def migrate_expression_sample(sqlite_conn, pg_conn, dry_run: bool, truncate: boo
     )
     print(f"  Inserted: {total}")
 
+    # 重置 identity sequence 为实际最大值
     if total > 0:
         max_id = sqlite_conn.execute("SELECT MAX(id) FROM expression_sample").fetchone()[0]
         with pg_conn.cursor() as cur:
@@ -433,7 +471,8 @@ def migrate_expression_sample(sqlite_conn, pg_conn, dry_run: bool, truncate: boo
 
 
 def migrate_gene_expression(sqlite_conn, pg_conn, dry_run: bool, truncate: bool):
-    step_header(14, "gene_expression (宽表，72 表达值列)")
+    """Step 14: gene_expression（宽表，72 表达值列 + 2 派生列由 PG 自动计算）"""
+    step_header(14, "gene_expression")
     cnt = get_sqlite_row_count(sqlite_conn, "gene_expression")
     print(f"  SQLite rows: {cnt}")
     if dry_run:
@@ -442,6 +481,7 @@ def migrate_gene_expression(sqlite_conn, pg_conn, dry_run: bool, truncate: bool)
     if truncate:
         pg_truncate(pg_conn, "gene_expression")
 
+    # 所有列（gene_id + 36 FPKM + 36 TPM，max_fpkm/max_tpm 由 PG GENERATED 列自动计算）
     fpkm_cols = [f"e{s}_{sx}{r}_fpkm"
                  for s, s_key in [("0","e0"),("35","e35"),("45","e45"),("55","e55"),("65","e65"),("185","e185")]
                  for sx in ("f", "m") for r in (1, 2, 3)]
@@ -467,12 +507,22 @@ def migrate_gene_expression(sqlite_conn, pg_conn, dry_run: bool, truncate: bool)
 # ─────────────────────────────────────────────
 
 def print_stats(sqlite_conn, pg_conn):
+    """打印两库行数对比"""
     tables = [
-        "chromosome", "gene_xref", "go_term", "gene_go",
-        "gene_kegg", "kegg_pathway_asset", "gene_kegg_pathway",
-        "kegg_pathway_node", "kegg_pathway_node_gene",
-        "transcript_seq", "cds_seq", "protein_seq",
-        "expression_sample", "gene_expression",
+        "chromosome",
+        "gene_xref",
+        "go_term",
+        "gene_go",
+        "gene_kegg",
+        "kegg_pathway_asset",
+        "gene_kegg_pathway",
+        "kegg_pathway_node",
+        "kegg_pathway_node_gene",
+        "transcript_seq",
+        "cds_seq",
+        "protein_seq",
+        "expression_sample",
+        "gene_expression",
     ]
     print("\n" + "=" * 60)
     print("Row count comparison: SQLite vs PostgreSQL")
@@ -502,10 +552,12 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Dry run (no writes)")
     parser.add_argument("--truncate-first", action="store_true", help="Truncate PG tables before migrating")
     parser.add_argument("--stats", action="store_true", help="Print row-count comparison and exit")
+    parser.add_argument("--reset-identity", action="store_true", help="Reset identity sequences and exit")
     parser.add_argument("--step", type=int, choices=range(1, 15), metavar="1-14",
                         help="Run a single step by number")
     args = parser.parse_args()
 
+    # ── 1. 连接检查 ──────────────────────────────
     if not SQLITE_DB.exists():
         print(f"[ERROR] SQLite DB not found: {SQLITE_DB}")
         sys.exit(1)
@@ -520,31 +572,50 @@ def main():
         print(f"PostgreSQL connected: {PG_DSN[:50]}...")
     except psycopg2.OperationalError as e:
         print(f"[ERROR] Cannot connect to PostgreSQL: {e}")
-        print(f"  Hint: Run 'docker-compose up -d postgres' first, or check PG_DSN.")
         sqlite_conn.close()
         sys.exit(1)
 
     try:
+        # ── 2. stats 模式 ─────────────────────────
         if args.stats:
             print_stats(sqlite_conn, pg_conn)
             return
 
+        # ── 3. reset-identity 模式 ───────────────
+        if args.reset_identity:
+            tables_with_identity = [
+                ("kegg_pathway_node", "id"),
+                ("expression_sample", "id"),
+            ]
+            for tbl, col in tables_with_identity:
+                try:
+                    max_q = f"SELECT MAX({col}) FROM {tbl}"
+                    cur = pg_conn.execute(max_q)
+                    max_id = cur.fetchone()[0] or 0
+                    cur.execute(f"SELECT setval(pg_get_serial_sequence('{tbl}', '{col}'), {max_id}, true)")
+                    pg_conn.commit()
+                    print(f"  {tbl}.{col}: sequence reset to {max_id}")
+                except Exception as e:
+                    print(f"  [WARN] {tbl}.{col}: {e}")
+            return
+
+        # ── 4. 单步模式 ───────────────────────────
         if args.step is not None:
             steps = [
-                (1,  "chromosome",               migrate_chromosome),
-                (2,  "gene_xref",                migrate_gene_xref),
-                (3,  "go_term",                  migrate_go_term),
-                (4,  "gene_go",                 migrate_gene_go),
-                (5,  "gene_kegg",               migrate_gene_kegg),
-                (6,  "kegg_pathway_asset",      migrate_kegg_pathway_asset),
-                (7,  "gene_kegg_pathway",        migrate_gene_kegg_pathway),
-                (8,  "kegg_pathway_node",        migrate_kegg_pathway_node),
-                (9,  "kegg_pathway_node_gene",  migrate_kegg_pathway_node_gene),
-                (10, "transcript_seq",           migrate_transcript_seq),
-                (11, "cds_seq",                 migrate_cds_seq),
-                (12, "protein_seq",             migrate_protein_seq),
-                (13, "expression_sample",        migrate_expression_sample),
-                (14, "gene_expression",          migrate_gene_expression),
+                (1,  "chromosome",         migrate_chromosome),
+                (2,  "gene_xref",          migrate_gene_xref),
+                (3,  "go_term",            migrate_go_term),
+                (4,  "gene_go",            migrate_gene_go),
+                (5,  "gene_kegg",          migrate_gene_kegg),
+                (6,  "kegg_pathway_asset", migrate_kegg_pathway_asset),
+                (7,  "gene_kegg_pathway",  migrate_gene_kegg_pathway),
+                (8,  "kegg_pathway_node",  migrate_kegg_pathway_node),
+                (9,  "kegg_pathway_node_gene", migrate_kegg_pathway_node_gene),
+                (10, "transcript_seq",     migrate_transcript_seq),
+                (11, "cds_seq",            migrate_cds_seq),
+                (12, "protein_seq",        migrate_protein_seq),
+                (13, "expression_sample",  migrate_expression_sample),
+                (14, "gene_expression",    migrate_gene_expression),
             ]
             n, name, fn = next((x for x in steps if x[0] == args.step), (None, None, None))
             if fn:
@@ -552,7 +623,7 @@ def main():
                 print_stats(sqlite_conn, pg_conn)
             return
 
-        # 全量迁移
+        # ── 5. 全量迁移（14 步，按依赖顺序） ───────
         start = time.time()
         print("\n" + "=" * 60)
         print("FULL MIGRATION: SQLite → PostgreSQL")
@@ -560,19 +631,19 @@ def main():
 
         steps = [
             ("chromosome",               migrate_chromosome),
-            ("gene_xref",               migrate_gene_xref),
-            ("go_term",                 migrate_go_term),
-            ("gene_go",                 migrate_gene_go),
-            ("gene_kegg",               migrate_gene_kegg),
-            ("kegg_pathway_asset",     migrate_kegg_pathway_asset),
-            ("gene_kegg_pathway",       migrate_gene_kegg_pathway),
-            ("kegg_pathway_node",       migrate_kegg_pathway_node),
-            ("kegg_pathway_node_gene",  migrate_kegg_pathway_node_gene),
-            ("transcript_seq",          migrate_transcript_seq),
-            ("cds_seq",                migrate_cds_seq),
-            ("protein_seq",            migrate_protein_seq),
-            ("expression_sample",       migrate_expression_sample),
-            ("gene_expression",         migrate_gene_expression),
+            ("gene_xref",                migrate_gene_xref),
+            ("go_term",                  migrate_go_term),
+            ("gene_go",                  migrate_gene_go),
+            ("gene_kegg",                migrate_gene_kegg),
+            ("kegg_pathway_asset",       migrate_kegg_pathway_asset),
+            ("gene_kegg_pathway",        migrate_gene_kegg_pathway),
+            ("kegg_pathway_node",        migrate_kegg_pathway_node),
+            ("kegg_pathway_node_gene",   migrate_kegg_pathway_node_gene),
+            ("transcript_seq",           migrate_transcript_seq),
+            ("cds_seq",                  migrate_cds_seq),
+            ("protein_seq",              migrate_protein_seq),
+            ("expression_sample",        migrate_expression_sample),
+            ("gene_expression",          migrate_gene_expression),
         ]
 
         for i, (name, fn) in enumerate(steps, 1):

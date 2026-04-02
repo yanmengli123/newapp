@@ -23,22 +23,20 @@ from fastapi.staticfiles import StaticFiles
 # ========== 2. 导入自定义路由（放在核心导入后） ==========
 from api.go_kegg_routes import router as go_kegg_router
 from api.go_kegg_routes import attach_annotations_to_gene_page
+from expression_service import ExpressionService, DatasetRegistry
 
-# ========== 3. 全局配置（只定义一次，避免重复） ==========
-# 数据库路径
-DB_PATH = Path(os.getenv("GRCG6A_DB_PATH", "./grcg6a_nc.db")).resolve()
-# PostgreSQL DSN（Docker 内: postgres:5432, 宿主机: 127.0.0.1:5433）
-PG_DSN = os.getenv("DATABASE_URL", "postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a")
+# ========== 3. 全局配置（统一从 config.py 读取，指向 D:\jbrowsedata\projectdata） ==========
+from config import (
+    GRCG6A_DB_PATH as DB_PATH,
+    GRCG6A_PG_DSN as PG_DSN,
+    GRCG6A_STATIC_ROOT as STATIC_ROOT,
+    KEGG_IMAGE_DIR,
+    GRCG6A_GENOME_OUTPUT as GENOME_OUTPUT_DIR,
+)
 APP_TITLE = "GRCg6a Gene API"
 APP_VERSION = "0.1.0"
 
-# 静态文件配置
-STATIC_ROOT = Path(os.getenv("GRCG6A_STATIC_ROOT", "./static")).resolve()
-KEGG_IMAGE_DIR = STATIC_ROOT / "kegg_pathways"
 KEGG_IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-
-# 基因组分析输出目录
-GENOME_OUTPUT_DIR = Path(os.getenv("GRCG6A_GENOME_OUTPUT", "./genome_outputs")).resolve()
 GENOME_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # 日志配置（只配置一次）
@@ -74,6 +72,20 @@ def pg_putconn(conn: psycopg2.extensions.connection) -> None:
 def pg_closeconn(conn: psycopg2.extensions.connection) -> None:
     """归还连接到池（别名）"""
     pg_putconn(conn)
+
+def pg_getconn_with_fallback():
+    """
+    Layer 2 运行时保护：获取 PG 连接，PG 不可用时返回 None。
+    在 app.state.pg_available=False 时或连接失败时静默降级。
+    """
+    if _pg_pool is None:
+        return None
+    if not getattr(pg_getconn, "_pg_available", True):
+        return None
+    try:
+        return _pg_pool.getconn()
+    except Exception:
+        return None
 
 def row_to_dict_pg(row) -> dict[str, Any] | None:
     """psycopg2 RealDictCursor row → dict"""
@@ -172,14 +184,19 @@ async def lifespan(app: FastAPI):
     # ── PostgreSQL 连接池（dual-DB: 所有业务表） ──────────
     pg_pool = init_pg_pool(minconn=2, maxconn=10)
     pg_conn = pg_getconn()
+    pg_available = True
     try:
         # 验证 PG 连接
         with pg_conn.cursor() as cur:
             cur.execute("SELECT 1")
     except Exception:
         logger.warning("PostgreSQL not available — some endpoints may fail")
+        pg_available = False
     finally:
         pg_putconn(pg_conn)
+
+    # Layer 1 启动保护：写入 pg_getconn 函数属性，供 pg_getconn_with_fallback 使用
+    pg_getconn._pg_available = pg_available
 
     # ── gffutils (仅用于 features 表，SQLite) ──────────
     global _pg_pool  # allow lifespan shutdown to write module-level _pg_pool
@@ -224,6 +241,7 @@ async def lifespan(app: FastAPI):
     app.state.pg_pool = pg_pool
     app.state.pg_getconn = pg_getconn
     app.state.pg_putconn = pg_putconn
+    app.state.pg_available = pg_available
     app.state.gff = gff_db
     app.state.gff_conn = gff_conn
     app.state.sql = sql_conn
@@ -501,153 +519,20 @@ def build_gene_page(state: Any, gene_id: str, include_sequences: bool = False) -
     }
 
 # ========== 表达数据加载 ==========
-def _col_for_sample(sample, metric: str) -> str:
-    """根据样本元数据找到对应的 DB 列名
-
-    DB 列命名: e{stage}_{sex[0]}{rep}_{metric}
-    stage: E0→e0, E3.5→e35, E18.5→e185
-    sex: Female→f, Male→m
-    rep: 1/2/3
-    metric: fpkm / tpm
+def load_gene_expression(pg_conn, gene_id: str,
+                          dataset: str | None = None,
+                          metric:  str | None = None) -> dict[str, Any] | None:
     """
-    stage_raw = sample["stage"]          # "E0" / "E3.5" / "E18.5"
-    sex_code  = sample["sex"][0].lower() # "f" / "m"
-    rep       = sample["replicate"]       # 1 / 2 / 3
-    # 处理特殊阶段名
-    stage_map = {"E0": "e0", "E3.5": "e35", "E4.5": "e45",
-                 "E5.5": "e55", "E6.5": "e65", "E18.5": "e185"}
-    stage_key = stage_map.get(stage_raw, stage_raw.lower())
-    return f"{stage_key}_{sex_code}{rep}_{metric}"
+    Load expression data for a gene (used by get_gene_page).
 
-
-def load_gene_expression(pg_conn, gene_id: str) -> dict[str, Any] | None:
+    Delegates to ExpressionService.load().
+    Defaults: day_deseq2_36 / normcount (backward-compatible).
     """
-    加载单个基因的表达数据（PostgreSQL 星型模型 Star Schema）。
-
-    数据来源：
-    - summary: gene_expression_summary (day_deseq2_36 dataset)
-    - per-sample: expression_fact JOIN dataset_sample JOIN expression_sample
-    """
-    import psycopg2.extras
-
-    # ── 1. Pre-computed summary from gene_expression_summary ───────────────────
-    with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """SELECT sample_count, mean_value, max_value, min_value,
-                      std_value, top_sample, top_stage
-               FROM gene_expression_summary
-               WHERE gene_id = %s AND dataset_code = 'day_deseq2_36'
-                 AND metric_code = 'normcount'""",
-            (gene_id,)
-        )
-        summary_row = cur.fetchone()
-
-    # ── 2. Per-sample expression_fact rows ────────────────────────────────────
-    with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """SELECT es.sample_name, es.stage, es.stage_label,
-                      es.sex, es.replicate, f.value
-               FROM expression_fact f
-               JOIN dataset_sample ds ON ds.dataset_sample_id = f.dataset_sample_id
-               JOIN expression_sample es ON es.id = ds.biosample_id
-               WHERE f.gene_id = %s
-                 AND ds.dataset_id = 2      -- day_deseq2_36
-                 AND f.metric_code = 'normcount'
-               ORDER BY es.stage_order, es.sex, es.replicate""",
-            (gene_id,)
-        )
-        fact_rows = cur.fetchall()
-
-    if not fact_rows:
+    svc = ExpressionService(pg_conn)
+    result = svc.load(gene_id, dataset=dataset, metric=metric)
+    if result.get("status") == "no_data":
         return None
-
-    # ── 3. Build items and compute stats ─────────────────────────────────────
-    items = []
-    nc_list = []
-    for row in fact_rows:
-        nc_val = float(row["value"]) if row["value"] is not None else 0.0
-        nc_list.append(nc_val)
-        items.append({
-            "sample_id": row["sample_name"],
-            "sample_name": row["sample_name"],
-            "stage": row["stage"],
-            "stage_label": row["stage_label"],
-            "sex": row["sex"],
-            "replicate": row["replicate"],
-            "normcount": nc_val,
-        })
-
-    # Basic stats
-    nonzero_nc = [v for v in nc_list if v > 0]
-    mean_nc = sum(nc_list) / len(nc_list) if nc_list else 0.0
-    max_nc = max(nc_list) if nc_list else 0.0
-    max_nc_idx = nc_list.index(max_nc) if nc_list else -1
-
-    # Stage means (aggregated by stage across sex replicates)
-    stage_sums = defaultdict(float)
-    stage_counts = defaultdict(int)
-    for i, item in enumerate(items):
-        stage_sums[item["stage"]] += nc_list[i]
-        stage_counts[item["stage"]] += 1
-    stage_means = {st: stage_sums[st] / stage_counts[st] for st in stage_sums}
-    top_stage_nc = max(stage_means, key=stage_means.get) if stage_means else None
-
-    # Sex bias
-    female_vals = [nc_list[i] for i, item in enumerate(items) if item["sex"] == "Female"]
-    male_vals   = [nc_list[i] for i, item in enumerate(items) if item["sex"] == "Male"]
-    female_mean = sum(female_vals) / len(female_vals) if female_vals else 0.0
-    male_mean   = sum(male_vals) / len(male_vals) if male_vals else 0.0
-
-    # summary_row provides pre-computed stats (mean/max/min/std)
-    precomputed = dict(summary_row) if summary_row else {}
-
-    # ── 4. Dataset & metric metadata ─────────────────────────────────────────
-    with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            """SELECT d.dataset_code, d.dataset_name, d.description,
-                      d.sample_scope, d.normalization_family,
-                      m.metric_code, m.metric_name, m.unit_desc
-               FROM dataset d
-               JOIN expr_metric m ON m.metric_code = 'normcount'
-               WHERE d.dataset_code = 'day_deseq2_36'
-               LIMIT 1""",
-        )
-        meta_row = cur.fetchone()
-
-    return {
-        "status": "available",
-        "dataset": {
-            "dataset_code": meta_row["dataset_code"],
-            "dataset_name": meta_row["dataset_name"],
-            "description": meta_row["description"],
-            "sample_scope": meta_row["sample_scope"],
-            "normalization_family": meta_row["normalization_family"],
-        } if meta_row else None,
-        "metric": {
-            "metric_code": meta_row["metric_code"],
-            "metric_name": meta_row["metric_name"],
-            "unit_desc": meta_row["unit_desc"],
-        } if meta_row else None,
-        "samples": items,
-        "summary": {
-            "max_normcount": round(max_nc, 4),
-            "max_normcount_sample": items[max_nc_idx]["sample_name"] if max_nc_idx >= 0 else None,
-            "min_normcount": round(float(precomputed.get("min_value") or 0.0), 4),
-            "mean_normcount": round(precomputed.get("mean_value", mean_nc) or mean_nc, 4),
-            "std_normcount": round(float(precomputed.get("std_value") or 0.0), 4),
-            "expressed_samples": len(nonzero_nc),
-            "zero_samples": len(nc_list) - len(nonzero_nc),
-            "top_stage_normcount": top_stage_nc,
-            "sex_bias": sex_bias(female_mean, male_mean),
-            "stage_normcount_means": {st: round(v, 4) for st, v in sorted(stage_means.items())},
-        },
-    }
-
-
-def sex_bias(female_mean: float, male_mean: float) -> str:
-    if abs(female_mean - male_mean) <= 0.1:
-        return "No_difference"
-    return "Female_higher" if female_mean > male_mean else "Male_higher"
+    return result
 
 
 def _extract_gene_id_from_symbol_hit(hit):
@@ -865,20 +750,208 @@ def get_gene_sequences(gene_id: str, request: Request):
         "transcript_sequences": items,
     }
 
+@app.get("/datasets")
+def get_datasets(request: Request):
+    """
+    List all available expression datasets with their metrics.
+
+    Returns datasets that have at least one enabled (dataset, metric) combination
+    in the mv_dataset_metric capability registry.
+
+    Note: 'raw_ballgown_36' is a deprecated alias for 'esc_srr_23' (same 23-SRR
+    master TSV); use 'esc_srr_23' instead.
+    """
+    state = get_state(request)
+    pg_conn = pg_getconn_with_fallback()
+    if pg_conn is None:
+        return {"datasets": [], "status": "unavailable"}
+    try:
+        reg = DatasetRegistry(pg_conn)
+        return {"datasets": reg.list_datasets()}
+    finally:
+        state.pg_putconn(pg_conn)
+
+
 @app.get("/genes/{gene_id}/expression")
-def get_gene_expression(gene_id: str, request: Request):
-    """独立端点：返回单个基因的完整表达数据（DESeq2 Normalized Count，36样本，可选 dataset/metric 参数切换）"""
+def get_gene_expression(
+    gene_id: str,
+    request: Request,
+    dataset: str | None = Query(default=None, description="Dataset code, e.g. 'day_deseq2_36', 'esc_srr_23'. Resolves aliases."),
+    metric:  str | None = Query(default=None, description="Metric code, e.g. 'normcount', 'tpm', 'fpkm'."),
+    expand:  bool = Query(default=False, description="If true, return ALL dataset×metric combinations with cross-dataset comparison note."),
+):
+    """
+    Expression data for one gene.
+
+    Query parameters
+    ----------------
+    dataset : dataset code (default: day_deseq2_36)
+              raw_ballgown_36 is a deprecated alias for esc_srr_23.
+    metric  : metric code (default: normcount)
+              Must be available for the given dataset.
+    expand  : if True, returns ALL datasets/metrics (Plan B — full gene expression view).
+              Response includes cross_comparison section with opposite_trends flag
+              and trend_note comparing day_deseq2_36 vs esc_srr_23.
+
+    Returns 422 if (dataset, metric) is not a valid combination.
+    Returns 404 if the gene does not exist.
+    """
     state = get_state(request)
     resolved = resolve_gene_id(state, gene_id)
     get_gene_feature_or_404(state, resolved)
-    pg_conn = state.pg_getconn()
+
+    pg_conn = pg_getconn_with_fallback()
+    if pg_conn is None:
+        return unavailable_expression_response(gene_id)
     try:
-        expr = load_gene_expression(pg_conn, resolved)
+        svc = ExpressionService(pg_conn)
+        if expand:
+            return svc.load_all(resolved)
+        result = svc.load(resolved, dataset=dataset, metric=metric)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     finally:
         state.pg_putconn(pg_conn)
-    if expr is None:
-        return {"status": "no_data", "gene_id": resolved}
-    return expr
+
+# ========== 12. Safe wrapper 函数（PG 容灾保护） ==========
+
+def _build_unavailable_go_response(gene_id: str, gene_symbol: str) -> dict[str, Any]:
+    """构建 GO 降级响应，保留 gene 标识"""
+    return {
+        "gene_id": gene_id,
+        "gene_symbol": gene_symbol,
+        "summary": {"bp_count": 0, "mf_count": 0, "cc_count": 0, "total": 0},
+        "items": []
+    }
+
+
+def _build_unavailable_kegg_response(gene_id: str, gene_symbol: str) -> dict[str, Any]:
+    """构建 KEGG 降级响应，保留 gene 标识"""
+    return {
+        "gene_id": gene_id,
+        "gene_symbol": gene_symbol,
+        "summary": {"pathway_count": 0},
+        "items": []
+    }
+
+
+def safe_attach_xref_and_aliases(pg_conn, page: dict[str, Any]) -> None:
+    """
+    安全附加 gene_xref 扩展字段 + gene_alias 列表。
+    PG 故障时静默降级：page["gene"] 保持原样（只有 SQLite 数据）。
+    """
+    try:
+        with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # gene_xref extended fields
+            cur.execute(
+                """SELECT gene_type, is_canonical, display_symbol,
+                          ncbi_gene_id, ensembl_gene_id
+                   FROM gene_xref WHERE gene_id = %s""",
+                (page["gene"]["gene_id"],),
+            )
+            xref_row = cur.fetchone()
+            if xref_row:
+                page["gene"]["gene_type"] = xref_row["gene_type"]
+                page["gene"]["is_canonical"] = xref_row["is_canonical"]
+                page["gene"]["display_symbol"] = xref_row["display_symbol"]
+                page["gene"]["ncbi_gene_id"] = xref_row["ncbi_gene_id"]
+                page["gene"]["ensembl_gene_id"] = xref_row["ensembl_gene_id"]
+
+            # gene_kegg: kegg_gene_id
+            cur.execute(
+                """SELECT kegg_gene_id FROM gene_kegg WHERE gene_id = %s""",
+                (page["gene"]["gene_id"],),
+            )
+            kegg_row = cur.fetchone()
+            if kegg_row:
+                page["gene"]["kegg_gene_id"] = kegg_row["kegg_gene_id"]
+
+            # gene_alias list
+            cur.execute(
+                """SELECT alias, alias_type, is_primary, source_dataset
+                   FROM gene_alias WHERE canonical_id = %s
+                   ORDER BY is_primary DESC, alias_type, alias""",
+                (page["gene"]["gene_id"],),
+            )
+            alias_rows = cur.fetchall()
+            page["gene"]["aliases"] = [
+                {
+                    "alias": r["alias"],
+                    "alias_type": r["alias_type"],
+                    "is_primary": r["is_primary"],
+                    "source": r["source_dataset"],
+                }
+                for r in alias_rows
+            ]
+    except Exception:
+        # PG 故障时静默降级：page["gene"]["aliases"] 保持为空列表
+        page["gene"]["aliases"] = []
+
+
+def safe_attach_annotations(request: Request, page: dict[str, Any], gene_id: str) -> None:
+    """
+    安全附加 GO/KEGG 注释。
+    所有异常都降级，不穿透：annotations 是非阻断模块，失败只模块降级。
+    """
+    gene_id = page["gene"]["gene_id"]
+    gene_sym = page["gene"].get("gene_symbol") or gene_id
+
+    try:
+        attach_annotations_to_gene_page(request, page, gene_id)
+        page["annotations_status"] = "available"
+        page["annotations_error"] = None
+    except HTTPException:
+        # PG 不可用，吞掉并降级
+        page["annotations"] = {
+            "go": _build_unavailable_go_response(gene_id, gene_sym),
+            "kegg": _build_unavailable_kegg_response(gene_id, gene_sym)
+        }
+        page["annotations_status"] = "unavailable"
+        page["annotations_error"] = "service_unavailable"
+    except Exception as e:
+        # 其他加载错误，降级
+        page["annotations"] = {
+            "go": _build_unavailable_go_response(gene_id, gene_sym),
+            "kegg": _build_unavailable_kegg_response(gene_id, gene_sym)
+        }
+        page["annotations_status"] = "unavailable"
+        page["annotations_error"] = "load_failed"
+        logger.warning("Annotations load failed for %s: %s", gene_id, e)
+
+
+def unavailable_expression_response(gene_id: str) -> dict[str, Any]:
+    """构建表达降级响应"""
+    return {
+        "status": "unavailable",
+        "gene_id": gene_id,
+        "dataset": None,
+        "metric": None,
+        "samples": [],
+        "summary": None
+    }
+
+
+def safe_attach_expression(pg_conn, gene_id: str) -> dict[str, Any]:
+    """
+    安全附加表达数据。
+    PG 故障时返回 unavailable 降级结构。
+    """
+    try:
+        expr = load_gene_expression(pg_conn, gene_id)
+        if expr is None:
+            return {
+                "status": "no_data",
+                "gene_id": gene_id,
+                "dataset": None,
+                "metric": None,
+                "samples": [],
+                "summary": None
+            }
+        return expr
+    except Exception:
+        return unavailable_expression_response(gene_id)
+
 
 @app.get("/genes/{gene_id}/page")
 def get_gene_page(
@@ -896,61 +969,22 @@ def get_gene_page(
         page = build_gene_page(state, gene_id, include_sequences=include_sequences)
 
         # Attach gene_xref extended fields + gene_alias from PostgreSQL
-        pg_conn = state.pg_getconn()
-        try:
-            with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                # gene_xref extended fields
-                cur.execute(
-                    """SELECT gene_type, is_canonical, display_symbol,
-                              ncbi_gene_id, ensembl_gene_id
-                       FROM gene_xref WHERE gene_id = %s""",
-                    (page["gene"]["gene_id"],),
-                )
-                xref_row = cur.fetchone()
-                if xref_row:
-                    page["gene"]["gene_type"] = xref_row["gene_type"]
-                    page["gene"]["is_canonical"] = xref_row["is_canonical"]
-                    page["gene"]["display_symbol"] = xref_row["display_symbol"]
-                    page["gene"]["ncbi_gene_id"] = xref_row["ncbi_gene_id"]
-                    page["gene"]["ensembl_gene_id"] = xref_row["ensembl_gene_id"]
-
-                # gene_kegg: kegg_gene_id
-                cur.execute(
-                    """SELECT kegg_gene_id FROM gene_kegg WHERE gene_id = %s""",
-                    (page["gene"]["gene_id"],),
-                )
-                kegg_row = cur.fetchone()
-                if kegg_row:
-                    page["gene"]["kegg_gene_id"] = kegg_row["kegg_gene_id"]
-
-                # gene_alias list
-                cur.execute(
-                    """SELECT alias, alias_type, is_primary, source_dataset
-                       FROM gene_alias WHERE canonical_id = %s
-                       ORDER BY is_primary DESC, alias_type, alias""",
-                    (page["gene"]["gene_id"],),
-                )
-                alias_rows = cur.fetchall()
-                page["gene"]["aliases"] = [
-                    {
-                        "alias": r["alias"],
-                        "alias_type": r["alias_type"],
-                        "is_primary": r["is_primary"],
-                        "source": r["source_dataset"],
-                    }
-                    for r in alias_rows
-                ]
-        finally:
+        pg_conn = pg_getconn_with_fallback()
+        if pg_conn is not None:
+            safe_attach_xref_and_aliases(pg_conn, page)
             state.pg_putconn(pg_conn)
 
-        page = attach_annotations_to_gene_page(request, page, page["gene"]["gene_id"])
-        # 附加表达数据（PostgreSQL）
-        pg_conn = state.pg_getconn()
-        try:
-            expr = load_gene_expression(pg_conn, page["gene"]["gene_id"])
-        finally:
+        # Attach GO/KEGG annotations (graceful degradation, no bubbling)
+        safe_attach_annotations(request, page, page["gene"]["gene_id"])
+
+        # Attach expression data (graceful degradation)
+        pg_conn = pg_getconn_with_fallback()
+        if pg_conn is not None:
+            expr = safe_attach_expression(pg_conn, page["gene"]["gene_id"])
             state.pg_putconn(pg_conn)
-        page["expression"] = expr if expr else {"status": "no_data"}
+        else:
+            expr = unavailable_expression_response(page["gene"]["gene_id"])
+        page["expression"] = expr
 
         return page
     except HTTPException:

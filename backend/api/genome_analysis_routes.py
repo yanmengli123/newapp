@@ -147,6 +147,13 @@ async def get_module_result(job_id: str, module_name: str):
     if job is None:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
+    # 统一返回 400：job 未完成时不返回 404
+    if job["status"] == "running":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job {job_id} is still running (status: {job['status']})"
+        )
+
     result_file = Path(job["output_dir"]) / "result" / "analysis_results.json"
     if not result_file.exists():
         raise HTTPException(status_code=404, detail="Results file not found")

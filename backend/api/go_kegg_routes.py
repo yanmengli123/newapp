@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 # ========== 2. 统一导入（删除重复，按规范排序） ==========
 import logging
 import os
+import sys
 import time
 from functools import lru_cache
 from pathlib import Path
@@ -16,6 +17,13 @@ import psycopg2.extras
 import requests
 from fastapi import APIRouter, HTTPException, Request
 
+# 添加 backend 目录到 sys.path 以便导入 config
+_backend_dir = Path(__file__).parent.parent
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
+
+from config import KEGG_IMAGE_DIR, GRCG6A_STATIC_ROOT
+
 # ========== 3. 全局配置（只定义一次，删除重复） ==========
 router = APIRouter(prefix="/annotations", tags=["annotations"])
 logger = logging.getLogger("grcg6a_fastapi_backend.annotations")
@@ -23,14 +31,17 @@ logger = logging.getLogger("grcg6a_fastapi_backend.annotations")
 # KEGG基础配置
 KEGG_BASE = "https://rest.kegg.jp"
 KEGG_REQ_INTERVAL = 0.35  # <= 3 req/sec
-KEGG_IMAGE_DIR = Path(r"D:\jbrowsedata\projectdata\static\kegg_pathways")
 KEGG_IMAGE_URL_PREFIX = "/static/kegg_pathways"
 
 # ========== 4. 工具函数（dual-DB: PostgreSQL 专用） ==========
 
 def get_pg(request: Request):
-    """获取 PostgreSQL 连接（从连接池）"""
-    return request.app.state.pg_getconn()
+    """获取 PostgreSQL 连接（从连接池）。Layer 2 运行时保护：连接失败返回 503。"""
+    try:
+        return request.app.state.pg_getconn()
+    except Exception as e:
+        logger.warning("PG connection failed in get_pg: %s", e)
+        raise HTTPException(status_code=503, detail="PostgreSQL unavailable")
 
 def put_pg(request: Request, conn):
     """归还 PostgreSQL 连接到池"""
@@ -260,8 +271,7 @@ import xml.etree.ElementTree as ET
 @router.get("/kegg/pathway/{pathway_id}/image", response_class=FileResponse)
 def get_kegg_pathway_image(pathway_id: str):
     """强制返回图片，不依赖任何数据库/状态"""
-    # 硬编码图片路径（避免app.state依赖问题）
-    image_path = Path(r"D:\jbrowsedata\projectdata\static\kegg_pathways") / f"{pathway_id}.png"
+    image_path = KEGG_IMAGE_DIR / f"{pathway_id}.png"
 
     # 1. 检查文件是否存在
     if not image_path.exists():
@@ -315,7 +325,7 @@ def get_kegg_pathway_info(pathway_id: str, request: Request):
             "png_height": png_height,
             "node_count": node_count,
             "gene_count": gene_count,
-            "local_image_path": str(Path(r"D:\jbrowsedata\projectdata\static\kegg_pathways") / f"{pathway_id}.png")
+            "local_image_path": str(KEGG_IMAGE_DIR / f"{pathway_id}.png")
         }
     finally:
         put_pg(request, pg_conn)
@@ -423,7 +433,7 @@ def get_kegg_pathway_detail(pathway_id: str, request: Request):
 KGML_CACHE: dict[str, str] = {}
 
 # KGML本地文件缓存目录
-KGML_CACHE_DIR = Path(r"D:\jbrowsedata\projectdata\static\kegg_kgml")
+KGML_CACHE_DIR = GRCG6A_STATIC_ROOT / "kegg_kgml"
 
 # 确保目录存在
 KGML_CACHE_DIR.mkdir(parents=True, exist_ok=True)

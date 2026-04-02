@@ -3,12 +3,18 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
+import sys
+from pathlib import Path as PP
+
+# 添加 backend 目录到 sys.path
+_backend_dir = PP(__file__).parent.parent
+if str(_backend_dir) not in sys.path:
+    sys.path.insert(0, str(_backend_dir))
+
+from config import KEGG_IMAGE_DIR
 
 # 新建独立路由（避免和原有路由冲突）
 kegg_image_router = APIRouter(prefix="/kegg-images", tags=["kegg-images"])
-
-# 硬编码图片目录（和你的路径一致）
-KEGG_IMAGE_DIR = Path(r"D:\jbrowsedata\projectdata\static\kegg_pathways")
 
 
 @kegg_image_router.get("/{pathway_id}.png")
