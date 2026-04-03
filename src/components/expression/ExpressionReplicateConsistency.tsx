@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box, Group, Paper, Progress, Stack, Text, Badge, Divider } from "@mantine/core";
 import type { ExpressionSample } from "../../lib/geneApi";
 import {
