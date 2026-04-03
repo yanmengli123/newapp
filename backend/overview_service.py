@@ -18,6 +18,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import numpy as np
 import psycopg2.extras
 
 DEFAULT_DATASET = "day_deseq2_36"
@@ -203,15 +204,25 @@ class Top50HeatmapService:
     def load(self) -> dict[str, Any]:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-        # 1. Get top 50 genes by CV
+        # 1. Get top 50 genes by CV that have non-zero expression in ≥5 samples
         cur.execute("""
-            SELECT gene_id, cv
-            FROM gene_expression_summary
-            WHERE dataset_code = %s
-              AND metric_code = %s
-              AND cv IS NOT NULL
-              AND cv > 0
-            ORDER BY cv DESC
+            SELECT ges.gene_id, ges.cv
+            FROM gene_expression_summary ges
+            WHERE ges.dataset_code = %s
+              AND ges.metric_code = %s
+              AND ges.cv IS NOT NULL
+              AND ges.cv > 0
+              AND (
+                  SELECT COUNT(*) FROM expression_fact f
+                  JOIN dataset_sample ds ON ds.dataset_sample_id = f.dataset_sample_id
+                  JOIN dataset d ON d.dataset_id = ds.dataset_id
+                  WHERE d.dataset_code = ges.dataset_code
+                    AND f.metric_code = ges.metric_code
+                    AND f.gene_id = ges.gene_id
+                    AND f.value IS NOT NULL
+                    AND f.value != 0
+              ) >= 5
+            ORDER BY ges.cv DESC
             LIMIT 50
         """, (DEFAULT_DATASET, DEFAULT_METRIC))
         top_genes = [dict(r)["gene_id"] for r in cur.fetchall()]
@@ -291,8 +302,8 @@ class Top50HeatmapService:
 
 class PCAService:
     """
-    Simple 2D PCA on samples using expression_fact.
-    Projects samples onto PC1/PC2 using SVD on the gene × sample matrix.
+    2D PCA on samples using SVD on the centered gene × sample matrix.
+    Uses numpy.linalg.svd for numerically stable computation.
     """
 
     def __init__(self, pg_conn):
@@ -357,74 +368,33 @@ class PCAService:
         n_samples = len(sample_names)
         n_genes_actual = len(top_genes)
 
-        # Build matrix (genes × samples)
-        M: list[list[float]] = []
-        for gid in top_genes:
-            M.append([expr[sn].get(gid, 0.0) for sn in sample_names])
+        # Build matrix M (genes × samples) and center columns (samples)
+        M_arr = np.array(
+            [[expr[sn].get(gid, 0.0) for sn in sample_names] for gid in top_genes],
+            dtype=np.float64,
+        )
+        col_means = M_arr.mean(axis=0)
+        M_centered = M_arr - col_means  # broadcast: subtract sample mean from each column
 
-        # Center columns (samples)
-        col_means: list[float] = []
-        for j in range(n_samples):
-            col_sum = sum(M[i][j] for i in range(n_genes_actual))
-            col_means.append(col_sum / n_genes_actual)
-        for i in range(n_genes_actual):
-            for j in range(n_samples):
-                M[i][j] -= col_means[j]
+        # SVD: M_centered = U @ S @ Vt  (full_matrices=False)
+        # U: (n_genes, n_samples), s: (n_samples,), Vt: (n_samples, n_samples)
+        U, s, Vt = np.linalg.svd(M_centered, full_matrices=False)
 
-        # SVD: compute sample covariance matrix S = (1/(n-1)) * M^T M  (n_samples × n_samples)
-        n = n_samples
-        S: list[list[float]] = [[0.0] * n for _ in range(n)]
-        for i in range(n_genes_actual):
-            for a in range(n):
-                for b in range(n):
-                    S[a][b] += M[i][a] * M[i][b]
-        for a in range(n):
-            for b in range(n):
-                S[a][b] /= max(n_genes_actual - 1, 1)
+        # PC scores: each column of Vt.T is a PC direction in sample space
+        # Scale by singular values / sqrt(n_samples - 1)
+        scale = s / np.sqrt(n_samples - 1)
+        pc1_coords = (Vt.T[:, 0] * scale[0]).tolist()
+        pc2_coords = (Vt.T[:, 1] * scale[1]).tolist()
 
-        # Power iteration for top 2 eigenvalues/eigenvectors (fast approximation)
-        def power_iteration(A, num_sim=50):
-            n = len(A)
-            v = [1.0 / math.sqrt(n)] * n
-            for _ in range(num_sim):
-                Av = [sum(A[i][j] * v[j] for j in range(n)) for i in range(n)]
-                norm = math.sqrt(sum(x * x for x in Av))
-                if norm < 1e-10:
-                    break
-                v = [x / norm for x in Av]
-            return v
-
-        def deflate(A, v):
-            n = len(v)
-            w = [sum(A[i][j] * v[j] for j in range(n)) for i in range(n)]
-            vt_w = sum(v[j] * w[j] for j in range(n))
-            for i in range(n):
-                for j in range(n):
-                    A[i][j] -= vt_w * v[i] * v[j]
-            return A
-
-        # PC1
-        pc1_vec = power_iteration(S)
-        pc1_eigval = sum(S[a][b] * pc1_vec[a] * pc1_vec[b] for a in range(n) for b in range(n))
-
-        # Deflate and PC2
-        S2 = [row[:] for row in S]
-        deflate(S2, pc1_vec)
-        pc2_vec = power_iteration(S2)
-
-        # Project samples onto PCs
-        pc1_coords = [sum(M[i][j] * pc1_vec[j] for i in range(n_genes_actual)) for j in range(n_samples)]
-        pc2_coords = [sum(M[i][j] * pc2_vec[j] for i in range(n_genes_actual)) for j in range(n_samples)]
-
-        # Explained variance ratio approximation
-        total_var = sum(S[a][a] for a in range(n))
-        ev_ratio = [abs(pc1_eigval) / max(total_var, 1e-10), 0.2]
+        # Explained variance ratio
+        total_var = float(np.sum(s**2))
+        ev_ratio = [float(s[i]**2 / total_var) for i in range(2)]
 
         return {
             "samples": sample_info,
-            "pc1": [round(v, 4) for v in pc1_coords],
-            "pc2": [round(v, 4) for v in pc2_coords],
-            "explained_variance_ratio": [round(v, 4) for v in ev_ratio],
+            "pc1": [round(float(v), 4) for v in pc1_coords],
+            "pc2": [round(float(v), 4) for v in pc2_coords],
+            "explained_variance_ratio": [round(float(v), 4) for v in ev_ratio],
         }
 
 
