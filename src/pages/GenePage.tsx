@@ -47,6 +47,9 @@ import ExpressionRadarChart from "../components/expression/ExpressionRadarChart"
 import ExpressionHeatmap from "../components/expression/ExpressionHeatmap";
 import ExpressionFoldChangeBar from "../components/expression/ExpressionFoldChangeBar";
 import ExpressionDendrogram from "../components/expression/ExpressionDendrogram";
+import ExpressionZScoreChart from "../components/expression/ExpressionZScoreChart";
+import ExpressionFoldChangeTrajectory from "../components/expression/ExpressionFoldChangeTrajectory";
+import ExpressionReplicateConsistency from "../components/expression/ExpressionReplicateConsistency";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -731,7 +734,7 @@ export default function GenePage() {
                         />
                       </Group>
 
-                      {/* New Charts Row 1: Violin + StackedArea */}
+                      {/* Charts Row 2: Violin + StackedArea */}
                       <Group grow align="flex-start" gap="md">
                         <ExpressionViolinPlot
                           samples={currentExpr?.samples ?? data.expression.samples ?? []}
@@ -745,7 +748,7 @@ export default function GenePage() {
                         />
                       </Group>
 
-                      {/* New Charts Row 2: Radar + Heatmap */}
+                      {/* Charts Row 3: Radar + Heatmap */}
                       <Group grow align="flex-start" gap="md">
                         <ExpressionRadarChart
                           summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
@@ -758,16 +761,34 @@ export default function GenePage() {
                         />
                       </Group>
 
-                      {/* New Charts Row 3: FoldChange + Dendrogram */}
+                      {/* Charts Row 4: ZScore + FoldChange */}
                       <Group grow align="flex-start" gap="md">
+                        <ExpressionZScoreChart
+                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                          dataset={selectedDataset}
+                        />
                         <ExpressionFoldChangeBar
                           summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                        />
+                      </Group>
+
+                      {/* Charts Row 5: FoldChangeTrajectory + Dendrogram */}
+                      <Group grow align="flex-start" gap="md">
+                        <ExpressionFoldChangeTrajectory
+                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                          dataset={selectedDataset}
                         />
                         <ExpressionDendrogram
                           samples={currentExpr?.samples ?? data.expression.samples ?? []}
                           dataset={selectedDataset}
                         />
                       </Group>
+
+                      {/* Charts Row 6: ReplicateConsistency */}
+                      <ExpressionReplicateConsistency
+                        samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                        dataset={selectedDataset}
+                      />
 
                       {/* Sample Table */}
                       <ExpressionTable

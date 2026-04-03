@@ -57,66 +57,46 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
     }
   }
 
+  // Use stage index for x positions
   const STAGE_X: Record<string, number> = {};
   stages.forEach((s, i) => { STAGE_X[s] = i; });
 
-  // Scatter traces: Male circles, Female diamonds
+  // Marker sizes proportional to replicate count (within reasonable range)
+  const sizeMale = maleData.map(d => Math.min(6 + d.count * 3, 18));
+  const sizeFemale = femaleData.map(d => Math.min(6 + d.count * 3, 18));
+
+  // Hover text
+  const hoverMale = maleData.map(d =>
+    `<b>${d.stage} Male</b><br>Mean: ${d.mean.toFixed(3)}<br>n = ${d.count}`
+  );
+  const hoverFemale = femaleData.map(d =>
+    `<b>${d.stage} Female</b><br>Mean: ${d.mean.toFixed(3)}<br>n = ${d.count}`
+  );
+
   const traces: any[] = [
+    // Male — line + scatter
     {
       type: "scatter",
-      mode: "markers+text",
+      mode: "lines+markers",
       x: maleData.map(d => STAGE_X[d.stage]),
       y: maleData.map(d => d.mean),
-      text: maleData.map(d => `${d.stage} Male\n${d.mean.toFixed(2)} (n=${d.count})`),
-      textposition: "top center",
-      textfont: { size: 8, color: "#228BE6" },
-      marker: {
-        color: "#228BE6",
-        size: maleData.map(d => Math.min(6 + d.count * 2, 18)),
-        symbol: "circle",
-        opacity: 0.8,
-      },
-      name: "Male",
+      line: { color: "#228BE6", width: 1.5, dash: "solid" },
+      marker: { color: "#228BE6", size: sizeMale, symbol: "circle" },
+      text: hoverMale,
       hovertemplate: "%{text}<extra>Male</extra>",
+      name: "Male",
     },
+    // Female — line + scatter
     {
       type: "scatter",
-      mode: "markers+text",
+      mode: "lines+markers",
       x: femaleData.map(d => STAGE_X[d.stage]),
       y: femaleData.map(d => d.mean),
-      text: femaleData.map(d => `${d.stage} Female\n${d.mean.toFixed(2)} (n=${d.count})`),
-      textposition: "bottom center",
-      textfont: { size: 8, color: "#E64980" },
-      marker: {
-        color: "#E64980",
-        size: femaleData.map(d => Math.min(6 + d.count * 2, 18)),
-        symbol: "diamond",
-        opacity: 0.8,
-      },
-      name: "Female",
+      line: { color: "#E64980", width: 1.5, dash: "solid" },
+      marker: { color: "#E64980", size: sizeFemale, symbol: "circle" },
+      text: hoverFemale,
       hovertemplate: "%{text}<extra>Female</extra>",
-    },
-    // Connect male points within same stage group
-    {
-      type: "scatter",
-      mode: "lines",
-      x: maleData.map(d => STAGE_X[d.stage]),
-      y: maleData.map(d => d.mean),
-      line: { color: "#228BE6", width: 1, dash: "dot" },
-      opacity: 0.4,
-      showlegend: false,
-      hoverinfo: "skip",
-    },
-    // Connect female points
-    {
-      type: "scatter",
-      mode: "lines",
-      x: femaleData.map(d => STAGE_X[d.stage]),
-      y: femaleData.map(d => d.mean),
-      line: { color: "#E64980", width: 1, dash: "dot" },
-      opacity: 0.4,
-      showlegend: false,
-      hoverinfo: "skip",
+      name: "Female",
     },
   ];
 
@@ -129,6 +109,8 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
       tickfont: { size: 9 },
       title: { text: "Stage", font: { size: 10 } },
       gridcolor: "#f8f8f8",
+      showgrid: true,
+      dtick: 1,
     },
     yaxis: {
       title: { text: "Mean Expression", font: { size: 10 } },
@@ -137,7 +119,11 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
       zeroline: false,
     },
     showlegend: true,
-    legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.22, font: { size: 9 } },
+    legend: {
+      orientation: "h",
+      x: 0.5, xanchor: "center", y: -0.22,
+      font: { size: 9 },
+    },
     hovermode: "closest" as const,
     ...PAPER_STYLE,
   };

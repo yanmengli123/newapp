@@ -19,6 +19,9 @@ import ExpressionRadarChart from "./ExpressionRadarChart";
 import ExpressionHeatmap from "./ExpressionHeatmap";
 import ExpressionFoldChangeBar from "./ExpressionFoldChangeBar";
 import ExpressionDendrogram from "./ExpressionDendrogram";
+import ExpressionZScoreChart from "./ExpressionZScoreChart";
+import ExpressionFoldChangeTrajectory from "./ExpressionFoldChangeTrajectory";
+import ExpressionReplicateConsistency from "./ExpressionReplicateConsistency";
 
 interface ExpressionComparePanelProps {
   expandData: GeneExpressionExpandResponse;
@@ -204,16 +207,32 @@ export default function ExpressionComparePanel({
                 metric={currentMetricObj.metric_code}
               />
             </Group>
-            {/* New Charts Row 3: FoldChange + Dendrogram */}
+            {/* New Charts Row 3: ZScore + FoldChange */}
             <Group grow align="flex-start" gap="xs">
+              <ExpressionZScoreChart
+                samples={currentMetricObj.samples}
+                dataset={currentDs.dataset_code}
+              />
               <ExpressionFoldChangeBar
                 summary={currentMetricObj.summary}
+              />
+            </Group>
+            {/* New Charts Row 4: FoldChangeTrajectory + Dendrogram */}
+            <Group grow align="flex-start" gap="xs">
+              <ExpressionFoldChangeTrajectory
+                samples={currentMetricObj.samples}
+                dataset={currentDs.dataset_code}
               />
               <ExpressionDendrogram
                 samples={currentMetricObj.samples}
                 dataset={currentDs.dataset_code}
               />
             </Group>
+            {/* New Charts Row 5: ReplicateConsistency */}
+            <ExpressionReplicateConsistency
+              samples={currentMetricObj.samples}
+              dataset={currentDs.dataset_code}
+            />
           </Stack>
         )}
       </Stack>

@@ -44,19 +44,26 @@ export default function KeggInteractiveViewer({
     }
   }, []);
 
-  // Load mapdata when drawer opens
+  // Reset state when drawer opens — intentional synchronous reset before data fetch
   useEffect(() => {
     if (!opened) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional state reset on drawer open
     setMapdata(null);
     setHoveredNode(null);
     setIsFullscreen(false);
     setLoading(true);
     setError(null);
+  }, [opened]);
+
+  // Load mapdata after reset (triggered when mapdata becomes null and opened is true)
+  useEffect(() => {
+    if (!opened) return;
+    if (mapdata !== null) return; // only load when reset
     getKEGGPathwayMapdata(pathwayId, geneId)
       .then((data) => setMapdata(data))
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mapdata"))
       .finally(() => setLoading(false));
-  }, [opened, pathwayId, geneId]);
+  }, [opened, mapdata, pathwayId, geneId]);
 
   // Track img size via ResizeObserver
   useEffect(() => {
