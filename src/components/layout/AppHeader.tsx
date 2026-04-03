@@ -1,5 +1,5 @@
 import { Box, Button, Container, Group, Text, ThemeIcon, Menu } from "@mantine/core";
-import { IconDna, IconTool, IconBox, IconChartBar } from "@tabler/icons-react";
+import { IconDna, IconTool, IconBox, IconChartBar, IconDownload } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
 function HeaderNav() {
@@ -41,6 +41,10 @@ function HeaderNav() {
           </Menu.Item>
           <Menu.Item component={Link} to="/genome/jobs/sample/downloads" leftSection={<IconBox size={14} />}>
             Sample Downloads
+          </Menu.Item>
+          <Menu.Divider />
+          <Menu.Item component={Link} to="/downloads" leftSection={<IconDownload size={14} />}>
+            ESC Atlas Downloads
           </Menu.Item>
         </Menu.Dropdown>
       </Menu>

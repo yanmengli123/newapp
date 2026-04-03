@@ -292,6 +292,10 @@ app.include_router(chat_router)
 from api.genome_analysis_routes import router as genome_router
 app.include_router(genome_router)
 
+# ESC Atlas Overview routes
+from api.overview_routes import router as overview_router
+app.include_router(overview_router)
+
 # ========== 9. CORS 中间件 ==========
 app.add_middleware(
     CORSMiddleware,

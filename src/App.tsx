@@ -19,6 +19,7 @@ import GenomeJobsPage from './pages/GenomeJobsPage';
 import GenomeJobPage from './pages/GenomeJobPage';
 import GenomeResultPage from './pages/GenomeResultPage';
 import GenomeDownloadsPage from './pages/GenomeDownloadsPage';
+import DownloadsPage from './pages/DownloadsPage';
 import ChatWidget from './components/chat/ChatWidget';
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="/genome/jobs/:jobId" element={<GenomeJobPage />} />
             <Route path="/genome/jobs/:jobId/result" element={<GenomeResultPage />} />
             <Route path="/genome/jobs/:jobId/downloads" element={<GenomeDownloadsPage />} />
+            <Route path="/downloads" element={<DownloadsPage />} />
           </Routes>
 
           <Divider my="xl" />

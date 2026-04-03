@@ -16,6 +16,7 @@ export default defineConfig({
       '/search':   'http://localhost:8000',
       '/datasets': 'http://localhost:8000',
       '/genes':    'http://localhost:8000',
+      '/overview': 'http://localhost:8000',
     },
   },
 })
