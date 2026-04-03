@@ -271,9 +271,9 @@ def female_male_scatter_csv(request: Request):
         data = svc.load()
         output = io.StringIO()
         writer = csv.writer(output)
-        writer.writerow(["Gene_ID", "Stage", "Female_Mean", "Male_Mean", "Sex_Bias_Label"])
+        writer.writerow(["Gene_ID", "Female_Mean", "Male_Mean", "Sex_Bias_Label"])
         for g in data["genes"]:
-            writer.writerow([g["gene_id"], g["stage"], g["female_mean"], g["male_mean"], g["sex_bias_label"]])
+            writer.writerow([g["gene_id"], g["female_mean"], g["male_mean"], g["sex_bias_label"]])
         output.seek(0)
         return StreamingResponse(
             iter([output.getvalue()]),

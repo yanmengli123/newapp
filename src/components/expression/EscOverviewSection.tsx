@@ -80,7 +80,7 @@ function ChartCard({ title, subtitle, thumbnail, fullscreenChart, badge }: Chart
           <IconMaximize size={14} />
         </ActionIcon>
         <Stack gap="xs">
-          <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+          <Text component="span" size="xs" fw={600} c="dimmed" tt="uppercase">
             {title} {badge && <Badge size="xs" ml={4}>{badge}</Badge>}
           </Text>
           <Text size="xs" c="dimmed">{subtitle}</Text>
