@@ -13,6 +13,12 @@ import type { GeneExpressionExpandResponse } from "../../lib/geneApi";
 import ExpressionStageChart from "./ExpressionStageChart";
 import ExpressionLineChart from "./ExpressionLineChart";
 import ExpressionStatsRow from "./ExpressionStatsRow";
+import ExpressionViolinPlot from "./ExpressionViolinPlot";
+import ExpressionStackedArea from "./ExpressionStackedArea";
+import ExpressionRadarChart from "./ExpressionRadarChart";
+import ExpressionHeatmap from "./ExpressionHeatmap";
+import ExpressionFoldChangeBar from "./ExpressionFoldChangeBar";
+import ExpressionDendrogram from "./ExpressionDendrogram";
 
 interface ExpressionComparePanelProps {
   expandData: GeneExpressionExpandResponse;
@@ -173,6 +179,41 @@ export default function ExpressionComparePanel({
               dataset={currentDs.dataset_code}
               metric={currentMetricObj.metric_code}
             />
+            {/* New Charts Row 1: Violin + StackedArea */}
+            <Group grow align="flex-start" gap="xs">
+              <ExpressionViolinPlot
+                samples={currentMetricObj.samples}
+                dataset={currentDs.dataset_code}
+                metric={currentMetricObj.metric_code}
+              />
+              <ExpressionStackedArea
+                summary={currentMetricObj.summary}
+                dataset={currentDs.dataset_code}
+                metric={currentMetricObj.metric_code}
+              />
+            </Group>
+            {/* New Charts Row 2: Radar + Heatmap */}
+            <Group grow align="flex-start" gap="xs">
+              <ExpressionRadarChart
+                summary={currentMetricObj.summary}
+                dataset={currentDs.dataset_code}
+              />
+              <ExpressionHeatmap
+                summary={currentMetricObj.summary}
+                dataset={currentDs.dataset_code}
+                metric={currentMetricObj.metric_code}
+              />
+            </Group>
+            {/* New Charts Row 3: FoldChange + Dendrogram */}
+            <Group grow align="flex-start" gap="xs">
+              <ExpressionFoldChangeBar
+                summary={currentMetricObj.summary}
+              />
+              <ExpressionDendrogram
+                samples={currentMetricObj.samples}
+                dataset={currentDs.dataset_code}
+              />
+            </Group>
           </Stack>
         )}
       </Stack>

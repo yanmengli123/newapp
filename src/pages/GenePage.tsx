@@ -41,6 +41,12 @@ import ExpressionStageChart from "../components/expression/ExpressionStageChart"
 import ExpressionLineChart from "../components/expression/ExpressionLineChart";
 import ExpressionTable from "../components/expression/ExpressionTable";
 import ExpressionComparePanel from "../components/expression/ExpressionComparePanel";
+import ExpressionViolinPlot from "../components/expression/ExpressionViolinPlot";
+import ExpressionStackedArea from "../components/expression/ExpressionStackedArea";
+import ExpressionRadarChart from "../components/expression/ExpressionRadarChart";
+import ExpressionHeatmap from "../components/expression/ExpressionHeatmap";
+import ExpressionFoldChangeBar from "../components/expression/ExpressionFoldChangeBar";
+import ExpressionDendrogram from "../components/expression/ExpressionDendrogram";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -722,6 +728,44 @@ export default function GenePage() {
                           samples={currentExpr?.samples ?? data.expression.samples ?? []}
                           dataset={selectedDataset}
                           metric={selectedMetric}
+                        />
+                      </Group>
+
+                      {/* New Charts Row 1: Violin + StackedArea */}
+                      <Group grow align="flex-start" gap="md">
+                        <ExpressionViolinPlot
+                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                          dataset={selectedDataset}
+                          metric={selectedMetric}
+                        />
+                        <ExpressionStackedArea
+                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                          dataset={selectedDataset}
+                          metric={selectedMetric}
+                        />
+                      </Group>
+
+                      {/* New Charts Row 2: Radar + Heatmap */}
+                      <Group grow align="flex-start" gap="md">
+                        <ExpressionRadarChart
+                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                          dataset={selectedDataset}
+                        />
+                        <ExpressionHeatmap
+                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                          dataset={selectedDataset}
+                          metric={selectedMetric}
+                        />
+                      </Group>
+
+                      {/* New Charts Row 3: FoldChange + Dendrogram */}
+                      <Group grow align="flex-start" gap="md">
+                        <ExpressionFoldChangeBar
+                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
+                        />
+                        <ExpressionDendrogram
+                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
+                          dataset={selectedDataset}
                         />
                       </Group>
 
