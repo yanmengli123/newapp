@@ -1,6 +1,7 @@
 /**
- * ESC Atlas Overview API — global aggregate data for homepage charts.
- * All calls go through apiFetch, which uses VITE_API_BASE (relative path in prod).
+ * ESC Atlas Overview API — single merged endpoint with in-memory cache.
+ * All overview data fetched via GET /overview/summary in one request,
+ * cached for the lifetime of the page session.
  */
 import { apiFetch } from "./apiClient";
 
@@ -65,28 +66,36 @@ export interface TrajectoryClusters {
   }>;
 }
 
-export const getSampleComposition = () =>
-  apiFetch<{ status: string } & SampleComposition>("/overview/sample_composition");
+export interface OverviewSummary {
+  status: string;
+  sample_composition: SampleComposition;
+  sex_biased_genes: SexBiasedGenes;
+  female_male_scatter: FemaleMaleScatter;
+  stage_deg_count: StageDEGCount;
+  expression_distribution: ExpressionDistribution;
+  pca: PCA;
+  top50_heatmap: Top50Heatmap;
+  trajectory_clusters: TrajectoryClusters;
+}
 
-export const getSexBiasedGenes = () =>
-  apiFetch<{ status: string } & SexBiasedGenes>("/overview/sex_biased_genes");
+// ── Session cache ─────────────────────────────────────────────────────────────
 
-export const getFemaleMaleScatter = (stage?: string) =>
-  apiFetch<{ status: string } & FemaleMaleScatter>(
-    stage ? `/overview/female_male_scatter?stage=${encodeURIComponent(stage)}` : "/overview/female_male_scatter"
-  );
+let _cache: OverviewSummary | null = null;
+let _promise: Promise<OverviewSummary> | null = null;
 
-export const getStageDEGCount = () =>
-  apiFetch<{ status: string } & StageDEGCount>("/overview/stage_deg_count");
+/**
+ * Fetch all overview data in a single request.
+ * Result is cached for the browser session — subsequent calls return the
+ * cached Promise, so multiple simultaneous callers get the same data.
+ */
+export function getOverviewSummary(): Promise<OverviewSummary> {
+  if (_cache) return Promise.resolve(_cache);
+  if (_promise) return _promise;
 
-export const getTop50Heatmap = () =>
-  apiFetch<{ status: string } & Top50Heatmap>("/overview/top50_heatmap");
+  _promise = apiFetch<OverviewSummary>("/overview/summary").then((data) => {
+    _cache = data;
+    return data;
+  });
 
-export const getPCA = () =>
-  apiFetch<{ status: string } & PCA>("/overview/pca");
-
-export const getExpressionDistribution = () =>
-  apiFetch<{ status: string } & ExpressionDistribution>("/overview/expression_distribution");
-
-export const getTrajectoryClusters = () =>
-  apiFetch<{ status: string } & TrajectoryClusters>("/overview/trajectory_clusters");
+  return _promise;
+}

@@ -32,7 +32,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **Pages** — `src/pages/` (route targets in App.tsx)
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
   - `GeneQueryPage` — Autocomplete gene search
-  - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion), KEGG Pathways, **Expression 模块** (StatsRow / StageChart / LineChart / 4新增图表行 / Table / ComparePanel内嵌图表)
+  - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion), KEGG Pathways, **Expression 模块** (StatsRow / StageChart+LineChart / ViolinPlot+StackedArea / RadarChart+Heatmap / ZScoreChart+FoldChangeBar / FoldChangeTrajectory+Dendrogram / ReplicateConsistency / Table / ComparePanel内嵌图表)
     - **Data loading**: Four-layer concept — (1) Load main page via `getGenePage(geneId, false)` (no sequences), (2) Hydrate expression from `response.expression`, (3) Annotations consumed directly from `response.annotations` (no separate API calls), (4) Sequences loaded on-demand via `getGenePage(geneId, true)`
   - `ChromosomePage` — Chromosome view with gene list
   - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
@@ -43,7 +43,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
-- **Expression components** — `src/components/expression/`: 11 个组件
+- **Expression components** — `src/components/expression/`: 14 个组件
   - `utils.ts` — 共享工具 (`isValidNumber`/`normalizeSex`/`STAGE_ORDER`/`resolveStageMeans`/`groupSamplesByStageSex`/`PLOT_CONFIG`)
   - `ExpressionHeader` — Dataset/Metric 选择器 + Expand All 切换
   - `ExpressionStatsRow` — 7 张统计卡片（Max/Min/Mean±Std/CV/Expressed/Top Stage/Sex Bias）
@@ -57,6 +57,9 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
   - `ExpressionViolinPlot` — 小提琴图（按 stage×sex 分布，含内嵌箱线图）
   - `ExpressionFoldChangeBar` — log2 Fold Change 柱状图（Top/Bottom Stage 上调/下调色彩）
   - `ExpressionDendrogram` — 样本聚类散点图（Male 圆形 / Female 菱形，按 stage 排列）
+  - `ExpressionZScoreChart` — Z-Score 样本谱图（折线图，M/F 分色 + 零线参考）
+  - `ExpressionFoldChangeTrajectory` — 相邻阶段 log2FC 分组柱状图
+  - `ExpressionReplicateConsistency` — 纯 Mantine 布局：Progress 条 + CV% 预警 Badge + 一致性标签
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)

@@ -142,6 +142,35 @@ def expression_distribution(request: Request):
         state.pg_putconn(conn)
 
 
+@router.get("/summary")
+def overview_summary(request: Request):
+    """
+    All overview data in a single request — one DB round-trip.
+    Returns all 8 chart data sets keyed by name.
+    """
+    conn, state = pg_conn(request)
+    try:
+        services = {
+            "sample_composition":   SampleCompositionService(conn).load,
+            "sex_biased_genes":     SexBiasedGenesService(conn).load,
+            "female_male_scatter":  lambda: FemaleMaleScatterService(conn).load(),
+            "stage_deg_count":      StageDEGCountService(conn).load,
+            "expression_distribution": ExpressionDistributionService(conn).load,
+            "pca":                 lambda: PCAService(conn).load(),
+            "top50_heatmap":       Top50HeatmapService(conn).load,
+            "trajectory_clusters":  TrajectoryClustersService(conn).load,
+        }
+        result = {}
+        for key, loader in services.items():
+            try:
+                result[key] = loader()
+            except Exception as e:
+                result[key] = {"error": str(e)}
+        return _ok(result)
+    finally:
+        state.pg_putconn(conn)
+
+
 @router.get("/trajectory_clusters")
 def trajectory_clusters(request: Request):
     """Gene trajectory clusters (k-means on stage-wise expression vectors)."""
