@@ -7,7 +7,7 @@ star schema — no schema changes, no new tables.
 
 Tables used:
   - expression_fact       (~3M rows: gene × sample × metric)
-  - gene_expression_summary (pre-computed per-gene stats)
+  - gene_expression_summary (pre-computed per-gene stats; stage_means JSON)
   - dataset_sample          (sample metadata: stage, sex, replicate)
   - dataset                 (dataset definitions)
   - stage_dim              (stage ordering)
@@ -28,8 +28,9 @@ DEFAULT_METRIC  = "normcount"
 
 class SexBiasedGenesService:
     """
-    Returns per-stage counts of Female_higher / Male_higher / No_difference
-    genes based on gene_expression_summary.sex_bias_label.
+    Returns per-stage counts of Female_higher / Male_higher genes.
+    Uses top_stage (stage with highest mean expression) as the stage assignment
+    for each gene's sex-bias classification.
     """
 
     def __init__(self, pg_conn):
@@ -39,20 +40,20 @@ class SexBiasedGenesService:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("""
             SELECT
-                ges.stage,
+                ges.top_stage  AS stage,
                 ges.sex_bias_label,
-                COUNT(*) AS gene_count
+                COUNT(*)       AS gene_count
             FROM gene_expression_summary ges
-            JOIN dataset d ON d.dataset_code = ges.dataset_code
             JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
                 AND m.metric_code = ges.metric_code
             WHERE ges.dataset_code = %s
               AND ges.metric_code = %s
               AND ges.sex_bias_label IS NOT NULL
               AND ges.sex_bias_label != 'No_difference'
+              AND ges.top_stage IS NOT NULL
               AND m.is_enabled = TRUE
-            GROUP BY ges.stage, ges.sex_bias_label
-            ORDER BY ges.stage,
+            GROUP BY ges.top_stage, ges.sex_bias_label
+            ORDER BY ges.top_stage,
                 CASE ges.sex_bias_label
                     WHEN 'Female_higher' THEN 1
                     WHEN 'Male_higher'   THEN 2
@@ -61,8 +62,6 @@ class SexBiasedGenesService:
         rows = cur.fetchall()
         cur.close()
 
-        # Fill all stages with all three categories
-        from config import GRCG6A_PG_DSN as _DSN
         stage_order = self._get_stage_order()
         counts: dict[str, dict[str, int]] = {s: {"Female_higher": 0, "Male_higher": 0} for s in stage_order}
         for row in rows:
@@ -92,6 +91,7 @@ class FemaleMaleScatterService:
     """
     Returns all genes' female_mean and male_mean per stage, used for
     the Female vs Male scatter plot on the overview page.
+    stage is extracted from stage_means JSON keys.
     """
 
     def __init__(self, pg_conn):
@@ -99,28 +99,34 @@ class FemaleMaleScatterService:
 
     def load(self, stage: str | None = None) -> dict[str, Any]:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
         if stage:
-            where_clause = "AND ges.stage = %s"
-            params: tuple[str, str] = (DEFAULT_DATASET, DEFAULT_METRIC, stage)
+            stage_filter = "AND j.stage = %(stage)s"
+            params = {"ds": DEFAULT_DATASET, "m": DEFAULT_METRIC, "stage": stage}
         else:
-            where_clause = ""
-            params = (DEFAULT_DATASET, DEFAULT_METRIC)
+            stage_filter = ""
+            params = {"ds": DEFAULT_DATASET, "m": DEFAULT_METRIC}
 
         cur.execute(f"""
             SELECT
-                ges.gene_id,
-                ges.stage,
-                COALESCE((ges.stage_means -> ges.stage ->> 'female')::float, 0) AS female_mean,
-                COALESCE((ges.stage_means -> ges.stage ->> 'male')::float, 0)   AS male_mean,
+                j.gene_id,
+                j.stage,
+                (ges.stage_means -> j.stage ->> 'female')::float AS female_mean,
+                (ges.stage_means -> j.stage ->> 'male')::float   AS male_mean,
                 ges.sex_bias_label
-            FROM gene_expression_summary ges
-            JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
-                AND m.metric_code = ges.metric_code
-            WHERE ges.dataset_code = %s
-              AND ges.metric_code = %s
-              AND m.is_enabled = TRUE
-              {where_clause}
-            ORDER BY ges.gene_id
+            FROM (
+                SELECT gene_id, jsonb_object_keys(stage_means) AS stage
+                FROM gene_expression_summary
+                WHERE dataset_code = %(ds)s
+                  AND metric_code = %(m)s
+                  AND stage_means IS NOT NULL
+            ) j
+            JOIN gene_expression_summary ges ON ges.gene_id = j.gene_id
+                AND ges.dataset_code = %(ds)s
+                AND ges.metric_code = %(m)s
+            WHERE ges.sex_bias_label IS NOT NULL
+              {stage_filter}
+            ORDER BY j.gene_id, j.stage
         """, params)
         rows = cur.fetchall()
         cur.close()
@@ -136,51 +142,46 @@ class FemaleMaleScatterService:
 
 class StageDEGCountService:
     """
-    For each adjacent stage pair, count up-regulated and down-regulated
-    genes (based on fold_change_top / fold_change_bottom).
+    For each stage, count up-regulated / down-regulated genes based on
+    fold_change_top / fold_change_bottom (single aggregate values per gene).
+    Also computes per-stage mean fold changes from stage_means for additional colour.
     """
 
-    STAGE_ORDER = ["E0", "E3.5", "E7", "E11", "E14", "E18.5", "P0", "Adult"]
+    STAGE_ORDER = ["E0", "E3.5", "E4.5", "E5.5", "E6.5", "E18.5"]
 
     def __init__(self, pg_conn):
         self._conn = pg_conn
 
     def load(self) -> dict[str, Any]:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Up/down counts per stage using top_stage (stage of max mean expression)
         cur.execute("""
             SELECT
-                ges.stage,
-                ges.fold_change_top,
-                ges.fold_change_bottom,
-                COUNT(*) AS gene_count
+                ges.top_stage  AS stage,
+                SUM(CASE WHEN ges.fold_change_top > 0 THEN 1 ELSE 0 END) AS up_count,
+                SUM(CASE WHEN ges.fold_change_bottom < 0 THEN 1 ELSE 0 END) AS down_count
             FROM gene_expression_summary ges
             JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
                 AND m.metric_code = ges.metric_code
             WHERE ges.dataset_code = %s
               AND ges.metric_code = %s
+              AND ges.top_stage IS NOT NULL
               AND m.is_enabled = TRUE
-              AND ges.stage IS NOT NULL
-            GROUP BY ges.stage, ges.fold_change_top, ges.fold_change_bottom
-            ORDER BY ges.stage
+            GROUP BY ges.top_stage
+            ORDER BY ges.top_stage
         """, (DEFAULT_DATASET, DEFAULT_METRIC))
         rows = cur.fetchall()
         cur.close()
 
-        # Build per-stage up/down counts
         stage_data: dict[str, dict[str, int]] = {}
         for row in rows:
-            stage = row["stage"]
-            if stage not in stage_data:
-                stage_data[stage] = {"up": 0, "down": 0}
-            fc_top = row["fold_change_top"]
-            fc_bot = row["fold_change_bottom"]
-            n = int(row["gene_count"])
-            if fc_top and fc_top > 0:
-                stage_data[stage]["up"] += n
-            if fc_bot and fc_bot < 0:
-                stage_data[stage]["down"] += n
+            stage_data[row["stage"]] = {
+                "up": int(row["up_count"] or 0),
+                "down": int(row["down_count"] or 0),
+            }
 
-        ordered = sorted(stage_data.keys(), key=lambda s: self.STAGE_ORDER.index(s) if s in self.STAGE_ORDER else 99)
+        ordered = [s for s in self.STAGE_ORDER if s in stage_data]
         return {
             "stages": ordered,
             "up":   [stage_data.get(s, {}).get("up", 0)   for s in ordered],
@@ -314,7 +315,7 @@ class PCAService:
         cur.close()
 
         if len(top_genes) < 2:
-            return {"samples": [], "pc1": [], "pc2": [], "explained_variance": []}
+            return {"samples": [], "pc1": [], "pc2": [], "explained_variance_ratio": []}
 
         # Get expression matrix: genes × samples
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -370,10 +371,7 @@ class PCAService:
             for j in range(n_samples):
                 M[i][j] -= col_means[j]
 
-        # SVD: we need V (samples × components) of M^T M
-        # Compute M * M^T first (n_genes × n_genes), then eigen-decompose
-        # For simplicity, compute sample covariance matrix directly
-        # S = (1/(n-1)) * M^T M  (n_samples × n_samples)
+        # SVD: compute sample covariance matrix S = (1/(n-1)) * M^T M  (n_samples × n_samples)
         n = n_samples
         S: list[list[float]] = [[0.0] * n for _ in range(n)]
         for i in range(n_genes_actual):
@@ -398,9 +396,7 @@ class PCAService:
 
         def deflate(A, v):
             n = len(v)
-            # w = A v
             w = [sum(A[i][j] * v[j] for j in range(n)) for i in range(n)]
-            # A := A - (v^T w) * v / (v^T v)
             vt_w = sum(v[j] * w[j] for j in range(n))
             for i in range(n):
                 for j in range(n):
@@ -422,7 +418,7 @@ class PCAService:
 
         # Explained variance ratio approximation
         total_var = sum(S[a][a] for a in range(n))
-        ev_ratio = [abs(pc1_eigval) / max(total_var, 1e-10), 0.2]  # approx for PC2
+        ev_ratio = [abs(pc1_eigval) / max(total_var, 1e-10), 0.2]
 
         return {
             "samples": sample_info,
@@ -459,16 +455,6 @@ class SampleCompositionService:
         rows = cur.fetchall()
         cur.close()
 
-        # Collect stages
-        stages: list[str] = []
-        seen = set()
-        for r in rows:
-            if r["stage"] not in seen:
-                seen.add(r["stage"])
-                stages.append(r["stage"])
-
-        male_counts: list[int] = []
-        female_counts: list[int] = []
         stage_counts: dict[str, dict[str, int]] = {}
         for r in rows:
             stage_counts.setdefault(r["stage"], {"Male": 0, "Female": 0})
@@ -477,14 +463,10 @@ class SampleCompositionService:
 
         stage_order = self._get_stage_order()
         ordered_stages = sorted(stage_counts.keys(), key=lambda s: stage_order.get(s, 99))
-        for s in ordered_stages:
-            male_counts.append(stage_counts[s]["Male"])
-            female_counts.append(stage_counts[s]["Female"])
-
         return {
             "stages": ordered_stages,
-            "male": male_counts,
-            "female": female_counts,
+            "male":   [stage_counts[s]["Male"]   for s in ordered_stages],
+            "female": [stage_counts[s]["Female"] for s in ordered_stages],
         }
 
     def _get_stage_order(self) -> dict[str, int]:
@@ -500,6 +482,7 @@ class SampleCompositionService:
 class ExpressionDistributionService:
     """
     Returns per-stage expression distribution statistics (quartiles).
+    Extracts per-stage mean values from stage_means JSON for all genes.
     """
 
     def __init__(self, pg_conn):
@@ -507,34 +490,61 @@ class ExpressionDistributionService:
 
     def load(self) -> dict[str, Any]:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Extract mean values per gene per stage from stage_means JSON
         cur.execute("""
             SELECT
-                ges.stage,
-                percentile_cont(0.25) WITHIN GROUP (ORDER BY ges.mean_value) AS q1,
-                percentile_cont(0.50) WITHIN GROUP (ORDER BY ges.mean_value) AS median,
-                percentile_cont(0.75) WITHIN GROUP (ORDER BY ges.mean_value) AS q3,
-                COUNT(*) AS gene_count
-            FROM gene_expression_summary ges
+                j.stage,
+                (ges.stage_means -> j.stage ->> 'mean')::float AS mean_val
+            FROM (
+                SELECT gene_id, jsonb_object_keys(stage_means) AS stage
+                FROM gene_expression_summary
+                WHERE dataset_code = %s
+                  AND metric_code = %s
+                  AND stage_means IS NOT NULL
+            ) j
+            JOIN gene_expression_summary ges ON ges.gene_id = j.gene_id
             JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
                 AND m.metric_code = ges.metric_code
-            WHERE ges.dataset_code = %s
-              AND ges.metric_code = %s
-              AND m.is_enabled = TRUE
-              AND ges.mean_value IS NOT NULL
-            GROUP BY ges.stage
-            ORDER BY ges.stage
+            WHERE m.is_enabled = TRUE
         """, (DEFAULT_DATASET, DEFAULT_METRIC))
         rows = cur.fetchall()
         cur.close()
 
+        # Collect values per stage
+        from collections import defaultdict
+        stage_values: dict[str, list[float]] = defaultdict(list)
+        for r in rows:
+            stage_values[r["stage"]].append(float(r["mean_val"]) if r["mean_val"] else 0.0)
+
+        def quartiles(vals: list[float]):
+            if not vals:
+                return 0.0, 0.0, 0.0
+            s = sorted(vals)
+            n = len(s)
+            q1 = s[int(n * 0.25)]
+            q2 = s[int(n * 0.50)]
+            q3 = s[int(n * 0.75)]
+            return q1, q2, q3
+
         stage_order = self._get_stage_order()
-        ordered = sorted(rows, key=lambda r: stage_order.get(r["stage"], 99))
+        ordered = sorted(stage_values.keys(), key=lambda s: stage_order.get(s, 99))
+
+        q1_list, median_list, q3_list, gene_count_list = [], [], [], []
+        for s in ordered:
+            vals = stage_values[s]
+            q1, q2, q3 = quartiles(vals)
+            q1_list.append(round(q1, 4))
+            median_list.append(round(q2, 4))
+            q3_list.append(round(q3, 4))
+            gene_count_list.append(len(vals))
+
         return {
-            "stages":    [r["stage"] for r in ordered],
-            "q1":        [float(r["q1"])     if r["q1"]     else 0.0 for r in ordered],
-            "median":    [float(r["median"]) if r["median"] else 0.0 for r in ordered],
-            "q3":        [float(r["q3"])     if r["q3"]     else 0.0 for r in ordered],
-            "gene_count":[int(r["gene_count"]) for r in ordered],
+            "stages":     ordered,
+            "q1":         q1_list,
+            "median":     median_list,
+            "q3":         q3_list,
+            "gene_count": gene_count_list,
         }
 
     def _get_stage_order(self) -> dict[str, int]:
@@ -560,19 +570,22 @@ class TrajectoryClustersService:
 
     def load(self) -> dict[str, Any]:
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Extract gene × stage × mean from stage_means JSON
         cur.execute("""
             SELECT
                 ges.gene_id,
-                ges.stage,
-                COALESCE((ges.stage_means -> ges.stage ->> 'mean')::float, 0) AS mean_val
+                j.stage,
+                COALESCE((ges.stage_means -> j.stage ->> 'mean')::float, 0) AS mean_val
             FROM gene_expression_summary ges
+            CROSS JOIN LATERAL jsonb_object_keys(ges.stage_means) AS j(stage)
             JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
                 AND m.metric_code = ges.metric_code
             WHERE ges.dataset_code = %s
               AND ges.metric_code = %s
-              AND m.is_enabled = TRUE
               AND ges.stage_means IS NOT NULL
-            ORDER BY ges.gene_id, ges.stage
+              AND m.is_enabled = TRUE
+            ORDER BY ges.gene_id, j.stage
         """, (DEFAULT_DATASET, DEFAULT_METRIC))
         rows = cur.fetchall()
         cur.close()
@@ -588,27 +601,28 @@ class TrajectoryClustersService:
 
         stage_order = self._get_stage_order()
         ordered_stages = sorted(all_stages, key=lambda s: stage_order.get(s, 99))
-        n_dims = len(ordered_stages)
 
         # Build vectors
         gene_vectors: list[tuple[str, list[float]]] = []
         for gid, sv in gene_stages.items():
             vec = [sv.get(s, 0.0) for s in ordered_stages]
-            if any(v != 0 for v in vec):  # skip all-zero
+            if any(v != 0 for v in vec):
                 gene_vectors.append((gid, vec))
 
         if len(gene_vectors) < self.K:
-            return {"clusters": [], "stages": ordered_stages}
+            return {"clusters": [], "stages": ordered_stages, "centroids": []}
 
         # K-means
-        centroids = self._kmeans([v for _, v in gene_vectors], self.K)
+        import random
+        vectors = [v for _, v in gene_vectors]
+        centroids = self._kmeans(vectors, self.K)
 
         # Assign genes to nearest centroid
-        clusters: list[dict[str, Any]] = [[] for _ in range(self.K)]
+        clusters: list[list[tuple[str, list[float]]]] = [[] for _ in range(self.K)]
         for gid, vec in gene_vectors:
             dists = [self._euclidean(vec, c) for c in centroids]
             cluster_id = int(dists.index(min(dists)))
-            clusters[cluster_id].append({"gene_id": gid, "vector": vec})
+            clusters[cluster_id].append((gid, vec))
 
         return {
             "stages": ordered_stages,
@@ -617,7 +631,7 @@ class TrajectoryClustersService:
                 {
                     "cluster_id": i,
                     "gene_count": len(c),
-                    "gene_ids": [g["gene_id"] for g in c[:10]],  # top 10 per cluster
+                    "gene_ids": [g[0] for g in c[:10]],
                 }
                 for i, c in enumerate(clusters)
             ],
@@ -625,7 +639,8 @@ class TrajectoryClustersService:
 
     def _kmeans(self, vectors: list[list[float]], k: int, max_iter: int = 20) -> list[list[float]]:
         import random
-        # Init centroids randomly from data
+        if len(vectors) < k:
+            k = len(vectors)
         centroids = [vectors[i] for i in random.sample(range(len(vectors)), k)]
         for _ in range(max_iter):
             assignments: list[list[int]] = [[] for _ in range(k)]

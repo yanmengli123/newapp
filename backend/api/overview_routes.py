@@ -8,8 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
+import csv
+import io
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from overview_service import (
     SexBiasedGenesService,
@@ -181,5 +183,184 @@ def trajectory_clusters(request: Request):
         return _ok(data)
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
+    finally:
+        state.pg_putconn(conn)
+
+
+# ─── CSV Export Endpoints ──────────────────────────────────────────────────────
+
+@router.get("/sample_composition/csv")
+def sample_composition_csv(request: Request):
+    """Download Sample Composition data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = SampleCompositionService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Stage", "Male", "Female"])
+        for i, stage in enumerate(data["stages"]):
+            writer.writerow([stage, data["male"][i], data["female"][i]])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=sample_composition.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/sex_biased_genes/csv")
+def sex_biased_genes_csv(request: Request):
+    """Download Sex-Biased Genes data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = SexBiasedGenesService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Stage", "Female_higher", "Male_higher"])
+        for i, stage in enumerate(data["stages"]):
+            writer.writerow([stage, data["female"][i], data["male"][i]])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=sex_biased_genes.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/female_male_scatter/csv")
+def female_male_scatter_csv(request: Request):
+    """Download Female vs Male scatter data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = FemaleMaleScatterService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Gene_ID", "Stage", "Female_Mean", "Male_Mean", "Sex_Bias_Label"])
+        for g in data["genes"]:
+            writer.writerow([g["gene_id"], g["stage"], g["female_mean"], g["male_mean"], g["sex_bias_label"]])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=female_male_scatter.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/stage_deg_count/csv")
+def stage_deg_count_csv(request: Request):
+    """Download Stage DEG Count data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = StageDEGCountService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Stage", "Up_regulated", "Down_regulated"])
+        for i, stage in enumerate(data["stages"]):
+            writer.writerow([stage, data["up"][i], data["down"][i]])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=stage_deg_count.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/expression_distribution/csv")
+def expression_distribution_csv(request: Request):
+    """Download Expression Distribution data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = ExpressionDistributionService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Stage", "Q1", "Median", "Q3", "Gene_Count"])
+        for i, stage in enumerate(data["stages"]):
+            writer.writerow([stage, data["q1"][i], data["median"][i], data["q3"][i], data["gene_count"][i]])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=expression_distribution.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/pca/csv")
+def pca_csv(request: Request):
+    """Download PCA data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = PCAService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Sample_Name", "Stage", "Sex", "PC1", "PC2"])
+        for i, s in enumerate(data["samples"]):
+            writer.writerow([s["sample_name"], s["stage"], s["sex"], data["pc1"][i], data["pc2"][i]])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=pca.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/top50_heatmap/csv")
+def top50_heatmap_csv(request: Request):
+    """Download Top 50 Heatmap data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = Top50HeatmapService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Gene_ID"] + data["samples"])
+        for i, gene in enumerate(data["genes"]):
+            writer.writerow([gene] + [data["matrix"][i][j] for j in range(len(data["samples"]))])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=top50_heatmap.csv"},
+        )
+    finally:
+        state.pg_putconn(conn)
+
+
+@router.get("/trajectory_clusters/csv")
+def trajectory_clusters_csv(request: Request):
+    """Download Trajectory Clusters data as CSV."""
+    conn, state = pg_conn(request)
+    try:
+        svc = TrajectoryClustersService(conn)
+        data = svc.load()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Cluster_ID", "Gene_Count", "Centroid"] + data["stages"])
+        for c in data["clusters"]:
+            centroid = data["centroids"][c["cluster_id"]]
+            writer.writerow([c["cluster_id"], c["gene_count"]] + centroid)
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=trajectory_clusters.csv"},
+        )
     finally:
         state.pg_putconn(conn)

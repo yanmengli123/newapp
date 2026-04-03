@@ -105,7 +105,10 @@ function FemaleMaleScatterChart({ data }: { data: any }) {
     hovertemplate: "%{text}<extra></extra>",
     marker: { color: colors, size: 5, opacity: 0.6 },
   }];
-  const maxVal = Math.max(...data.genes.flatMap((g: any) => [g.female_mean, g.male_mean]), 1);
+  const maxVal = data.genes.reduce(
+    (m: number, g: any) => Math.max(m, g.female_mean ?? 0, g.male_mean ?? 0),
+    1
+  );
   const layout: any = {
     margin: { t: 8, b: 48, l: 56, r: 16 },
     xaxis: { title: { text: "Female Mean (log₂)", font: { size: 10 } }, gridcolor: "#f0f0f0", tickfont: { size: 9 }, range: [0, maxVal * 1.1] },
