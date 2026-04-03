@@ -1,6 +1,6 @@
 import { Alert, Anchor, Button, Card, Group, Stack, Text, Title } from '@mantine/core';
 
-const BLAST_URL = 'http://localhost:4567';
+const BLAST_BASE = import.meta.env.VITE_BLAST_BASE || '/blast';
 
 export default function BlastPage() {
   return (
@@ -20,25 +20,25 @@ export default function BlastPage() {
           <Group>
             <Button
               component="a"
-              href={BLAST_URL}
+              href={BLAST_BASE}
               target="_blank"
               rel="noreferrer"
             >
-              打开 BLAST
+              Open BLAST
             </Button>
 
             <Anchor
-              href={`${BLAST_URL}/searchdata.json`}
+              href={`${BLAST_BASE}/searchdata.json`}
               target="_blank"
               rel="noreferrer"
             >
-              查看数据库 JSON
+              View database JSON
             </Anchor>
           </Group>
 
           <Text size="sm" c="dimmed">
-            本地开发建议新窗口打开。后面如果你把 SequenceServer 反代到同源
-            /blast-ui/，再改成 iframe 嵌入。
+            In production, SequenceServer should be reverse-proxied to /blast
+            on the same domain as this app.
           </Text>
         </Stack>
       </Card>

@@ -1,0 +1,10 @@
+*.tsx text encoding=utf-8
+*.ts text encoding=utf-8
+*.jsx text encoding=utf-8
+*.js text encoding=utf-8
+*.json text encoding=utf-8
+*.md text encoding=utf-8
+*.css text encoding=utf-8
+*.html text encoding=utf-8
+*.py text encoding=utf-8 eol=lf
+*.sql text encoding=utf-8

@@ -11,7 +11,6 @@ import {
   Divider,
   Button,
   Accordion,
-  Alert,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -23,33 +22,15 @@ import {
   IconSquare,
   IconDna2,
   IconApi,
-  IconChartBar,
 } from "@tabler/icons-react";
 import type {
   GenePageResponse,
   TranscriptResult,
-  GeneExpressionResponse,
-  GeneExpressionExpandResponse,
-  DatasetInfo,
 } from "../lib/geneApi";
-import { getGenePage, getChromosome, getGeneExpression, getDatasets } from "../lib/geneApi";
+import { getGenePage, getChromosome } from "../lib/geneApi";
 import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
-import ExpressionHeader from "../components/expression/ExpressionHeader";
-import ExpressionStatsRow from "../components/expression/ExpressionStatsRow";
-import ExpressionStageChart from "../components/expression/ExpressionStageChart";
-import ExpressionLineChart from "../components/expression/ExpressionLineChart";
-import ExpressionTable from "../components/expression/ExpressionTable";
-import ExpressionComparePanel from "../components/expression/ExpressionComparePanel";
-import ExpressionViolinPlot from "../components/expression/ExpressionViolinPlot";
-import ExpressionStackedArea from "../components/expression/ExpressionStackedArea";
-import ExpressionRadarChart from "../components/expression/ExpressionRadarChart";
-import ExpressionHeatmap from "../components/expression/ExpressionHeatmap";
-import ExpressionFoldChangeBar from "../components/expression/ExpressionFoldChangeBar";
-import ExpressionDendrogram from "../components/expression/ExpressionDendrogram";
-import ExpressionZScoreChart from "../components/expression/ExpressionZScoreChart";
-import ExpressionFoldChangeTrajectory from "../components/expression/ExpressionFoldChangeTrajectory";
-import ExpressionReplicateConsistency from "../components/expression/ExpressionReplicateConsistency";
+import ExpressionSection from "../components/expression/ExpressionSection";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -59,15 +40,6 @@ export default function GenePage() {
   const [loading, setLoading] = useState(true);
   const [downloadingFasta, setDownloadingFasta] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
-
-  // Expression module state
-  const [selectedDataset, setSelectedDataset] = useState<string>('day_deseq2_36');
-  const [selectedMetric, setSelectedMetric] = useState<string>('normcount');
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [currentExpr, setCurrentExpr] = useState<GeneExpressionResponse | null>(null);
-  const [expandData, setExpandData] = useState<GeneExpressionExpandResponse | null>(null);
-  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
-  const [loadingExpression, setLoadingExpression] = useState(false);
 
   // ========== Layer 1: Load main page data (no sequences) ==========
   useEffect(() => {
@@ -84,22 +56,6 @@ export default function GenePage() {
         // Chromosome details
         const chromData = await getChromosome(result.gene.seqid);
         setChromosomeGeneCount(chromData.gene_count);
-
-        // Annotations come from page response - no separate API calls needed
-        // Initialize expression from page data
-        if (result.expression && result.expression.status === 'available') {
-          setCurrentExpr(result.expression);
-          setSelectedDataset(result.expression.dataset || 'day_deseq2_36');
-          setSelectedMetric(result.expression.metric || 'normcount');
-        }
-
-        // Load available datasets
-        try {
-          const dsResult = await getDatasets();
-          setAvailableDatasets(dsResult.datasets || []);
-        } catch {
-          // ignore
-        }
       } catch (err) {
         setPageError(err instanceof Error ? err.message : 'Failed to load gene page');
       } finally {
@@ -256,86 +212,6 @@ export default function GenePage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [data]);
-
-  // Fetch expression for a specific dataset/metric
-  const fetchExpression = useCallback(async (ds: string, metric: string) => {
-    if (!geneId) return;
-    setLoadingExpression(true);
-    try {
-      const result = await getGeneExpression(geneId, { dataset: ds, metric });
-      if (result && "samples" in result) {
-        setCurrentExpr(result as GeneExpressionResponse);
-      }
-    } catch (err) {
-      console.error("Failed to fetch expression:", err);
-    } finally {
-      setLoadingExpression(false);
-    }
-  }, [geneId]);
-
-  // Fetch expand-all data
-  const fetchExpand = useCallback(async () => {
-    if (!geneId) return;
-    setLoadingExpression(true);
-    try {
-      const result = await getGeneExpression(geneId, { expand: true });
-      if (result && "cross_comparison" in result) {
-        setExpandData(result as GeneExpressionExpandResponse);
-        // Seed availableDatasets from expand response
-        if ((result as GeneExpressionExpandResponse).datasets) {
-          const derived: DatasetInfo[] = (result as GeneExpressionExpandResponse).datasets.map((d) => ({
-            dataset_id: 0,
-            dataset_code: d.dataset_code,
-            dataset_name: d.dataset_name,
-            sample_scope: null,
-            normalization_family: d.normalization_family,
-            description: null,
-            source_file: null,
-            metrics: d.metrics.map((m) => ({
-              metric_code: m.metric_code,
-              metric_name: m.metric_name,
-              unit_desc: m.unit_desc,
-              is_comparable: m.is_comparable,
-              gene_count: m.gene_count,
-            })),
-          }));
-          setAvailableDatasets((prev) =>
-            prev.length === 0 ? derived : prev
-          );
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch expand expression:", err);
-    } finally {
-      setLoadingExpression(false);
-    }
-  }, [geneId]);
-
-  const handleToggleExpand = useCallback(() => {
-    setIsExpanded((prev) => {
-      if (!prev) fetchExpand();
-      return !prev;
-    });
-  }, [fetchExpand]);
-
-  const handleDatasetChange = useCallback((ds: string) => {
-    setSelectedDataset(ds);
-    const dsInfo = availableDatasets.find((d) => d.dataset_code === ds);
-    const defaultMetric = dsInfo?.metrics[0]?.metric_code || "normcount";
-    setSelectedMetric(defaultMetric);
-    fetchExpression(ds, defaultMetric);
-  }, [availableDatasets, fetchExpression]);
-
-  const handleMetricChange = useCallback((m: string) => {
-    setSelectedMetric(m);
-    fetchExpression(selectedDataset, m);
-  }, [selectedDataset, fetchExpression]);
-
-  const handleCompareSelect = useCallback((ds: string, m: string) => {
-    setSelectedDataset(ds);
-    setSelectedMetric(m);
-    fetchExpression(ds, m);
-  }, [fetchExpression]);
 
   // Download all Proteins as FASTA (with info only - no actual sequence from API)
   const downloadProteinsFasta = useCallback((transcript: TranscriptResult) => {
@@ -669,140 +545,13 @@ export default function GenePage() {
         )}
       </Paper>
 
-      {/* Expression Module (ESC Star Schema) */}
+      {/* Expression Module — isolated component, geneId change forces full remount */}
       {data?.expression ? (
-        <Paper withBorder radius="xl" p="xl">
-          <Stack gap="md">
-            <ExpressionHeader
-              selectedDataset={selectedDataset}
-              selectedMetric={selectedMetric}
-              onDatasetChange={handleDatasetChange}
-              onMetricChange={handleMetricChange}
-              availableDatasets={availableDatasets}
-              loading={loadingExpression}
-              isExpanded={isExpanded}
-              onToggleExpand={handleToggleExpand}
-              sampleCount={currentExpr?.samples?.length ?? data.expression.samples?.length ?? 0}
-              summary={currentExpr?.summary ?? data.expression.summary}
-            />
-
-            {/* Expand All: Cross-Dataset Compare Panel */}
-            {isExpanded && expandData ? (
-              <ExpressionComparePanel
-                expandData={expandData}
-                onSelectDataset={handleCompareSelect}
-                onLoadingChange={setLoadingExpression}
-                selectedDataset={selectedDataset}
-                selectedMetric={selectedMetric}
-              />
-            ) : (
-              <>
-                {/* No data */}
-                {(currentExpr?.status === "no_data" || (!currentExpr && data.expression.status === "no_data")) && (
-                  <Alert color="gray" variant="light" title="No expression data" icon={<IconChartBar size={16} />}>
-                    This gene does not have expression profiling data in the current dataset.
-                  </Alert>
-                )}
-
-                {/* unavailable */}
-                {(currentExpr?.status === 'unavailable' || (!currentExpr && data.expression.status === 'unavailable')) && (
-                  <Alert color="yellow" variant="light" title="Database unavailable" icon={<IconChartBar size={16} />}>
-                    Expression data is temporarily unavailable. Please try again later.
-                  </Alert>
-                )}
-
-                {/* Stats Row — only when summary exists */}
-                {(currentExpr?.status === "available" || data.expression.status === "available") &&
-                  (currentExpr?.summary || data.expression.summary) && (
-                    <>
-                      <ExpressionStatsRow
-                        summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
-                        sampleCount={currentExpr?.samples?.length ?? data.expression.samples?.length ?? 0}
-                      />
-
-                      {/* Charts: Stage + Line side by side */}
-                      <Group grow align="flex-start" gap="md">
-                        <ExpressionStageChart
-                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
-                          dataset={selectedDataset}
-                          metric={selectedMetric}
-                        />
-                        <ExpressionLineChart
-                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                          dataset={selectedDataset}
-                          metric={selectedMetric}
-                        />
-                      </Group>
-
-                      {/* Charts Row 2: Violin + StackedArea */}
-                      <Group grow align="flex-start" gap="md">
-                        <ExpressionViolinPlot
-                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                          dataset={selectedDataset}
-                          metric={selectedMetric}
-                        />
-                        <ExpressionStackedArea
-                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
-                          dataset={selectedDataset}
-                          metric={selectedMetric}
-                        />
-                      </Group>
-
-                      {/* Charts Row 3: Radar + Heatmap */}
-                      <Group grow align="flex-start" gap="md">
-                        <ExpressionRadarChart
-                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
-                          dataset={selectedDataset}
-                        />
-                        <ExpressionHeatmap
-                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
-                          dataset={selectedDataset}
-                          metric={selectedMetric}
-                        />
-                      </Group>
-
-                      {/* Charts Row 4: ZScore + FoldChange */}
-                      <Group grow align="flex-start" gap="md">
-                        <ExpressionZScoreChart
-                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                          dataset={selectedDataset}
-                        />
-                        <ExpressionFoldChangeBar
-                          summary={currentExpr?.summary ?? data.expression.summary ?? undefined}
-                        />
-                      </Group>
-
-                      {/* Charts Row 5: FoldChangeTrajectory + Dendrogram */}
-                      <Group grow align="flex-start" gap="md">
-                        <ExpressionFoldChangeTrajectory
-                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                          dataset={selectedDataset}
-                        />
-                        <ExpressionDendrogram
-                          samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                          dataset={selectedDataset}
-                        />
-                      </Group>
-
-                      {/* Charts Row 6: ReplicateConsistency */}
-                      <ExpressionReplicateConsistency
-                        samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                        dataset={selectedDataset}
-                      />
-
-                      {/* Sample Table */}
-                      <ExpressionTable
-                        samples={currentExpr?.samples ?? data.expression.samples ?? []}
-                        summary={currentExpr?.summary ?? data.expression.summary}
-                        dataset={selectedDataset}
-                      />
-                    </>
-                  )
-                }
-              </>
-            )}
-          </Stack>
-        </Paper>
+        <ExpressionSection
+          key={geneId}
+          geneId={geneId!}
+          initialExpression={data.expression}
+        />
       ) : null}
 
       {/* KEGG Pathways (Interactive KGML Viewer) */}
