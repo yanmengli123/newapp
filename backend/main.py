@@ -30,6 +30,7 @@ from config import (
     GRCG6A_DB_PATH as DB_PATH,
     GRCG6A_PG_DSN as PG_DSN,
     GRCG6A_STATIC_ROOT as STATIC_ROOT,
+    GRCG6A_RAWDATA_ROOT as RAWDATA_ROOT,
     KEGG_IMAGE_DIR,
     GRCG6A_GENOME_OUTPUT as GENOME_OUTPUT_DIR,
 )
@@ -274,6 +275,10 @@ app = FastAPI(
 
 # ========== 7. 挂载静态目录（只挂载一次） ==========
 app.mount("/static", StaticFiles(directory=str(STATIC_ROOT)), name="static")
+
+# ========== 7b. 挂载基因组文件（JBrowse 用） ==========
+# Genome files (FASTA/GFF/aliases) are in GRCG6A_BASE_DIR = D:\jbrowsedata\projectdata
+app.mount("/genome", StaticFiles(directory=str(RAWDATA_ROOT.parent)), name="genome")
 
 # ========== 8. 注册自定义路由 ==========
 app.include_router(go_kegg_router)
