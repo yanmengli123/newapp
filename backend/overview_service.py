@@ -99,36 +99,50 @@ class FemaleMaleScatterService:
         self._conn = pg_conn
 
     def load(self, stage: str | None = None) -> dict[str, Any]:
+        """
+        Returns one row per gene (averaged across all stages) for the
+        Female vs Male scatter plot. Uses top_stage for per-stage filtering.
+        """
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         if stage:
-            stage_filter = "AND j.stage = %(stage)s"
-            params = {"ds": DEFAULT_DATASET, "m": DEFAULT_METRIC, "stage": stage}
+            # Per-stage query: genes whose top_stage matches the filter
+            cur.execute("""
+                SELECT
+                    ges.gene_id,
+                    %(stage)s                                  AS stage,
+                    (ges.stage_means -> %(stage)s::text ->> 'female')::float AS female_mean,
+                    (ges.stage_means -> %(stage)s::text ->> 'male')::float   AS male_mean,
+                    ges.sex_bias_label
+                FROM gene_expression_summary ges
+                JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
+                    AND m.metric_code = ges.metric_code
+                WHERE ges.dataset_code = %(ds)s
+                  AND ges.metric_code = %(m)s
+                  AND ges.top_stage = %(stage)s
+                  AND ges.stage_means IS NOT NULL
+                  AND m.is_enabled = TRUE
+                ORDER BY ges.gene_id
+            """, {"ds": DEFAULT_DATASET, "m": DEFAULT_METRIC, "stage": stage})
         else:
-            stage_filter = ""
-            params = {"ds": DEFAULT_DATASET, "m": DEFAULT_METRIC}
-
-        cur.execute(f"""
-            SELECT
-                j.gene_id,
-                j.stage,
-                (ges.stage_means -> j.stage ->> 'female')::float AS female_mean,
-                (ges.stage_means -> j.stage ->> 'male')::float   AS male_mean,
-                ges.sex_bias_label
-            FROM (
-                SELECT gene_id, jsonb_object_keys(stage_means) AS stage
-                FROM gene_expression_summary
-                WHERE dataset_code = %(ds)s
-                  AND metric_code = %(m)s
-                  AND stage_means IS NOT NULL
-            ) j
-            JOIN gene_expression_summary ges ON ges.gene_id = j.gene_id
-                AND ges.dataset_code = %(ds)s
-                AND ges.metric_code = %(m)s
-            WHERE ges.sex_bias_label IS NOT NULL
-              {stage_filter}
-            ORDER BY j.gene_id, j.stage
-        """, params)
+            # One row per gene: average female/male mean across all stages
+            cur.execute("""
+                SELECT
+                    ges.gene_id,
+                    AVG((ges.stage_means -> stage_key::text ->> 'female')::float) AS female_mean,
+                    AVG((ges.stage_means -> stage_key::text ->> 'male')::float)   AS male_mean,
+                    ges.sex_bias_label
+                FROM gene_expression_summary ges
+                CROSS JOIN LATERAL jsonb_object_keys(ges.stage_means) AS stage_key
+                JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
+                    AND m.metric_code = ges.metric_code
+                WHERE ges.dataset_code = %(ds)s
+                  AND ges.metric_code = %(m)s
+                  AND ges.stage_means IS NOT NULL
+                  AND m.is_enabled = TRUE
+                GROUP BY ges.gene_id, ges.sex_bias_label
+                ORDER BY ges.gene_id
+            """, {"ds": DEFAULT_DATASET, "m": DEFAULT_METRIC})
         rows = cur.fetchall()
         cur.close()
 
