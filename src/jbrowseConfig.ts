@@ -8,10 +8,10 @@ export const jbrowseConfig = {
       adapter: {
         type: 'IndexedFastaAdapter',
         fastaLocation: {
-          uri: '/genome/GCF_000002315.6_GRCg6a_genomic.fna',
+          uri: '/genome/GCF_000002315.6_GRCg6a_genomic.chr.fna',
         },
         faiLocation: {
-          uri: '/genome/GCF_000002315.6_GRCg6a_genomic.fna.fai',
+          uri: '/genome/GCF_000002315.6_GRCg6a_genomic.chr.fna.fai',
         },
       },
     },
