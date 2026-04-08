@@ -166,6 +166,21 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 python -m scripts.generate_overview_static
 ```
 
+### JBrowse Genome Files (static, prefix `/genome`)
+Served from `RAWDATA_ROOT.parent` = `D:\jbrowsedata\projectdata\` via FastAPI `StaticFiles`. These are **external data files not in the git repo** — they must exist on the server:
+
+| File | Description |
+|------|-------------|
+| `GCF_000002315.6_GRCg6a_genomic.chr.fna` | Uncompressed FASTA, 35 main chromosomes only (~1 GB) |
+| `GCF_000002315.6_GRCg6a_genomic.chr.fna.fai` | FAI index for the chr-only FASTA |
+| `GCF_000002315.6_GRCg6a_genomic.gff` | Filtered GFF (excludes `region`/`cDNA_match` types, ~429 MB) |
+| `aliases.txt` | chr→NC_ accession mapping (35 entries) |
+
+Regenerate the chr-only FASTA if the full genome FASTA changes:
+```bash
+python backend/scripts/filter_fasta.py
+```
+
 ### Chat (1, prefix `/api`)
 - `POST /api/chat` — `{ "message": "..." }` → `{ "reply": "...", "type": "...", "data": {...} }`. Intent 从消息中检测，直接查询数据库。支持的 intent: genome_stats, gene_search, chromosome, go, kegg, analysis_results。
 
@@ -178,7 +193,7 @@ All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowse
 | `GRCG6A_BASE_DIR` | `D:\jbrowsedata\projectdata` | Project root |
 | `GRCG6A_DB_PATH` | `.../grcg6a_nc.db` | SQLite gene DB |
 | `GRCG6A_STATIC_ROOT` | `.../static` | KEGG images |
-| `GRCG6A_RAWDATA_ROOT` | `.../rawdata` | Genome FASTA/GFF files |
+| `GRCG6A_RAWDATA_ROOT` | `.../rawdata` | Raw TSV matrices only (FPKM/TPM); genome FASTA/GFF/aliases live in `RAWDATA_ROOT.parent` and are served via `/genome/` |
 | `GRCG6A_GENOME_OUTPUT` | `.../outputs/jobs` | Analysis job outputs |
 | `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
 | `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
@@ -383,6 +398,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **API Client**: All backend calls go through `src/lib/apiClient.ts`. Never hardcode URLs — use `apiFetch<T>(path)` which prefixes `API_BASE` automatically. All API functions in `geneApi.ts`/`genomeApi.ts`/`chatApi.ts` use `apiFetch` internally.
 - **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id. Use `resolveGeneId()` to canonicalize before API calls — geneApi functions call this internally, components should NOT call search separately.
 - **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
+- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`.
 - **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
 - **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state. `<Text>` defaults to `<p>` — never nest block elements (`<div>`, `<Badge>`, `<Card>`) inside `<Text>`; use `component="span"` if Badge is needed inline.
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
