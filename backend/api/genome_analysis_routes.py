@@ -13,7 +13,7 @@ from config import GRCG6A_SAMPLE_RESULTS
 
 logger = logging.getLogger("grcg6a_fastapi_backend.genome_analysis")
 
-router = APIRouter(prefix="/genome", tags=["Genome Analysis"])
+router = APIRouter(prefix="/genome-api", tags=["Genome Analysis"])
 
 
 class AnalysisRequest(BaseModel):

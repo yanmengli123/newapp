@@ -694,9 +694,23 @@ export async function refreshKGMLCache(pathwayId?: string): Promise<{
 
 export interface GeneSequencesResponse {
   gene_id: string;
-  mrna_sequence: string | null;
-  cds_sequence: string | null;
-  protein_sequence: string | null;
+  transcript_sequences: Array<{
+    transcript_id: string;
+    transcript_acc: string | null;
+    feature_type: string;
+    product: string | null;
+    rna_sequence: string | null;
+    proteins: Array<{
+      protein_id: string;
+      has_cds_sequence: boolean;
+      cds_length: number | null;
+      has_protein_sequence: boolean;
+      protein_length: number | null;
+      protein_description: string | null;
+      cds_sequence?: string | null;
+      protein_sequence?: string | null;
+    }>;
+  }>;
 }
 
 export async function getGeneSequences(geneId: string): Promise<GeneSequencesResponse> {

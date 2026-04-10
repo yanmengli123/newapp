@@ -140,31 +140,31 @@ export interface GenomeCarouselImagesResponse {
 // ========== API Functions ==========
 
 export async function getGenomeHealth(): Promise<GenomeHealthResponse> {
-  return apiFetch<GenomeHealthResponse>('/genome/health');
+  return apiFetch<GenomeHealthResponse>('/genome-api/health');
 }
 
 export async function getGenomeFiles(): Promise<GenomeFilesResponse> {
-  return apiFetch<GenomeFilesResponse>('/genome/files');
+  return apiFetch<GenomeFilesResponse>('/genome-api/files');
 }
 
 export async function scanGenomeFiles(): Promise<GenomeFilesResponse> {
-  return apiFetch<GenomeFilesResponse>('/genome/files/scan', { method: 'POST' });
+  return apiFetch<GenomeFilesResponse>('/genome-api/files/scan', { method: 'POST' });
 }
 
 export async function runGenomeAnalysis(): Promise<GenomeRunResponse> {
-  return apiFetch<GenomeRunResponse>('/genome/analysis/run', { method: 'POST' });
+  return apiFetch<GenomeRunResponse>('/genome-api/analysis/run', { method: 'POST' });
 }
 
 export async function getGenomeJobs(): Promise<GenomeJobsResponse> {
-  return apiFetch<GenomeJobsResponse>('/genome/jobs');
+  return apiFetch<GenomeJobsResponse>('/genome-api/jobs');
 }
 
 export async function getGenomeJob(jobId: string): Promise<GenomeJobResponse> {
-  return apiFetch<GenomeJobResponse>(`/genome/jobs/${encodeURIComponent(jobId)}`);
+  return apiFetch<GenomeJobResponse>(`/genome-api/jobs/${encodeURIComponent(jobId)}`);
 }
 
 export async function getGenomeResult(jobId: string): Promise<GenomeResultResponse> {
-  return apiFetch<GenomeResultResponse>(`/genome/jobs/${encodeURIComponent(jobId)}/result`);
+  return apiFetch<GenomeResultResponse>(`/genome-api/jobs/${encodeURIComponent(jobId)}/result`);
 }
 
 export async function getGenomeModuleResult(
@@ -172,20 +172,20 @@ export async function getGenomeModuleResult(
   moduleName: string
 ): Promise<GenomeModuleResultResponse> {
   return apiFetch<GenomeModuleResultResponse>(
-    `/genome/jobs/${encodeURIComponent(jobId)}/result/${encodeURIComponent(moduleName)}`
+    `/genome-api/jobs/${encodeURIComponent(jobId)}/result/${encodeURIComponent(moduleName)}`
   );
 }
 
 export async function getGenomeDownloads(jobId: string): Promise<GenomeDownloadsResponse> {
-  return apiFetch<GenomeDownloadsResponse>(`/genome/jobs/${encodeURIComponent(jobId)}/downloads`);
+  return apiFetch<GenomeDownloadsResponse>(`/genome-api/jobs/${encodeURIComponent(jobId)}/downloads`);
 }
 
 export async function getGenomeCarousel(): Promise<GenomeCarouselResponse> {
-  return apiFetch<GenomeCarouselResponse>('/genome/carousel');
+  return apiFetch<GenomeCarouselResponse>('/genome-api/carousel');
 }
 
 export async function getGenomeCarouselImages(): Promise<GenomeCarouselImagesResponse> {
-  return apiFetch<GenomeCarouselImagesResponse>('/genome/carousel/images');
+  return apiFetch<GenomeCarouselImagesResponse>('/genome-api/carousel/images');
 }
 
 // ========== URL Builders ==========
@@ -195,33 +195,33 @@ export function buildGenomeDownloadUrl(
   category: string,
   filename: string
 ): string {
-  return `${API_BASE}/genome/download/${encodeURIComponent(jobId)}/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
+  return `${API_BASE}/genome-api/download/${encodeURIComponent(jobId)}/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
 }
 
 export function buildPublicCarouselImageUrl(filename: string): string {
-  return `${API_BASE}/genome/download/public/carousel/${encodeURIComponent(filename)}`;
+  return `${API_BASE}/genome-api/download/public/carousel/${encodeURIComponent(filename)}`;
 }
 
 export function buildChartUrl(jobId: string, chartKey: string, format: string): string {
-  return `${API_BASE}/genome/charts/${encodeURIComponent(jobId)}/${encodeURIComponent(chartKey)}/${format}`;
+  return `${API_BASE}/genome-api/charts/${encodeURIComponent(jobId)}/${encodeURIComponent(chartKey)}/${format}`;
 }
 
 // ========== Sample Results API (Pre-generated) ==========
 
 export async function getSampleResult(): Promise<GenomeResultResponse> {
-  return apiFetch<GenomeResultResponse>('/genome/sample/result');
+  return apiFetch<GenomeResultResponse>('/genome-api/sample/result');
 }
 
 export async function getSampleDownloads(): Promise<GenomeDownloadsResponse> {
-  return apiFetch<GenomeDownloadsResponse>('/genome/sample/downloads');
+  return apiFetch<GenomeDownloadsResponse>('/genome-api/sample/downloads');
 }
 
 export function buildSampleChartUrl(chartKey: string, format: string): string {
-  return `${API_BASE}/genome/sample/charts/${encodeURIComponent(chartKey)}/${format}`;
+  return `${API_BASE}/genome-api/sample/charts/${encodeURIComponent(chartKey)}/${format}`;
 }
 
 export function buildSampleTableUrl(tableName: string, format: string): string {
-  return `${API_BASE}/genome/sample/tables/${encodeURIComponent(tableName)}/${format}`;
+  return `${API_BASE}/genome-api/sample/tables/${encodeURIComponent(tableName)}/${format}`;
 }
 
 export interface SampleStatusResponse {
@@ -232,29 +232,29 @@ export interface SampleStatusResponse {
 }
 
 export async function getSampleStatus(): Promise<SampleStatusResponse> {
-  return apiFetch<SampleStatusResponse>('/genome/sample/status');
+  return apiFetch<SampleStatusResponse>('/genome-api/sample/status');
 }
 
 // ========== Job Chart Endpoints (direct) ==========
 
 export async function getJobChartJson(jobId: string, chartKey: string): Promise<unknown> {
-  return apiFetch<unknown>(`/genome/charts/${encodeURIComponent(jobId)}/${encodeURIComponent(chartKey)}/json`);
+  return apiFetch<unknown>(`/genome-api/charts/${encodeURIComponent(jobId)}/${encodeURIComponent(chartKey)}/json`);
 }
 
 export function buildJobChartHtmlUrl(jobId: string, chartKey: string): string {
-  return `${API_BASE}/genome/charts/${encodeURIComponent(jobId)}/${encodeURIComponent(chartKey)}/html`;
+  return `${API_BASE}/genome-api/charts/${encodeURIComponent(jobId)}/${encodeURIComponent(chartKey)}/html`;
 }
 
 // ========== Sample Chart Endpoints (direct) ==========
 
 export async function getSampleChartJson(chartKey: string): Promise<unknown> {
-  return apiFetch<unknown>(`/genome/sample/charts/${encodeURIComponent(chartKey)}/json`);
+  return apiFetch<unknown>(`/genome-api/sample/charts/${encodeURIComponent(chartKey)}/json`);
 }
 
 // ========== Sample File Endpoints ==========
 
 export function buildSampleFileUrl(category: string, filename: string): string {
-  return `${API_BASE}/genome/sample/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
+  return `${API_BASE}/genome-api/sample/${encodeURIComponent(category)}/${encodeURIComponent(filename)}`;
 }
 
 // ========== Sample Downloads Response (enhanced) ==========
@@ -296,5 +296,5 @@ export function buildKEGGImageUrl(pathwayId: string): string {
 }
 
 export function buildPublicCarouselUrl(filename: string): string {
-  return `${API_BASE}/genome/download/public/carousel/${encodeURIComponent(filename)}`;
+  return `${API_BASE}/genome-api/download/public/carousel/${encodeURIComponent(filename)}`;
 }

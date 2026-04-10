@@ -240,8 +240,6 @@ CREATE TABLE IF NOT EXISTS gene_expression_summary (
     cv             DOUBLE PRECISION,
     expressed_samples INTEGER,
     zero_samples   INTEGER,
-    top_sample     TEXT,
-    top_stage      TEXT,
     sex_bias_label TEXT,
     sex_bias_ratio DOUBLE PRECISION,
     fold_change_top    DOUBLE PRECISION,

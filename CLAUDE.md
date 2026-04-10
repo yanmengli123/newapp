@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeScript frontend with FastAPI backend. Frontend runs on port 5173, backend on port 8000.
 
+**Architecture model**: `C:\Users\32110\Desktop\newapp\backend\` is the development/main copy. `D:\jbrowsedata\projectdata\` is the production data/execution drive. The two directories have different structures — C has a `backend/` subdirectory that D does not. Python code lives in C; data, Docker, and genome files live in D. Only C is synced to Git; D is outside the repo.
+
 ## Commands
 
 ```bash
@@ -14,20 +16,80 @@ npm run dev      # Start dev server (port 5173)
 npm run build    # TypeScript check + production build
 npm run lint     # ESLint
 
-# Backend
-# 方式1：激活 venv 后运行
-cd backend
-venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
+# Backend — ONLY supported way to start (from C root):
+D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
-# 方式2：直接使用系统 Python
-D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
+# Legacy ways (DEPRECATED — do not use):
+# python backend/main.py               ← wrong: uses old import style
+# python grcg6a_fastapi_backend.py    ← wrong: different directory structure
 ```
 
 ## Architecture
 
+### Directory Structure
+
+```
+C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
+├── src/                          # React/TypeScript frontend
+│   ├── pages/                    # Route targets (App.tsx)
+│   ├── components/                # UI components
+│   │   ├── expression/            # 14 Plotly expression chart components
+│   │   ├── kegg/                # KEGG pathway viewer
+│   │   ├── go/                   # GO term cards
+│   │   └── chat/                 # ChatWidget
+│   └── lib/                      # API clients
+│       ├── apiClient.ts           # Mandatory centralized fetch wrapper
+│       ├── geneApi.ts            # Gene/GO/KEGG API
+│       ├── genomeApi.ts           # Genome analysis API (ALL /genome-api/*)
+│       └── overviewApi.ts         # ESC Atlas overview API
+│
+└── backend/                       # FastAPI backend (standard Python package)
+    ├── __init__.py               # Makes backend a package (required)
+    ├── __main__.py               # Optional: python -m backend
+    ├── main.py                   # **ONLY entry point** (uvicorn backend.main:app)
+    ├── config.py                 # Centralized path config → D:\jbrowsedata\projectdata
+    ├── expression_service.py       # Expression queries (PostgreSQL star schema)
+    ├── overview_service.py         # Overview aggregation (8 charts)
+    ├── gene_utils.py              # Gene ID resolution
+    ├── api/                       # Route modules (must have __init__.py)
+    │   ├── __init__.py
+    │   ├── go_kegg_routes.py     # /annotations/*
+    │   ├── overview_routes.py     # /overview/*
+    │   ├── genome_analysis_routes.py  # /genome-api/*  ← NOTE prefix
+    │   ├── kegg_image_router.py  # /kegg-images/*
+    │   ├── tool_routes.py        # /tools/*
+    │   └── chat_router.py         # /api/*
+    ├── genome_analysis/            # Analysis engine (runtime-loaded)
+    │   ├── __init__.py
+    │   ├── analyzer.py
+    │   ├── task_manager.py
+    │   └── ...
+    ├── tools/                     # Tool implementations
+    │   ├── __init__.py
+    │   ├── domain_searcher.py
+    │   └── primer3_designer.py
+    └── db/                        # Schema and migrations
+        ├── schema.sql
+        ├── schema_esc_v1.sql      # Fixed: no duplicate columns
+        └── migrations/             # Versioned schema changes
+            ├── V002__add_dataset_alias.sql
+            └── V003__add_mv_dataset_metric.sql
+
+D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
+├── grcg6a_nc.db                 # SQLite (gffutils, read-only at startup)
+├── docker-compose.yml           # PostgreSQL Docker (port 5433)
+├── static/                       # KEGG pathway images
+├── rawdata/                      # Expression TSV matrices
+├── outputs/                      # Job results
+├── genome_outputs/
+├── backend/                      # C's backend/ synced here (manual copy)
+├── api/                          # D's own api/ (independent from C)
+├── grcg6a_fastapi_backend.py      # D's own entry (independent from C)
+└── scripts/                      # ETL scripts
+```
+
 ### Frontend (src/)
+
 - **App.tsx** — Route definitions; ChatWidget rendered globally here
 - **Pages** — `src/pages/` (route targets in App.tsx)
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
@@ -40,7 +102,7 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
 - **`EscOverviewSection.tsx`** — ESC Gene Expression Atlas homepage section: 8 clickable chart cards (Sample Composition / Sex-Biased Genes / Female vs Male Scatter / Stage DEG Count / Expression Distribution / PCA / Top50 Heatmap / Trajectory Clusters). Each card opens in a `Drawer` fullscreen view via `useDisclosure` + `useHotkeys`. Heatmap uses agglomerative hierarchical clustering (pure TypeScript, single linkage) for gene ordering.
 - **`DownloadsPage.tsx`** — CSV download cards for all 8 overview charts. Download via `fetch` + `Blob` + `createObjectURL` pattern hitting `/overview/<id>/csv` endpoints.
-- **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis), `src/lib/chatApi.ts` (chat)
+- **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis — **all paths use `/genome-api/` prefix**), `src/lib/chatApi.ts` (chat)
   - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `http://localhost:8000`). Never hardcode URLs in components.
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
@@ -65,27 +127,23 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)
-- **config.py** — Centralized path configuration. All modules import from here; no hardcoded `D:\jbrowsedata\projectdata` paths allowed.
-- **overview_service.py** — Overview aggregation service (8 chart services for the ESC Atlas homepage). All queries read from `gene_expression_summary` JSONB `stage_means` field; `jsonb_object_keys()` returns `text`, use `stage_key::text` cast in `->>` chains.
-- **expression_service.py** — Expression data service layer (ESC star schema queries, stage_means aggregation, cross-dataset comparison).
-- **gene_utils.py** — Gene utility functions (ID resolution, alias lookup).
-- **main.py** — FastAPI app, lifespan context (opens gffutils + SQLite + PostgreSQL pool), registers all routers
-- **api/** — Route modules:
-  - `overview_routes.py` — ESC Atlas overview charts (**registered**, prefix `/overview`)
-  - `go_kegg_routes.py` — Gene/GO/KEGG endpoints (**registered**, prefix `/annotations`)
-  - `kegg_image_router.py` — KEGG pathway image serving via `_get_asset_path()` (**registered**, prefix `/kegg-images`)
-  - `tool_routes.py` — Primer3, Domain Search tools (**registered**, prefix `/tools`)
-  - `genome_analysis_routes.py` — Genome analysis job management + sample results (**registered**, prefix `/genome`)
-  - `chat_router.py` — Chat (**registered**, prefix `/api`)
-- **genome_analysis/** — Analysis engine (not imported by main.py at startup; called at runtime):
-  - `analyzer.py` — Main analysis pipeline
-  - `task_manager.py` — Job queue, state in `jobs/` JSON files
-  - `output_config.py` — Chart keys, output structure
-  - `carousel_service.py` — Featured carousel management
-  - `file_discovery.py` — Genome file scanning
-  - `chart_exporter.py` — Chart export (HTML/PNG/SVG/JSON)
-  - `chart_styles.py` — Plotly chart theming
-  - `settings.py` — Analysis configuration
+
+- **config.py** — Centralized path configuration. All paths resolve to `D:\jbrowsedata\projectdata\` unless overridden by env vars. All modules import from here; no hardcoded paths.
+- **main.py** — **The only supported entry point**. Must be started as `uvicorn backend.main:app`. Responsibilities: app creation, lifespan (DB pools + gffutils + in-memory indexes), middleware, exception handlers, router registration. **No business logic** lives here.
+- **api/** — Route modules (all importable as `from backend.api.xxx`):
+  - `go_kegg_routes.py` — Gene/GO/KEGG endpoints (prefix `/annotations`)
+  - `overview_routes.py` — ESC Atlas overview charts (prefix `/overview`)
+  - `genome_analysis_routes.py` — Genome analysis (prefix `/genome-api`) — **NOTE: prefix was changed from `/genome`**
+  - `kegg_image_router.py` — KEGG pathway image serving (prefix `/kegg-images`)
+  - `tool_routes.py` — Primer3, Domain Search (prefix `/tools`)
+  - `chat_router.py` — Chat (prefix `/api`)
+- **expression_service.py** — Expression data service (ESC star schema queries, `stage_means` aggregation, cross-dataset comparison). Depends on `mv_dataset_metric` materialized view.
+- **overview_service.py** — Overview aggregation (8 chart services). Reads from `gene_expression_summary` JSONB `stage_means`; `jsonb_object_keys()` returns `text`, use `stage_key::text` cast in `->>` chains.
+- **genome_analysis/** — Analysis engine (imported at runtime, not at startup):
+  - `analyzer.py`, `task_manager.py`, `output_config.py`, `carousel_service.py`, `file_discovery.py`, `chart_exporter.py`, `chart_styles.py`, `settings.py`
+- **db/migrations/** — Versioned SQL migrations (authoritative source for schema changes):
+  - `V002__add_dataset_alias.sql` — `dataset_alias` table for dataset code aliases
+  - `V003__add_mv_dataset_metric.sql` — `mv_dataset_metric` materialized view for (dataset, metric) capability registry
 
 ## Backend Endpoints
 
@@ -126,28 +184,28 @@ D:\soft\python310\python.exe C:\Users\32110\Desktop\newapp\backend\main.py
 - `GET /tools/primer3` — Primer3 PCR 引物设计（query 参数：`gene_id`, `include_flank`, `product_size_min/max`, `num_primers`）
 - `GET /tools/domain-search` — HMMER/Pfam 蛋白结构域搜索（query 参数：`gene_id`）
 
-### Genome Analysis (21, prefix `/genome`)
-- `GET /genome/health` — 模块健康检查
-- `GET /genome/files` — 扫描基因组文件
-- `POST /genome/files/scan` — 重新扫描文件
-- `POST /genome/analysis/run` — 提交分析任务
-- `GET /genome/jobs` — 任务列表
-- `GET /genome/jobs/{job_id}` — 任务详情
-- `GET /genome/jobs/{job_id}/result` — 分析结果
-- `GET /genome/jobs/{job_id}/result/{module_name}` — 单模块结果
-- `GET /genome/jobs/{job_id}/downloads` — 下载列表
-- `GET /genome/carousel` — 轮播图清单
-- `GET /genome/carousel/images` — 轮播图片列表
-- `GET /genome/charts/{job_id}/{chart_key}/json` — 图表 JSON
-- `GET /genome/charts/{job_id}/{chart_key}/html` — 图表 HTML
-- `GET /genome/download/public/carousel/{filename}` — 下载轮播图
-- `GET /genome/download/{job_id}/{category}/{filename}` — 下载分析结果
-- `GET /genome/sample/status` — 预生成结果状态
-- `GET /genome/sample/result` — 预生成分析结果
-- `GET /genome/sample/downloads` — 预生成下载列表
-- `GET /genome/sample/charts/{key}/{format}` — 图表 (html/png/svg/json)
-- `GET /genome/sample/tables/{name}/{format}` — 表格 (csv/xlsx)
-- `GET /genome/sample/{category}/{filename}` — 样本结果/元数据文件
+### Genome Analysis (21, prefix `/genome-api`) — **NOTE: prefix changed from `/genome`**
+- `GET /genome-api/health` — 模块健康检查
+- `GET /genome-api/files` — 扫描基因组文件
+- `POST /genome-api/files/scan` — 重新扫描文件
+- `POST /genome-api/analysis/run` — 提交分析任务
+- `GET /genome-api/jobs` — 任务列表
+- `GET /genome-api/jobs/{job_id}` — 任务详情
+- `GET /genome-api/jobs/{job_id}/result` — 分析结果
+- `GET /genome-api/jobs/{job_id}/result/{module_name}` — 单模块结果
+- `GET /genome-api/jobs/{job_id}/downloads` — 下载列表
+- `GET /genome-api/carousel` — 轮播图清单
+- `GET /genome-api/carousel/images` — 轮播图片列表
+- `GET /genome-api/charts/{job_id}/{chart_key}/json` — 图表 JSON
+- `GET /genome-api/charts/{job_id}/{chart_key}/html` — 图表 HTML
+- `GET /genome-api/download/public/carousel/{filename}` — 下载轮播图
+- `GET /genome-api/download/{job_id}/{category}/{filename}` — 下载分析结果
+- `GET /genome-api/sample/status` — 预生成结果状态
+- `GET /genome-api/sample/result` — 预生成分析结果
+- `GET /genome-api/sample/downloads` — 预生成下载列表
+- `GET /genome-api/sample/charts/{key}/{format}` — 图表 (html/png/svg/json)
+- `GET /genome-api/sample/tables/{name}/{format}` — 表格 (csv/xlsx)
+- `GET /genome-api/sample/{category}/{filename}` — 样本结果/元数据文件
 
 ### Overview — ESC Atlas (17, prefix `/overview`)
 - `GET /overview/summary` — All 8 charts in one request (static file served from `backend/static/overview/summary.json` when present; falls back to live DB)
@@ -198,10 +256,11 @@ All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowse
 | `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
 | `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
 | `GRCG6A_PG_DSN` | `postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a` | PostgreSQL 连接字符串 |
+| `ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:5174` | CORS allowed origins (comma-separated) |
 
 **PostgreSQL 启动**（Docker）：
 ```bash
-cd backend && docker compose up -d   # 端口 5433，自动初始化 schema
+cd /d/jbrowsedata/projectdata && docker-compose up -d postgres
 ```
 
 All backend modules import from `config.py` — never hardcode `D:\jbrowsedata\projectdata` directly.
@@ -217,7 +276,6 @@ All backend modules import from `config.py` — never hardcode `D:\jbrowsedata\p
 
 **连接管理**：
 ```python
-# PostgreSQL：按需从池中借/还
 pg_conn = pg_getconn()    # 从 ThreadedConnectionPool 借
 try:
     cur.execute("SELECT ...")
@@ -235,8 +293,8 @@ finally:
 interface GeneExpressionResponse {
   status: "available" | "no_data" | "unavailable";
   gene_id?: string;
-  dataset?: string;   // e.g. "day_deseq2_36"
-  metric?: string;    // e.g. "normcount"
+  dataset?: string;
+  metric?: string;
   samples: ExpressionSample[];
   summary?: {
     sample_count: number;
@@ -249,7 +307,7 @@ interface GeneExpressionResponse {
     zero_samples: number | null;
     top_sample: string | null;
     top_stage: string | null;
-    sex_bias_label: string | null;   // "Female_higher" | "Male_higher" | "No_difference"
+    sex_bias_label: string | null;
     sex_bias_ratio: number | null;
     fold_change_top: number | null;
     fold_change_bottom: number | null;
@@ -262,10 +320,10 @@ interface ExpressionSample {
   dataset_sample_id: number;
   sample_name: string;
   srr_run_id: string | null;
-  stage: string;        // "E0", "E3.5", "E7", ...
+  stage: string;
   stage_label: string | null;
   stage_order: number | null;
-  sex: string;         // "Male" | "Female"
+  sex: string;
   sex_code: string | null;
   replicate: number | null;
   batch: string | null;
@@ -309,16 +367,16 @@ interface GeneExpressionExpandResponse {
 ### Registered Routers
 所有路由已在 `main.py` 中注册：
 
-| 路由文件 | 前缀 | 接口数 | 状态 |
-|---|---|---|---|
-| main.py | `/` | 12 | 已注册 |
-| go_kegg_routes.py | `/annotations` | 11 | 已注册 |
-| kegg_image_router.py | `/kegg-images` | 2 | 已注册 |
-| tool_routes.py | `/tools` | 2 | 已注册 |
-| genome_analysis_routes.py | `/genome` | 21 | 已注册 |
-| chat_router.py | `/api` | 1 | 已注册 |
-| overview_routes.py | `/overview` | 17 | 已注册 |
-| **总计** | | **66** | |
+| 路由文件 | 前缀 | 接口数 |
+|---|---|---|
+| main.py (inline) | `/` | 11 |
+| go_kegg_routes.py | `/annotations` | 11 |
+| kegg_image_router.py | `/kegg-images` | 2 |
+| tool_routes.py | `/tools` | 2 |
+| genome_analysis_routes.py | `/genome-api` | 21 |
+| chat_router.py | `/api` | 1 |
+| overview_routes.py | `/overview` | 17 |
+| **总计** | | **65** |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
@@ -337,6 +395,12 @@ Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`
 - `expression_sample` — 样本元信息（stage / stage_label / sex / replicate）
 - `expression_fact` — 表达事实表（~3M 行，基因×样本×指标的中心表）
 - `gene_expression_summary` — 预聚合统计（mean/max/min/std / sex_bias / stage_means）
+
+**dataset_alias 表**（V002 migration）：
+- `alias_code` → `canonical_code` 映射，用于解析 `raw_ballgown_36` → `esc_srr_23` 等别名
+
+**mv_dataset_metric 物化视图**（V003 migration）：
+- (dataset, metric) 能力注册表，`ExpressionService` 验证用户查询的 (dataset, metric) 是否启用
 
 **Staging 表**：
 - `stg_esc_master` — ESC 原始数据（23 SRR Run × 3 种 metric）
@@ -396,13 +460,14 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 ## Key Patterns
 
 - **API Client**: All backend calls go through `src/lib/apiClient.ts`. Never hardcode URLs — use `apiFetch<T>(path)` which prefixes `API_BASE` automatically. All API functions in `geneApi.ts`/`genomeApi.ts`/`chatApi.ts` use `apiFetch` internally.
+- **Genome API paths**: All `genomeApi.ts` functions use `/genome-api/` prefix (changed from `/genome/`). Frontend components only call `genomeApi.ts` functions — never hardcode `/genome-api/` paths directly.
 - **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id. Use `resolveGeneId()` to canonicalize before API calls — geneApi functions call this internally, components should NOT call search separately.
 - **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
 - **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`.
 - **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
 - **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state. `<Text>` defaults to `<p>` — never nest block elements (`<div>`, `<Badge>`, `<Card>`) inside `<Text>`; use `component="span"` if Badge is needed inline.
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
-- **Genome analysis**: `/genome/analysis/run` submits jobs; `/genome/sample/*` serves pre-generated results without running analysis.
+- **Genome analysis**: `/genome-api/analysis/run` submits jobs; `/genome-api/sample/*` serves pre-generated results without running analysis.
 - **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
 - **Expression Status**: Three states only — `'available'`, `'no_data'`, `'unavailable'`. Check `status === 'available'` before rendering charts/tables. Never check for `'pg_unavailable'`.
 - **KEGG Interactive Viewer**：`KeggInteractiveViewer` 使用 Drawer + CSS fullscreen（`size="100%"` 切换）实现全屏。PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 高亮基因。`viewBox="0 0 ${pngW} ${pngH}"` 使用后端原始像素坐标，`ResizeObserver` 监听 img 尺寸变化。点击节点 `window.open(node.url)` 跳转 KEGG。highlighted 判断：kegg_gene_id 精确匹配。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
@@ -417,4 +482,17 @@ git log --oneline            # Recent commits
 git add <files>
 git commit -m "message"
 git push origin <branch>
+```
+
+## Running Services
+
+```bash
+# Frontend (from C root)
+npm run dev
+
+# Backend (ONLY way — from C root)
+D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# Restart PostgreSQL Docker
+cd /d/jbrowsedata/projectdata && docker-compose stop postgres && docker-compose rm -f postgres && docker-compose up -d
 ```
