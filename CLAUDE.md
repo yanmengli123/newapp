@@ -36,6 +36,7 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
 │   │   ├── expression/            # 14 Plotly expression chart components
 │   │   ├── kegg/                # KEGG pathway viewer
 │   │   ├── go/                   # GO term cards
+│   │   ├── gene/                 # Gene structure & transcript components
 │   │   └── chat/                 # ChatWidget
 │   └── lib/                      # API clients
 │       ├── apiClient.ts           # Mandatory centralized fetch wrapper
@@ -94,7 +95,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - **Pages** — `src/pages/` (route targets in App.tsx)
   - `HomePage` — Hero, gene search, chart carousel (11 charts from sample results)
   - `GeneQueryPage` — Autocomplete gene search
-  - `GenePage` — Gene detail: gene header (xref/aliases), transcripts, exons, CDS, GO (Accordion), KEGG Pathways, **Expression 模块** (StatsRow / StageChart+LineChart / ViolinPlot+StackedArea / RadarChart+Heatmap / ZScoreChart+FoldChangeBar / FoldChangeTrajectory+Dendrogram / ReplicateConsistency / Table / ComparePanel内嵌图表)
+  - `GenePage` — Gene detail: gene header (xref/aliases), **GeneStructurePlot** (SVG transcript visualization with drag-pan/scroll-zoom/PNG export), transcripts accordion with exons/CDS/UTR, GO (Accordion), KEGG Pathways, **Expression 模块**
     - **Data loading**: Four-layer concept — (1) Load main page via `getGenePage(geneId, false)` (no sequences), (2) Hydrate expression from `response.expression`, (3) Annotations consumed directly from `response.annotations` (no separate API calls), (4) Sequences loaded on-demand via `getGenePage(geneId, true)`
   - `ChromosomePage` — Chromosome view with gene list
   - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
@@ -108,12 +109,12 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
 - **Expression components** — `src/components/expression/`: 14 个组件
-  - `utils.ts` — 共享工具 (`isValidNumber`/`normalizeSex`/`STAGE_ORDER`/`resolveStageMeans`/`groupSamplesByStageSex`/`PLOT_CONFIG`)
+  - `utils.ts` — 共享工具 (`isValidNumber`/`normalizeSex`/`STAGE_ORDER`/`resolveStageMeans`/`groupSamplesByStageSex`/`groupSamplesByStageSexReplicate`/`PLOT_CONFIG`)
   - `ExpressionHeader` — Dataset/Metric 选择器 + Expand All 切换
   - `ExpressionStatsRow` — 7 张统计卡片（Max/Min/Mean±Std/CV/Expressed/Top Stage/Sex Bias）
   - `ExpressionStageChart` — Plotly 分组柱状图（Male/Female + Total Mean 折线，双 Y 轴）
   - `ExpressionLineChart` — Plotly 折线图（按 stage_order 排序，含 Male/Female 分色）
-  - `ExpressionTable` — 可排序/可筛选/可分页（12/页）/CSV 导出/SortIcon 提取到组件外
+  - `ExpressionTable` — 可排序/可筛选/可分页（12/页）/CSV 导出/多基准 Log2FC（E0/Mean/Stage median SegmentedControl）/SortIcon 提取到组件外
   - `ExpressionComparePanel` — Expand All 跨数据集对比面板（Dataset Tabs + 指标切换）
   - `ExpressionHeatmap` — Stage × Sex 热力图（基于 stage_means）
   - `ExpressionStackedArea` — 堆叠面积图（Male/Female 分层填充 + Total Mean 折线）
@@ -123,7 +124,9 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `ExpressionDendrogram` — 样本聚类散点图（Male 圆形 / Female 菱形，按 stage 排列）
   - `ExpressionZScoreChart` — Z-Score 样本谱图（折线图，M/F 分色 + 零线参考）
   - `ExpressionFoldChangeTrajectory` — 相邻阶段 log2FC 分组柱状图
-  - `ExpressionReplicateConsistency` — 纯 Mantine 布局：Progress 条 + CV% 预警 Badge + 一致性标签
+  - `ExpressionReplicateConsistency` — 纯 Mantine 布局：Progress 条 + CV% 预警 Badge + 一致性标签；CV 按 stage×sex 组内 3 个 replicate 计算，附详细分析说明 Popover
+- **Gene components** — `src/components/gene/`:
+  - `GeneStructurePlot` — SVG gene structure visualization (black body line, blue CDS blocks, gray UTR, intron lines, GT/AG splice triangles, drag-pan, scroll-zoom, hover tooltip in English, PNG export). Single-transcript selector above transcript accordion in GenePage.
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)

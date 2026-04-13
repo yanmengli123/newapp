@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useRef, useState, useCallback, useMemo } from "react";
 import { Paper, Stack, Group, Text, Badge, ActionIcon, Tooltip, Box, Select } from "@mantine/core";
-import { IconZoomIn, IconZoomOut, IconDownload, IconRotateClockwise } from "@tabler/icons-react";
+import { IconZoomIn, IconZoomOut, IconDownload, IconRotateClockwise, IconExternalLink } from "@tabler/icons-react";
 import type { TranscriptResult } from "../../lib/geneApi";
 
 interface GeneStructurePlotProps {
@@ -520,6 +520,36 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     setTooltip(null);
   }, [isDragging, currentPt, zoom, panOffset, svgWidth, totalLength]);
 
+  // ── Open in JBrowse ──
+  const openInJBrowse = useCallback(() => {
+    const { seqid, start, end } = currentPt.tx;
+    if (!seqid) return;
+
+    // NC_ accession → chr ID
+    const NC_TO_CHR: [string, string][] = [
+      ["NC_006088.5", "chr1"], ["NC_006089.5", "chr2"], ["NC_006090.5", "chr3"],
+      ["NC_006091.5", "chr4"], ["NC_006092.5", "chr5"], ["NC_006093.5", "chr6"],
+      ["NC_006094.5", "chr7"], ["NC_006095.5", "chr8"], ["NC_006096.5", "chr9"],
+      ["NC_006097.5", "chr10"], ["NC_006098.5", "chr11"], ["NC_006099.5", "chr12"],
+      ["NC_006100.5", "chr13"], ["NC_006101.5", "chr14"], ["NC_006102.5", "chr15"],
+      ["NC_006103.5", "chr16"], ["NC_006104.5", "chr17"], ["NC_006105.5", "chr18"],
+      ["NC_006106.5", "chr19"], ["NC_006107.5", "chr20"], ["NC_006108.5", "chr21"],
+      ["NC_006109.5", "chr22"], ["NC_006110.5", "chr23"], ["NC_006111.5", "chr24"],
+      ["NC_006112.4", "chr25"], ["NC_006113.5", "chr26"], ["NC_006114.5", "chr27"],
+      ["NC_006115.5", "chr28"], ["NC_008465.4", "chr29"], ["NC_028739.2", "chr30"],
+      ["NC_028740.2", "chr31"], ["NC_006119.4", "chr32"], ["NC_006126.5", "chrW"],
+      ["NC_006127.5", "chrZ"], ["NC_040902.1", "chrMT"],
+    ];
+    const chrId = seqid.startsWith("chr") ? seqid
+      : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
+
+    // Pad the region ±5%, min 500bp
+    const pad = Math.max(Math.floor((end - start) * 0.05), 500);
+    const loc = `${chrId}:${Math.max(1, start - pad)}..${end + pad}`;
+    // Use window.location for full page reload so JBrowse always initialises fresh
+    window.location.href = `/jbrowse?loc=${encodeURIComponent(loc)}`;
+  }, [currentPt.tx]);
+
   // ── Export PNG ──
   const exportPng = useCallback(() => {
     const svgEl = svgRef.current;
@@ -598,6 +628,11 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
           <Tooltip label="Export PNG">
             <ActionIcon size="sm" variant="subtle" onClick={exportPng}>
               <IconDownload size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Open in JBrowse">
+            <ActionIcon size="sm" variant="subtle" color="blue" onClick={openInJBrowse}>
+              <IconExternalLink size={14} />
             </ActionIcon>
           </Tooltip>
         </Group>

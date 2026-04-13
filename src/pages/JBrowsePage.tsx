@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Button, Card, Stack, Text, Title, SimpleGrid } from "@mantine/core";
 import {
   createViewState,
   JBrowseLinearGenomeView,
 } from "@jbrowse/react-linear-genome-view2";
+import { useSearchParams } from "react-router-dom";
 import { jbrowseConfig } from "../jbrowseConfig";
 
 // 染色体列表
@@ -45,22 +46,82 @@ const chromosomes = [
   { id: "chrMT", name: "MT", seqid: "NC_040902.1", length: 16784 },
 ];
 
+// NC_ accession → chr ID
+const NC_TO_CHR: [string, string][] = [
+  ["NC_006088.5", "chr1"], ["NC_006089.5", "chr2"], ["NC_006090.5", "chr3"],
+  ["NC_006091.5", "chr4"], ["NC_006092.5", "chr5"], ["NC_006093.5", "chr6"],
+  ["NC_006094.5", "chr7"], ["NC_006095.5", "chr8"], ["NC_006096.5", "chr9"],
+  ["NC_006097.5", "chr10"], ["NC_006098.5", "chr11"], ["NC_006099.5", "chr12"],
+  ["NC_006100.5", "chr13"], ["NC_006101.5", "chr14"], ["NC_006102.5", "chr15"],
+  ["NC_006103.5", "chr16"], ["NC_006104.5", "chr17"], ["NC_006105.5", "chr18"],
+  ["NC_006106.5", "chr19"], ["NC_006107.5", "chr20"], ["NC_006108.5", "chr21"],
+  ["NC_006109.5", "chr22"], ["NC_006110.5", "chr23"], ["NC_006111.5", "chr24"],
+  ["NC_006112.4", "chr25"], ["NC_006113.5", "chr26"], ["NC_006114.5", "chr27"],
+  ["NC_006115.5", "chr28"], ["NC_008465.4", "chr29"], ["NC_028739.2", "chr30"],
+  ["NC_028740.2", "chr31"], ["NC_006119.4", "chr32"], ["NC_006126.5", "chrW"],
+  ["NC_006127.5", "chrZ"], ["NC_040902.1", "chrMT"],
+];
+
+function toChrId(seqid: string): string {
+  if (seqid.startsWith("chr")) return seqid;
+  return NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid;
+}
+
 function formatLength(len: number): string {
-  if (len >= 1000000) {
-    return `${(len / 1000000).toFixed(1)} Mb`;
-  }
+  if (len >= 1000000) return `${(len / 1000000).toFixed(1)} Mb`;
   return `${(len / 1000).toFixed(1)} kb`;
 }
 
+function parseLocParam(locParam: string): string {
+  // locParam format: "chr1:start..end" or "NC_006088.5:start..end"
+  const match = locParam.match(/^(.+?):(\d+)\.\.(\d+)$/);
+  if (!match) return "chr1:1..5000000";
+
+  const [, refName, startStr, endStr] = match;
+  const start = parseInt(startStr, 10);
+  const end = parseInt(endStr, 10);
+  if (isNaN(start) || isNaN(end)) return "chr1:1..5000000";
+
+  // Convert NC_ accession to chr ID
+  const chrId = toChrId(refName);
+
+  // Add padding ±5%, min 500bp
+  const pad = Math.max(Math.floor((end - start) * 0.05), 500);
+  const paddedStart = Math.max(1, start - pad);
+  const paddedEnd = end + pad;
+
+  return `${chrId}:${paddedStart}..${paddedEnd}`;
+}
+
 export default function JBrowsePage() {
-  const [viewState] = useState(() =>
-    createViewState({
+  const [searchParams] = useSearchParams();
+
+  // Compute initial location from ?loc= param; falls back to default
+  const initialLoc = useMemo(() => {
+    const locParam = searchParams.get("loc");
+    if (!locParam) return "chr1:1..5000000";
+    return parseLocParam(locParam);
+  }, [searchParams]);
+
+  // Build viewState with the correct initial location
+  const viewState = useMemo(() => {
+    return createViewState({
       ...jbrowseConfig,
-    }),
-  );
+      defaultSession: {
+        ...jbrowseConfig.defaultSession,
+        view: {
+          ...jbrowseConfig.defaultSession.view,
+          init: {
+            ...jbrowseConfig.defaultSession.view.init,
+            loc: initialLoc,
+          },
+        },
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally only once on mount
 
   const handleChrClick = (chr: typeof chromosomes[0]) => {
-    // 跳转到染色体起始位置，显示前 5Mb 区域
     const endPos = Math.min(chr.length, 5000000);
     viewState.session.view.navToLocString(`${chr.id}:1..${endPos}`);
   };
