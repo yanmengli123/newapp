@@ -112,6 +112,42 @@ export function groupSamplesByStageSex(
   return result;
 }
 
+// Group by stage → sex → replicate, then compute replicate-level means for CV
+export function groupSamplesByStageSexReplicate(
+  samples: ExpressionSample[]
+): Record<string, { male: number[]; female: number[] }> {
+  // First group: stage → sex → replicate → values[]
+  const nested: Record<string, Record<string, Record<number, number[]>>> = {};
+  for (const s of samples) {
+    if (!s.stage) continue;
+    const canon = normalizeSex(s.sex);
+    if (!canon || !isValidNumber(s.value)) continue;
+    const rep = s.replicate ?? 0;
+    if (!nested[s.stage]) nested[s.stage] = {};
+    if (!nested[s.stage][canon]) nested[s.stage][canon] = {};
+    if (!nested[s.stage][canon][rep]) nested[s.stage][canon][rep] = [];
+    nested[s.stage][canon][rep].push(s.value);
+  }
+
+  // For each stage × sex: compute mean per replicate, then return replicate means array
+  const result: Record<string, { male: number[]; female: number[] }> = {};
+  for (const stage of Object.keys(nested)) {
+    result[stage] = { male: [], female: [] };
+    const stageData = nested[stage];
+    for (const repVals of Object.values(stageData?.Male ?? {})) {
+      if (repVals.length > 0) {
+        result[stage].male.push(repVals.reduce((a, b) => a + b, 0) / repVals.length);
+      }
+    }
+    for (const repVals of Object.values(stageData?.Female ?? {})) {
+      if (repVals.length > 0) {
+        result[stage].female.push(repVals.reduce((a, b) => a + b, 0) / repVals.length);
+      }
+    }
+  }
+  return result;
+}
+
 export const PLOT_CONFIG: any = {
   displayModeBar: false,
   responsive: true,

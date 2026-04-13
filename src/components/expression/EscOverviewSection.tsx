@@ -199,25 +199,84 @@ function SampleCompositionChart({ data, fullscreen }: { data: any; fullscreen?: 
 }
 
 function SexBiasedChart({ data, fullscreen }: { data: any; fullscreen?: boolean }) {
+  // Female → negative (left side), Male → positive (right side)
+  const femaleVals = data.female.map((v: number) => -v);
+  const maleVals = data.male;
+
+  const maxAbs = Math.max(...data.female, ...data.male, 1);
+
   const traces: any[] = [
     {
-      type: "bar", x: data.stages, y: data.female, name: "Female higher",
-      marker: { color: "#E64980" },
-      hovertemplate: "Female higher<br>%{x}: %{y}<extra></extra>",
+      type: "bar",
+      y: data.stages,
+      x: femaleVals,
+      orientation: "h",
+      name: "Female higher",
+      marker: { color: "#E64980", opacity: 0.85 },
+      hovertemplate: "Female higher<br>%{y}: %{customdata}<extra></extra>",
+      customdata: data.female,
     },
     {
-      type: "bar", x: data.stages, y: data.male, name: "Male higher",
-      marker: { color: "#228BE6" },
-      hovertemplate: "Male higher<br>%{x}: %{y}<extra></extra>",
+      type: "bar",
+      y: data.stages,
+      x: maleVals,
+      orientation: "h",
+      name: "Male higher",
+      marker: { color: "#228BE6", opacity: 0.85 },
+      hovertemplate: "Male higher<br>%{y}: %{customdata}<extra></extra>",
+      customdata: data.male,
     },
   ];
+
   const layout: any = {
-    margin: { t: 16, b: fullscreen ? 60 : 48, l: 56, r: 24 },
-    xaxis: { tickangle: -30, gridcolor: "#f0f0f0", tickfont: { size: fullscreen ? 11 : 9 } },
-    yaxis: { title: { text: "Gene Count", font: { size: fullscreen ? 11 : 9 } }, gridcolor: "#f0f0f0", tickfont: { size: fullscreen ? 11 : 9 } },
+    margin: { t: 16, b: fullscreen ? 56 : 44, l: fullscreen ? 80 : 64, r: 80 },
+    xaxis: {
+      title: { text: "Gene Count", font: { size: fullscreen ? 11 : 9 } },
+      tickfont: { size: fullscreen ? 10 : 9 },
+      gridcolor: "#f0f0f0",
+      zeroline: true,
+      zerolinewidth: 2,
+      zerolinecolor: "#888",
+      range: [-maxAbs * 1.15, maxAbs * 1.15],
+      tickvals: Array.from({ length: 9 }, (_, i) => -Math.round(maxAbs * (4 - i) / 4)),
+      ticktext: Array.from({ length: 9 }, (_, i) => {
+        const v = Math.round(maxAbs * (4 - i) / 4);
+        return v === 0 ? "0" : v.toString();
+      }),
+    },
+    yaxis: {
+      tickfont: { size: fullscreen ? 11 : 9 },
+      gridcolor: "transparent",
+      automargin: true,
+    },
     barmode: "relative",
-    legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.28, font: { size: fullscreen ? 11 : 9 } },
-    hovermode: "closest" as const, ...PAPER_STYLE,
+    legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.16, font: { size: fullscreen ? 11 : 9 } },
+    hovermode: "closest" as const,
+    annotations: [
+      // Label "Female" on the left of zero line
+      {
+        x: -maxAbs * 0.5,
+        y: data.stages.length - 0.5,
+        xref: "x",
+        yref: "y",
+        text: "♀ Female",
+        showarrow: false,
+        font: { size: fullscreen ? 11 : 9, color: "#E64980" },
+        xanchor: "center",
+      },
+      // Label "Male" on the right of zero line
+      {
+        x: maxAbs * 0.5,
+        y: data.stages.length - 0.5,
+        xref: "x",
+        yref: "y",
+        text: "Male ♂",
+        showarrow: false,
+        font: { size: fullscreen ? 11 : 9, color: "#228BE6" },
+        xanchor: "center",
+      },
+    ],
+    ...PAPER_STYLE,
     height: fullscreen ? FULL_PLOT_HEIGHT : PLOT_HEIGHT,
   };
   return <Plot data={traces} layout={layout} config={PLOT_CONFIG} style={{ width: "100%", height: fullscreen ? FULL_PLOT_HEIGHT : PLOT_HEIGHT }} useResizeHandler />;

@@ -31,6 +31,7 @@ import { getGenePage, getChromosome } from "../lib/geneApi";
 import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
 import ExpressionSection from "../components/expression/ExpressionSection";
+import GeneStructurePlot from "../components/gene/GeneStructurePlot";
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -572,6 +573,16 @@ export default function GenePage() {
         {transcripts.length === 0 ? (
           <Text c="dimmed">No transcripts found</Text>
         ) : (
+          <>
+            {/* Gene Structure Plot — all transcripts combined */}
+            <GeneStructurePlot
+              transcripts={transcripts}
+              geneSymbol={data?.gene.gene_symbol}
+            />
+
+            <Divider my="md" />
+
+            {/* Individual transcript accordion */}
           <Accordion variant="separated" radius="md">
             {transcripts.map((tx) => (
               <Accordion.Item key={tx.transcript_id} value={tx.transcript_id}>
@@ -801,6 +812,7 @@ export default function GenePage() {
               </Accordion.Item>
             ))}
           </Accordion>
+          </>
         )}
       </Paper>
 
