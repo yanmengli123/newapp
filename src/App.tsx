@@ -10,6 +10,7 @@ import GenePage from './pages/GenePage';
 import GeneQueryPage from './pages/GeneQueryPage';
 import HomePage from './pages/HomePage';
 import JBrowsePage from './pages/JBrowsePage';
+import JBrowseGenePage from './pages/JBrowseGenePage';
 import VizPage from './pages/VizPage';
 import ToolsPage from './pages/ToolsPage';
 import GenomeHomePage from './pages/GenomeHomePage';
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/query" element={<GeneQueryPage />} />
             <Route path="/browser" element={<BrowserPage />} />
             <Route path="/jbrowse" element={<JBrowsePage />} />
+            <Route path="/jbrowse/gene" element={<JBrowseGenePage />} />
             <Route path="/blast" element={<BlastPage />} />
             <Route path="/viz" element={<VizPage />} />
             <Route path="/data" element={<DataPage />} />

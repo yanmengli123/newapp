@@ -636,10 +636,10 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
                 const chrId = seqid.startsWith("chr") ? seqid
                   : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
                 const pad = Math.max(Math.floor((end - start) * 0.05), 500);
-                return `/jbrowse?loc=${encodeURIComponent(`${chrId}:${Math.max(1, start - pad)}..${end + pad}`)}`;
+                const loc = `${chrId}:${Math.max(1, start - pad)}..${end + pad}`;
+                const gene = geneSymbol ? `&geneSymbol=${encodeURIComponent(geneSymbol)}` : "";
+                return `/jbrowse/gene?loc=${encodeURIComponent(loc)}${gene}`;
               })()}
-              target="_blank"
-              rel="noopener noreferrer"
               style={{ display: "inline-flex", cursor: "pointer" }}
             >
               <IconExternalLink size={14} />
