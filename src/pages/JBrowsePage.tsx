@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { Button, Card, Stack, Text, Title, SimpleGrid } from "@mantine/core";
 import {
   createViewState,
@@ -97,16 +97,48 @@ export default function JBrowsePage() {
   const [searchParams] = useSearchParams();
 
   // Compute initial location from ?loc= param; falls back to default
+  const locParam = searchParams.get("loc");
+
   const initialLoc = useMemo(() => {
-    const locParam = searchParams.get("loc");
     if (!locParam) return "chr1:1..5000000";
     return parseLocParam(locParam);
-  }, [searchParams]);
+  }, [locParam]);
 
-  // Build viewState with the correct initial location
+  // Non-padded gene coordinates for nav + highlight
+  const geneLoc = useMemo(() => {
+    if (!locParam) return "";
+    const match = locParam.match(/^(.+?):(\d+)\.\.(\d+)$/);
+    if (!match) return "";
+    const [, refName, startStr, endStr] = match;
+    const start = parseInt(startStr, 10);
+    const end = parseInt(endStr, 10);
+    if (isNaN(start) || isNaN(end)) return "";
+    const chrId = toChrId(refName);
+    return `${chrId}:${start}..${end}`;
+  }, [locParam]);
+
+  const navRef = useRef(false);
+
+  // Navigate + highlight to exact gene region when ?loc= is present
+  useEffect(() => {
+    if (!geneLoc || navRef.current) return;
+    navRef.current = true;
+    const timer = setTimeout(() => {
+      try {
+        viewState.session.view.navToLocString(geneLoc);
+        viewState.session.view.setHighlight(geneLoc);
+      } catch {
+        // ignore if view not ready
+      }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [viewState, geneLoc]);
+
+  // Build viewState with the correct initial location; recreate when loc changes
   const viewState = useMemo(() => {
     return createViewState({
       ...jbrowseConfig,
+      location: initialLoc,
       defaultSession: {
         ...jbrowseConfig.defaultSession,
         view: {
@@ -119,7 +151,7 @@ export default function JBrowsePage() {
       },
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally only once on mount
+  }, [initialLoc]);
 
   const handleChrClick = (chr: typeof chromosomes[0]) => {
     const endPos = Math.min(chr.length, 5000000);
