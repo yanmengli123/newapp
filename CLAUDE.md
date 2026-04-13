@@ -126,7 +126,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `ExpressionFoldChangeTrajectory` — 相邻阶段 log2FC 分组柱状图
   - `ExpressionReplicateConsistency` — 纯 Mantine 布局：Progress 条 + CV% 预警 Badge + 一致性标签；CV 按 stage×sex 组内 3 个 replicate 计算，附详细分析说明 Popover
 - **Gene components** — `src/components/gene/`:
-  - `GeneStructurePlot` — SVG gene structure visualization (black body line, blue CDS blocks, gray UTR, intron lines, GT/AG splice triangles, drag-pan, scroll-zoom, hover tooltip in English, PNG export). Single-transcript selector above transcript accordion in GenePage.
+  - `GeneStructurePlot` — SVG gene structure visualization (black body line, blue CDS blocks, gray UTR, intron lines, GT/AG splice triangles, drag-pan, scroll-zoom, hover tooltip in English, PNG export). "Open in JBrowse" button navigates to `/jbrowse?loc=chrN:start..end`. Single-transcript selector above transcript accordion in GenePage.
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
 
 ### Backend (backend/)
@@ -466,7 +466,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **Genome API paths**: All `genomeApi.ts` functions use `/genome-api/` prefix (changed from `/genome/`). Frontend components only call `genomeApi.ts` functions — never hardcode `/genome-api/` paths directly.
 - **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id. Use `resolveGeneId()` to canonicalize before API calls — geneApi functions call this internally, components should NOT call search separately.
 - **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
-- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`.
+- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Gene-specific navigation via `?loc=chrN:start..end` query param (e.g. from GeneStructurePlot "Open in JBrowse" button); NC_ accessions are auto-converted to chr IDs using a 35-entry lookup table. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`.
 - **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
 - **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state. `<Text>` defaults to `<p>` — never nest block elements (`<div>`, `<Badge>`, `<Card>`) inside `<Text>`; use `component="span"` if Badge is needed inline.
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.

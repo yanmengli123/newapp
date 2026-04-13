@@ -64,6 +64,22 @@ const C = {
 // ── Layout constants ────────────────────────────────────────────────────────────
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 30;
+
+// NC_ accession → chr ID (GRCg6a 35 chromosomes)
+const NC_TO_CHR: [string, string][] = [
+  ["NC_006088.5", "chr1"], ["NC_006089.5", "chr2"], ["NC_006090.5", "chr3"],
+  ["NC_006091.5", "chr4"], ["NC_006092.5", "chr5"], ["NC_006093.5", "chr6"],
+  ["NC_006094.5", "chr7"], ["NC_006095.5", "chr8"], ["NC_006096.5", "chr9"],
+  ["NC_006097.5", "chr10"], ["NC_006098.5", "chr11"], ["NC_006099.5", "chr12"],
+  ["NC_006100.5", "chr13"], ["NC_006101.5", "chr14"], ["NC_006102.5", "chr15"],
+  ["NC_006103.5", "chr16"], ["NC_006104.5", "chr17"], ["NC_006105.5", "chr18"],
+  ["NC_006106.5", "chr19"], ["NC_006107.5", "chr20"], ["NC_006108.5", "chr21"],
+  ["NC_006109.5", "chr22"], ["NC_006110.5", "chr23"], ["NC_006111.5", "chr24"],
+  ["NC_006112.4", "chr25"], ["NC_006113.5", "chr26"], ["NC_006114.5", "chr27"],
+  ["NC_006115.5", "chr28"], ["NC_008465.4", "chr29"], ["NC_028739.2", "chr30"],
+  ["NC_028740.2", "chr31"], ["NC_006119.4", "chr32"], ["NC_006126.5", "chrW"],
+  ["NC_006127.5", "chrZ"], ["NC_040902.1", "chrMT"],
+];
 const BODY_H = 5;
 const RULER_H = 48;
 const CDS_H = 26;
@@ -412,6 +428,10 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     region: ExonRegion;
   } | null>(null);
 
+  // Track whether mouse is over a CDS/UTR block to prevent SVG-level
+  // handleSvgMouseMove from clearing the tooltip during hover.
+  const isOverBlockRef = useRef(false);
+
   const processed = useMemo(() => transcripts.map(processTranscript), [transcripts]);
   const defaultPt = useMemo(() => pickDefault(processed), [processed]);
   const [selectedTxId, setSelectedTxId] = useState<string>(defaultPt.tx.transcript_id);
@@ -481,6 +501,10 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     const vbMouseX = (svgMouseX / rect.width) * svgWidth;
     const vbMouseY = (svgMouseY / rect.height) * svgHeight;
 
+    // Skip coordinate-based clear when mouse is over a block — the rect's
+    // own onMouseEnter/onMouseLeave will manage the tooltip.
+    if (isOverBlockRef.current) return;
+
     // Check if mouse is in the CDS or UTR band
     const cdsTop = BODY_TOP - CDS_H;
     const utrBottom = BODY_BOTTOM + UTR_H;
@@ -519,36 +543,6 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     }
     setTooltip(null);
   }, [isDragging, currentPt, zoom, panOffset, svgWidth, totalLength]);
-
-  // ── Open in JBrowse ──
-  const openInJBrowse = useCallback(() => {
-    const { seqid, start, end } = currentPt.tx;
-    if (!seqid) return;
-
-    // NC_ accession → chr ID
-    const NC_TO_CHR: [string, string][] = [
-      ["NC_006088.5", "chr1"], ["NC_006089.5", "chr2"], ["NC_006090.5", "chr3"],
-      ["NC_006091.5", "chr4"], ["NC_006092.5", "chr5"], ["NC_006093.5", "chr6"],
-      ["NC_006094.5", "chr7"], ["NC_006095.5", "chr8"], ["NC_006096.5", "chr9"],
-      ["NC_006097.5", "chr10"], ["NC_006098.5", "chr11"], ["NC_006099.5", "chr12"],
-      ["NC_006100.5", "chr13"], ["NC_006101.5", "chr14"], ["NC_006102.5", "chr15"],
-      ["NC_006103.5", "chr16"], ["NC_006104.5", "chr17"], ["NC_006105.5", "chr18"],
-      ["NC_006106.5", "chr19"], ["NC_006107.5", "chr20"], ["NC_006108.5", "chr21"],
-      ["NC_006109.5", "chr22"], ["NC_006110.5", "chr23"], ["NC_006111.5", "chr24"],
-      ["NC_006112.4", "chr25"], ["NC_006113.5", "chr26"], ["NC_006114.5", "chr27"],
-      ["NC_006115.5", "chr28"], ["NC_008465.4", "chr29"], ["NC_028739.2", "chr30"],
-      ["NC_028740.2", "chr31"], ["NC_006119.4", "chr32"], ["NC_006126.5", "chrW"],
-      ["NC_006127.5", "chrZ"], ["NC_040902.1", "chrMT"],
-    ];
-    const chrId = seqid.startsWith("chr") ? seqid
-      : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
-
-    // Pad the region ±5%, min 500bp
-    const pad = Math.max(Math.floor((end - start) * 0.05), 500);
-    const loc = `${chrId}:${Math.max(1, start - pad)}..${end + pad}`;
-    // Use window.location for full page reload so JBrowse always initialises fresh
-    window.location.href = `/jbrowse?loc=${encodeURIComponent(loc)}`;
-  }, [currentPt.tx]);
 
   // ── Export PNG ──
   const exportPng = useCallback(() => {
@@ -631,7 +625,23 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Open in JBrowse">
-            <ActionIcon size="sm" variant="subtle" color="blue" onClick={openInJBrowse}>
+            <ActionIcon
+              size="sm"
+              variant="subtle"
+              color="blue"
+              component="a"
+              href={(() => {
+                const { seqid, start, end } = currentPt.tx;
+                if (!seqid) return "#";
+                const chrId = seqid.startsWith("chr") ? seqid
+                  : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
+                const pad = Math.max(Math.floor((end - start) * 0.05), 500);
+                return `/jbrowse?loc=${encodeURIComponent(`${chrId}:${Math.max(1, start - pad)}..${end + pad}`)}`;
+              })()}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ display: "inline-flex", cursor: "pointer" }}
+            >
               <IconExternalLink size={14} />
             </ActionIcon>
           </Tooltip>
@@ -678,7 +688,11 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
           onMouseDown={onMouseDown}
           onMouseMove={(e) => { onMouseMove(e); handleSvgMouseMove(e); }}
           onMouseUp={onMouseUp}
-          onMouseLeave={() => { setIsDragging(false); setTooltip(null); }}
+          onMouseLeave={() => {
+            setIsDragging(false);
+            isOverBlockRef.current = false;
+            setTooltip(null);
+          }}
           onWheel={onWheel}
         >
           {/* Ruler */}
@@ -729,13 +743,17 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(ev) => {
                     ev.preventDefault();
+                    isOverBlockRef.current = true;
                     const rect = svgRef.current?.getBoundingClientRect();
                     if (!rect) return;
                     const svgMouseX = ((ev.clientX - rect.left) / rect.width) * svgWidth;
                     const svgMouseY = ((ev.clientY - rect.top) / rect.height) * svgHeight;
                     setTooltip({ mouseX: svgMouseX, mouseY: svgMouseY, exonIdx: ei, region: exon });
                   }}
-                  onMouseLeave={() => setTooltip(null)}
+                  onMouseLeave={() => {
+                    isOverBlockRef.current = false;
+                    setTooltip(null);
+                  }}
                 />
               );
             })
@@ -757,13 +775,17 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
                   style={{ cursor: "pointer" }}
                   onMouseEnter={(ev) => {
                     ev.preventDefault();
+                    isOverBlockRef.current = true;
                     const rect = svgRef.current?.getBoundingClientRect();
                     if (!rect) return;
                     const svgMouseX = ((ev.clientX - rect.left) / rect.width) * svgWidth;
                     const svgMouseY = ((ev.clientY - rect.top) / rect.height) * svgHeight;
                     setTooltip({ mouseX: svgMouseX, mouseY: svgMouseY, exonIdx: ei, region: exon });
                   }}
-                  onMouseLeave={() => setTooltip(null)}
+                  onMouseLeave={() => {
+                    isOverBlockRef.current = false;
+                    setTooltip(null);
+                  }}
                 />
               );
             })
@@ -834,8 +856,13 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
                 zIndex: 20,
                 pointerEvents: "auto",
               }}
-              onMouseEnter={() => {}}
-              onMouseLeave={() => setTooltip(null)}
+              onMouseEnter={() => {
+                isOverBlockRef.current = true;
+              }}
+              onMouseLeave={() => {
+                isOverBlockRef.current = false;
+                setTooltip(null);
+              }}
             >
               <div
                 style={{
