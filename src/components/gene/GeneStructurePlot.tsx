@@ -7,6 +7,8 @@ import type { TranscriptResult } from "../../lib/geneApi";
 interface GeneStructurePlotProps {
   transcripts: TranscriptResult[];
   geneSymbol?: string;
+  geneStart?: number;
+  geneEnd?: number;
 }
 
 interface CdsRegion {
@@ -413,7 +415,7 @@ function Legend() {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
-export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStructurePlotProps) {
+export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, geneEnd }: GeneStructurePlotProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -631,14 +633,17 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
               color="blue"
               component="a"
               href={(() => {
-                const { seqid, start, end } = currentPt.tx;
+                const { seqid } = currentPt.tx;
                 if (!seqid) return "#";
+                // Prefer gene-level coordinates (full gene span), fallback to transcript
+                const start = geneStart ?? currentPt.tx.start;
+                const end = geneEnd ?? currentPt.tx.end;
                 const chrId = seqid.startsWith("chr") ? seqid
                   : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
                 const pad = Math.max(Math.floor((end - start) * 0.05), 500);
                 const loc = `${chrId}:${Math.max(1, start - pad)}..${end + pad}`;
-                const gene = geneSymbol ? `&geneSymbol=${encodeURIComponent(geneSymbol)}` : "";
-                return `/jbrowse/gene?loc=${encodeURIComponent(loc)}${gene}`;
+                const gs = geneSymbol ? `&geneSymbol=${encodeURIComponent(geneSymbol)}` : "";
+                return `/jbrowse/gene?loc=${encodeURIComponent(loc)}${gs}`;
               })()}
               style={{ display: "inline-flex", cursor: "pointer" }}
             >

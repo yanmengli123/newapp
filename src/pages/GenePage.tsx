@@ -578,6 +578,8 @@ export default function GenePage() {
             <GeneStructurePlot
               transcripts={transcripts}
               geneSymbol={data?.gene.gene_symbol}
+              geneStart={data.gene.start}
+              geneEnd={data.gene.end}
             />
 
             <Divider my="md" />
