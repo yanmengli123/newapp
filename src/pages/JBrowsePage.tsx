@@ -111,6 +111,22 @@ export default function JBrowsePage() {
     return `${chrId}:${start}..${end}`;
   }, [locParam]);
 
+  // Create fresh viewState on every mount to avoid stale/corrupted session from /jbrowse/gene
+  const viewState = createViewState({
+    ...jbrowseConfig,
+    location: initialLoc,
+    defaultSession: {
+      ...jbrowseConfig.defaultSession,
+      view: {
+        ...jbrowseConfig.defaultSession.view,
+        init: {
+          ...jbrowseConfig.defaultSession.view.init,
+          loc: initialLoc,
+        },
+      },
+    },
+  });
+
   const navRef = useRef(false);
 
   // Navigate + highlight to exact gene region when ?loc= is present
@@ -126,26 +142,8 @@ export default function JBrowsePage() {
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [viewState, geneLoc]);
-
-  // Build viewState with the correct initial location; recreate when loc changes
-  const viewState = useMemo(() => {
-    return createViewState({
-      ...jbrowseConfig,
-      location: initialLoc,
-      defaultSession: {
-        ...jbrowseConfig.defaultSession,
-        view: {
-          ...jbrowseConfig.defaultSession.view,
-          init: {
-            ...jbrowseConfig.defaultSession.view.init,
-            loc: initialLoc,
-          },
-        },
-      },
-    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialLoc]);
+  }, [geneLoc]);
 
   const handleChrClick = (chr: typeof chromosomes[0]) => {
     const endPos = Math.min(chr.length, 5000000);

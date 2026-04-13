@@ -47,6 +47,7 @@ export default function JBrowseGenePage() {
   const geneSymbol = searchParams.get("geneSymbol");
   const geneLoc = parseLocParam(locParam);
 
+  // Pass exact gene coords to search box (no padding)
   const viewState = createViewState({
     ...jbrowseConfig,
     location: geneLoc,
