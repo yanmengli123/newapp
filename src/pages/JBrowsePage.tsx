@@ -84,13 +84,7 @@ function parseLocParam(locParam: string): string {
 
   // Convert NC_ accession to chr ID
   const chrId = toChrId(refName);
-
-  // Add padding ±5%, min 500bp
-  const pad = Math.max(Math.floor((end - start) * 0.05), 500);
-  const paddedStart = Math.max(1, start - pad);
-  const paddedEnd = end + pad;
-
-  return `${chrId}:${paddedStart}..${paddedEnd}`;
+  return `${chrId}:${start}..${end}`;
 }
 
 export default function JBrowsePage() {

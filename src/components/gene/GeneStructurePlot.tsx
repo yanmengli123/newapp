@@ -640,8 +640,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, 
                 const end = geneEnd ?? currentPt.tx.end;
                 const chrId = seqid.startsWith("chr") ? seqid
                   : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
-                const pad = Math.max(Math.floor((end - start) * 0.05), 500);
-                const loc = `${chrId}:${Math.max(1, start - pad)}..${end + pad}`;
+                const loc = `${chrId}:${Math.max(1, start)}..${end}`;
                 const gs = geneSymbol ? `&geneSymbol=${encodeURIComponent(geneSymbol)}` : "";
                 return `/jbrowse/gene?loc=${encodeURIComponent(loc)}${gs}`;
               })()}
