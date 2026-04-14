@@ -500,6 +500,7 @@ function ExonTooltipCard({
 
   return (
     <div
+      onClick={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
         left: 0,
@@ -508,10 +509,11 @@ function ExonTooltipCard({
         zIndex: 20,
         display: "flex",
         justifyContent: "center",
-        pointerEvents: "none",
+        pointerEvents: "auto",
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: C.tooltipBg,
           borderRadius: 10,
@@ -789,27 +791,21 @@ export default function GeneStructurePlot({
         style={{
           border: "1px solid #e0e0e0",
           borderRadius: 8,
-          overflow: "hidden",
+          overflow: "visible",
           background: C.bg,
           position: "relative",
         }}
       >
-        {/* Click outside to close tooltip */}
-        <div
-          style={{ position: "absolute", inset: 0, zIndex: 10 }}
-          onClick={() => setClickedExon(null)}
-        />
-
         <svg
           className="gene-structure-svg"
           width="100%"
           height={svgHeight}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ display: "block" }}
+          style={{ display: "block", position: "relative", zIndex: 1 }}
           onClick={(e) => {
-            // Only close tooltip if clicking on SVG background (not a track row)
             const target = e.target as SVGElement;
-            if (target.tagName === "svg" || target.tagName === "rect" || target.tagName === "line" || target.tagName === "text") {
+            // Close tooltip when clicking SVG background (not a rect/cds/utr which have their own handlers)
+            if (target.tagName === "svg") {
               setClickedExon(null);
             }
           }}
