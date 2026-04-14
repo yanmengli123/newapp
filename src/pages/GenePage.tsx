@@ -127,7 +127,7 @@ export default function GenePage() {
   // Note: sequences can be loaded on demand when user expands a transcript
   // Currently sequences come from the full page load if include_sequences=true
 
-  // Download FASTA file — prefers rna_sequence from DB, falls back to /genes/genomic
+  // Download FASTA file — always fetches the full gene genomic region
   const downloadFasta = useCallback(async () => {
     if (!geneId) return;
 
@@ -136,42 +136,13 @@ export default function GenePage() {
       const result = await getGenePage(geneId, true);
 
       const geneSymbol = result.gene.gene_symbol || result.gene.gene_id;
-      // For negative strand, swap coords so header shows mRNA 5'→3' orientation
-      const geneStart = result.gene.strand === "-" ? Math.max(result.gene.start, result.gene.end) : Math.min(result.gene.start, result.gene.end);
-      const geneEnd = result.gene.strand === "-" ? Math.min(result.gene.start, result.gene.end) : Math.max(result.gene.start, result.gene.end);
-      const geneDesc = `${toChrId(result.gene.seqid)}:${geneStart}-${geneEnd} strand=${result.gene.strand} gene=${geneSymbol}`;
+      const geneDesc = `${toChrId(result.gene.seqid)}:${result.gene.start}-${result.gene.end} strand=${result.gene.strand} gene=${geneSymbol}`;
 
-      // Try rna_sequence from DB first, pick longest
-      let bestSeq: string | null = null;
-      let bestTxId = result.transcripts[0]?.transcript_acc || result.transcripts[0]?.transcript_id || result.gene.gene_id;
-      for (const tx of result.transcripts) {
-        if (tx.rna_sequence && (!bestSeq || tx.rna_sequence.length > bestSeq.length)) {
-          bestSeq = tx.rna_sequence;
-          bestTxId = tx.transcript_acc || tx.transcript_id;
-        }
-      }
+      // Always fetch the full gene genomic region via /genes/genomic
+      const loc = `${toChrId(result.gene.seqid)}:${result.gene.start}-${result.gene.end}`;
+      const region = await fetchGenomicSeq(loc, result.gene.strand === "-");
 
-      // Fall back to genomic fetch for the longest transcript
-      if (!bestSeq) {
-        const longestTx = result.transcripts.reduce((a, b) =>
-          (a.end - a.start) > (b.end - b.start) ? a : b
-        );
-        try {
-          const loc = `${toChrId(longestTx.seqid)}:${longestTx.start}-${longestTx.end}`;
-          const region = await fetchGenomicSeq(loc, longestTx.strand === "-");
-          bestSeq = region.seq;
-          bestTxId = longestTx.transcript_acc || longestTx.transcript_id;
-        } catch { /* bestSeq stays null */ }
-      }
-
-      let fastaContent: string;
-      if (bestSeq) {
-        fastaContent = `>${bestTxId} ${geneDesc}\n`;
-        const wrapped = bestSeq.match(/.{1,80}/g)?.join('\n') || bestSeq;
-        fastaContent += wrapped + '\n';
-      } else {
-        fastaContent = `>${result.gene.gene_id} ${geneDesc} [No sequence available]\nNNNN\n`;
-      }
+      const fastaContent = `>${result.gene.gene_id} ${geneDesc}\n${region.seq.match(/.{1,80}/g)?.join('\n') || region.seq}\n`;
 
       const blob = new Blob([fastaContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
