@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useMemo, useRef } from "react";
 import { Box, Stack, Group, Text, Badge, ActionIcon, Tooltip, Paper } from "@mantine/core";
-import { IconDownload, IconExternalLink } from "@tabler/icons-react";
+import { IconDownload, IconExternalLink, IconZoomIn, IconZoomOut, IconX } from "@tabler/icons-react";
 import type { TranscriptResult } from "../../lib/geneApi";
 
 interface GeneStructurePlotProps {
@@ -477,14 +477,13 @@ function TranscriptTrackRow({
 }
 
 function ExonTooltipCard({
-  region, exonIdx, txStart, strand,
-  containerEl,
+  region, exonIdx, txStart, strand, onClose,
 }: {
   region: ExonRegion;
   exonIdx: number;
   txStart: number;
   strand: string;
-  containerEl: HTMLDivElement | null;
+  onClose: () => void;
 }) {
   const absStart = txStart + region.start;
   const absEnd = txStart + region.end;
@@ -494,42 +493,36 @@ function ExonTooltipCard({
   const utr3Len = region.utrRegions.filter((u) => u.type === "3UTR").reduce((s, u) => s + (u.end - u.start), 0);
   const isNonCoding = cdsLen === 0;
 
-  // Position at bottom of the plot area
-  const containerW = containerEl?.clientWidth ?? 1000;
-  const top = HEADER_H + RULER_H + 4;
-
   return (
     <div
-      onClick={(e) => e.stopPropagation()}
       style={{
-        position: "absolute",
-        left: 0,
-        top,
-        width: containerW,
-        zIndex: 20,
-        display: "flex",
-        justifyContent: "center",
+        background: C.tooltipBg,
+        borderRadius: 10,
+        padding: "10px 14px",
+        minWidth: 240,
+        boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
         pointerEvents: "auto",
+        position: "relative",
       }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: C.tooltipBg,
-          borderRadius: 10,
-          padding: "10px 16px",
-          minWidth: 220,
-          boxShadow: "0 6px 24px rgba(0,0,0,0.45)",
-          pointerEvents: "auto",
-        }}
+      {/* Close button */}
+      <ActionIcon
+        size="xs"
+        variant="subtle"
+        onClick={onClose}
+        style={{ position: "absolute", top: 6, right: 6 }}
+        title="Close"
       >
-        <Group justify="space-between" align="center" mb={6}>
-          <Group gap={4}>
-            <Badge size="xs" color="blue" variant="filled">Exon {exonIdx + 1}</Badge>
-            {isNonCoding && <Badge size="xs" color="gray" variant="light">Non-coding</Badge>}
-          </Group>
-          <Text size="xs" c="#9ca3af" ff="monospace">{absLen.toLocaleString()} bp</Text>
+        <IconX size={11} />
+      </ActionIcon>
+
+      <Group justify="space-between" align="center" mb={6}>
+        <Group gap={4}>
+          <Badge size="xs" color="blue" variant="filled">Exon {exonIdx + 1}</Badge>
+          {isNonCoding && <Badge size="xs" color="gray" variant="light">Non-coding</Badge>}
         </Group>
+        <Text size="xs" c="#9ca3af" ff="monospace">{absLen.toLocaleString()} bp</Text>
+      </Group>
         <Text size="xs" c="white" ff="monospace" mb={4}>
           {absStart.toLocaleString()} — {absEnd.toLocaleString()}
         </Text>
@@ -667,6 +660,12 @@ export default function GeneStructurePlot({
     y: number;
   } | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const ZOOM_MIN = 0.3;
+  const ZOOM_MAX = 5;
+  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, parseFloat((z * 1.3).toFixed(2))));
+  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, parseFloat((z / 1.3).toFixed(2))));
+  const zoomReset = () => setZoom(1);
 
   const processed = useMemo(() => transcripts.map(processTranscript), [transcripts]);
   const defaultPt = useMemo(() => pickDefault(processed), [processed]);
@@ -698,6 +697,8 @@ export default function GeneStructurePlot({
 
   const svgWidth = LABEL_W + SUMMARY_W + 820;
   const svgHeight = HEADER_H + RULER_H + displayTracks.length * TRACK_FULL_H;
+  const scaledWidth = svgWidth * zoom;
+  const scaledHeight = svgHeight * zoom;
 
   // ── Export PNG ──
   const exportPng = useCallback(() => {
@@ -765,6 +766,24 @@ export default function GeneStructurePlot({
           )}
         </Group>
         <Group gap={4}>
+          <Tooltip label="Zoom out">
+            <ActionIcon size="sm" variant="subtle" onClick={zoomOut}>
+              <IconZoomOut size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Text size="xs" ff="monospace" c="dimmed" w={36} ta="center">
+            {Math.round(zoom * 100)}%
+          </Text>
+          <Tooltip label="Zoom in">
+            <ActionIcon size="sm" variant="subtle" onClick={zoomIn}>
+              <IconZoomIn size={14} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Reset zoom">
+            <ActionIcon size="sm" variant="subtle" onClick={zoomReset}>
+              <IconZoomOut size={12} style={{ transform: "rotate(180deg)" }} />
+            </ActionIcon>
+          </Tooltip>
           <Tooltip label="Export PNG">
             <ActionIcon size="sm" variant="subtle" onClick={exportPng}>
               <IconDownload size={14} />
@@ -785,26 +804,25 @@ export default function GeneStructurePlot({
       {/* ── Legend ── */}
       <Legend />
 
-      {/* ── Plot ── */}
+      {/* ── Plot — no border box, freely positioned ── */}
       <Box
         ref={containerRef}
         style={{
-          border: "1px solid #e0e0e0",
-          borderRadius: 8,
           overflow: "visible",
           background: C.bg,
           position: "relative",
+          width: scaledWidth,
+          maxWidth: "100%",
         }}
       >
         <svg
           className="gene-structure-svg"
-          width="100%"
-          height={svgHeight}
+          width={scaledWidth}
+          height={scaledHeight}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ display: "block", position: "relative", zIndex: 1 }}
+          style={{ display: "block", overflow: "visible" }}
           onClick={(e) => {
             const target = e.target as SVGElement;
-            // Close tooltip when clicking SVG background (not a rect/cds/utr which have their own handlers)
             if (target.tagName === "svg") {
               setClickedExon(null);
             }
@@ -883,15 +901,17 @@ export default function GeneStructurePlot({
           )}
         </svg>
 
-        {/* Click-triggered exon tooltip — positioned outside SVG */}
+        {/* Click-triggered exon tooltip — floats outside SVG */}
         {clickedExon && (
-          <ExonTooltipCard
-            region={clickedExon.region}
-            exonIdx={clickedExon.exonIdx}
-            txStart={activePt.txStart}
-            strand={activePt.strand}
-            containerEl={containerRef.current}
-          />
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
+            <ExonTooltipCard
+              region={clickedExon.region}
+              exonIdx={clickedExon.exonIdx}
+              txStart={activePt.txStart}
+              strand={activePt.strand}
+              onClose={() => setClickedExon(null)}
+            />
+          </div>
         )}
       </Box>
 
