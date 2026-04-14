@@ -717,6 +717,13 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
           height={svgH}
           style={{ display: "block" }}
         >
+          <defs>
+            {/* Clip to track area so exons never overflow left/right */}
+            <clipPath id="track-clip">
+              <rect x={LABEL_W} y={HEADER_H + RULER_H} width={SVG_W - LABEL_W - SUMMARY_W} height={svgH - HEADER_H - RULER_H} />
+            </clipPath>
+          </defs>
+
           {/* Background — close tooltip on click */}
           <rect x={0} y={0} width={SVG_W} height={svgH} fill="transparent"
             onClick={() => setActiveExon(null)} />
@@ -729,6 +736,8 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
 
           <RulerSvg startBp={startBp} spanBp={spanBp} />
 
+          {/* All tracks clipped to track area — prevents exon overflow */}
+          <g clipPath="url(#track-clip)">
           {displayTracks.map((pt, trackIndex) => (
             <g key={pt.tx.transcript_id}
               onMouseEnter={() => setHoveredTxId(pt.tx.transcript_id)}
@@ -746,6 +755,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
               />
             </g>
           ))}
+          </g>
 
           {/* Fold row */}
           {extraCount > 0 && (
