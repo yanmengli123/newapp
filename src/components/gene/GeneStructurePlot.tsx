@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { Box, Stack, Group, Text, Badge, ActionIcon, Paper } from "@mantine/core";
+import { Box, Stack, Group, Text, Badge, ActionIcon, Paper, Select } from "@mantine/core";
 import { IconDownload, IconExternalLink, IconZoomIn, IconZoomOut, IconFocus2 } from "@tabler/icons-react";
 import type { TranscriptResult } from "../../lib/geneApi";
 
@@ -521,9 +521,10 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     });
   }, [processed]);
 
-  const FOLD_THRESHOLD = 8;
-  const extraCount = sorted.length - FOLD_THRESHOLD;
-  const displayTracks = (expanded || extraCount <= 0) ? sorted : sorted.slice(0, FOLD_THRESHOLD);
+  // Always show only the selected transcript (single-track view)
+  const displayTracks = useMemo(() => {
+    return sorted.filter((pt) => pt.tx.transcript_id === (selectedTxId ?? defaultPt.tx.transcript_id));
+  }, [sorted, selectedTxId, defaultPt]);
 
   // ── Viewport state ─────────────────────────────────────────────────────────
   const [viewport, setViewport] = useState<{ startBp: number; endBp: number }>({
@@ -689,12 +690,18 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
       <Group justify="space-between" align="center">
         <Group gap="xs">
           <Text size="xs" fw={600} c="dimmed">Gene Structure — {geneSymbol ?? "Unknown"}</Text>
-          <Badge size="xs" variant="light" color="gray">{processed.length} transcript{processed.length !== 1 ? "s" : ""}</Badge>
-          {activePt.tx.seqid && (
-            <Badge size="xs" variant="light" color="gray">
-              {activePt.tx.seqid.startsWith("chr") ? activePt.tx.seqid : (NC_TO_CHR.find(([k]) => k === activePt.tx.seqid)?.[1] ?? activePt.tx.seqid)}
-            </Badge>
-          )}
+          <Select
+            size="xs"
+            w={240}
+            value={selectedTxId ?? defaultPt.tx.transcript_id}
+            onChange={(val) => { setSelectedTxId(val); setActiveExon(null); }}
+            data={sorted.map((pt) => ({
+              value: pt.tx.transcript_id,
+              label: `${pt.tx.transcript_acc || pt.tx.transcript_id} (${pt.relativeExons.length}E, ${formatBp(pt.totalLength)})`,
+            }))}
+            styles={{ input: { fontFamily: "monospace", fontSize: 11 } }}
+          />
+          <Badge size="xs" variant="light" color="gray">{processed.length} total</Badge>
         </Group>
 
         {/* Toolbar */}
