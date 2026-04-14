@@ -11,6 +11,7 @@ import {
   Divider,
   Button,
   Accordion,
+  Tooltip,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -22,6 +23,7 @@ import {
   IconSquare,
   IconDna2,
   IconApi,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import type {
   GenePageResponse,
@@ -32,6 +34,27 @@ import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
 import ExpressionSection from "../components/expression/ExpressionSection";
 import GeneStructurePlot from "../components/gene/GeneStructurePlot";
+
+// NC_ accession → chr ID (same mapping as JBrowsePage)
+const NC_TO_CHR: [string, string][] = [
+  ["NC_006088.5", "chr1"], ["NC_006089.5", "chr2"], ["NC_006090.5", "chr3"],
+  ["NC_006091.5", "chr4"], ["NC_006092.5", "chr5"], ["NC_006093.5", "chr6"],
+  ["NC_006094.5", "chr7"], ["NC_006095.5", "chr8"], ["NC_006096.5", "chr9"],
+  ["NC_006097.5", "chr10"], ["NC_006098.5", "chr11"], ["NC_006099.5", "chr12"],
+  ["NC_006100.5", "chr13"], ["NC_006101.5", "chr14"], ["NC_006102.5", "chr15"],
+  ["NC_006103.5", "chr16"], ["NC_006104.5", "chr17"], ["NC_006105.5", "chr18"],
+  ["NC_006106.5", "chr19"], ["NC_006107.5", "chr20"], ["NC_006108.5", "chr21"],
+  ["NC_006109.5", "chr22"], ["NC_006110.5", "chr23"], ["NC_006111.5", "chr24"],
+  ["NC_006112.4", "chr25"], ["NC_006113.5", "chr26"], ["NC_006114.5", "chr27"],
+  ["NC_006115.5", "chr28"], ["NC_008465.4", "chr29"], ["NC_028739.2", "chr30"],
+  ["NC_028740.2", "chr31"], ["NC_006119.4", "chr32"], ["NC_006126.5", "chrW"],
+  ["NC_006127.5", "chrZ"], ["NC_040902.1", "chrMT"],
+];
+
+function toChrId(seqid: string): string {
+  if (seqid.startsWith("chr")) return seqid;
+  return NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid;
+}
 
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
@@ -683,6 +706,14 @@ export default function GenePage() {
                         <Group gap="xs">
                           <IconDna2 size={16} />
                           <Title order={5}>Exons ({tx.exon_count})</Title>
+                          <Tooltip
+                            label="Copy a coordinate (e.g. chr1:944136-944228) and paste it into the JBrowse search box at /jbrowse to view the actual sequence."
+                            multiline
+                            w={280}
+                            withArrow
+                          >
+                            <IconInfoCircle size={14} color="var(--mantine-color-dimmed)" style={{ cursor: "pointer" }} />
+                          </Tooltip>
                         </Group>
                         <Button
                           variant="light"
@@ -698,7 +729,7 @@ export default function GenePage() {
                           <Group key={exon.exon_id} justify="space-between">
                             <Text size="xs">Exon {idx + 1}</Text>
                             <Text size="xs" c="dimmed">
-                              {exon.seqid}:{exon.start.toLocaleString()}-{exon.end.toLocaleString()} ({exon.length.toLocaleString()} bp)
+                              {toChrId(exon.seqid)}:{exon.start.toLocaleString()}-{exon.end.toLocaleString()} ({exon.length.toLocaleString()} bp)
                             </Text>
                           </Group>
                         ))}
@@ -713,6 +744,14 @@ export default function GenePage() {
                         <Group gap="xs">
                           <IconCode size={16} />
                           <Title order={5}>CDS Segments ({tx.cds_segment_count})</Title>
+                          <Tooltip
+                            label="Copy a coordinate (e.g. chr1:944136-944228) and paste it into the JBrowse search box at /jbrowse to view the actual sequence."
+                            multiline
+                            w={280}
+                            withArrow
+                          >
+                            <IconInfoCircle size={14} color="var(--mantine-color-dimmed)" style={{ cursor: "pointer" }} />
+                          </Tooltip>
                         </Group>
                         <Button
                           variant="light"
@@ -733,7 +772,7 @@ export default function GenePage() {
                               )}
                             </Group>
                             <Text size="xs" c="dimmed">
-                              {cds.seqid}:{cds.start.toLocaleString()}-{cds.end.toLocaleString()} (phase: {cds.phase})
+                              {toChrId(cds.seqid)}:{cds.start.toLocaleString()}-{cds.end.toLocaleString()} (phase: {cds.phase})
                             </Text>
                           </Group>
                         ))}
