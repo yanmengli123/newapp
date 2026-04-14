@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { Box, Stack, Group, Text, Badge, ActionIcon, Paper, Select } from "@mantine/core";
 import { IconDownload, IconExternalLink, IconZoomIn, IconZoomOut, IconFocus2 } from "@tabler/icons-react";
@@ -147,10 +147,8 @@ function bpToX(bp: number, startBp: number, spanBp: number): number {
 
 // ── Ruler ─────────────────────────────────────────────────────────────────────
 function RulerSvg({ startBp, spanBp }: { startBp: number; spanBp: number }) {
-  const innerW = SVG_W - LABEL_W - SUMMARY_W;
-
   // Adaptive tick: aim for 5-7 major ticks across the viewport
-  let rawInterval = spanBp / 6;
+  const rawInterval = spanBp / 6;
   let interval = 1;
   const candidates = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000];
   for (const c of candidates) {
@@ -491,7 +489,6 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
   const [activeExon, setActiveExon] = useState<{
     exonIdx: number; region: ExonRegion; anchorRect: DOMRect;
   } | null>(null);
-  const [hoveredExon, setHoveredExon] = useState<{ transcriptId: string; exonIdx: number } | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [dragState, setDragState] = useState<{
     active: boolean; startClientX: number;
@@ -533,11 +530,6 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     endBp: totalLen,
   });
 
-  // Reset viewport when active transcript changes
-  useEffect(() => {
-    setViewport({ startBp: 0, endBp: totalLen });
-  }, [activePt.tx.transcript_id, totalLen]);
-
   const startBp = viewport.startBp;
   const spanBp = viewport.endBp - viewport.startBp;
   const innerW = SVG_W - LABEL_W - SUMMARY_W;
@@ -577,6 +569,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
 
   const fitToGene = useCallback(() => {
     setViewport({ startBp: 0, endBp: totalLen });
+    setActiveExon(null);
   }, [totalLen]);
 
   // ── Drag-to-pan ────────────────────────────────────────────────────────────
@@ -631,16 +624,6 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [zoomAt]);
-
-  // Close tooltip on viewport change
-  const prevViewport = useRef(viewport);
-  useEffect(() => {
-    const same =
-      Math.abs(prevViewport.current.startBp - viewport.startBp) < 0.5 &&
-      Math.abs(prevViewport.current.endBp - viewport.endBp) < 0.5;
-    if (!same) setActiveExon(null);
-    prevViewport.current = viewport;
-  }, [viewport]);
 
   // ── PNG export ─────────────────────────────────────────────────────────────
   const exportPng = useCallback(() => {
@@ -698,10 +681,12 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
             onChange={(val) => {
               if (val === "__all__") {
                 setShowAll(true);
+                setViewport({ startBp: 0, endBp: totalLen });
               } else {
                 setShowAll(false);
                 setSelectedTxId(val);
                 setActiveExon(null);
+                setViewport({ startBp: 0, endBp: totalLen });
               }
             }}
             data={[
@@ -760,7 +745,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
             data-bg="true" onClick={() => setActiveExon(null)} />
 
           <GeneHeaderBar
-            geneSymbol={geneSymbol} seqid={activePt.tx.seqid || ""}
+            geneSymbol={geneSymbol}
             strand={activePt.strand}
             startBp={startBp} spanBp={spanBp} trackCount={processed.length}
           />

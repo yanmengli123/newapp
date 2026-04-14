@@ -73,7 +73,16 @@ export default function JBrowseGenePage() {
     const timer = setTimeout(() => {
       try {
         viewState.session.view.navToLocString(geneLoc);
-        viewState.session.view.setHighlight(geneLoc);
+        const locMatch = geneLoc.match(/^(.+?):(\d+)\.\.(\d+)$/);
+        if (locMatch) {
+          const [, refName, startStr, endStr] = locMatch;
+          viewState.session.view.setHighlight([{
+            refName,
+            start: parseInt(startStr, 10),
+            end: parseInt(endStr, 10),
+            assemblyName: "GRCg6a",
+          }]);
+        }
       } catch {
         // ignore if view not ready
       }

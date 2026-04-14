@@ -136,7 +136,17 @@ export default function JBrowsePage() {
     const timer = setTimeout(() => {
       try {
         viewState.session.view.navToLocString(geneLoc);
-        viewState.session.view.setHighlight(geneLoc);
+        // Parse geneLoc like "chr1:123..456" for setHighlight
+        const locMatch = geneLoc.match(/^(.+?):(\d+)\.\.(\d+)$/);
+        if (locMatch) {
+          const [, refName, startStr, endStr] = locMatch;
+          viewState.session.view.setHighlight([{
+            refName,
+            start: parseInt(startStr, 10),
+            end: parseInt(endStr, 10),
+            assemblyName: "GRCg6a",
+          }]);
+        }
       } catch {
         // ignore if view not ready
       }

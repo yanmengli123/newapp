@@ -13,7 +13,6 @@ import {
   Accordion,
   Tooltip,
   Tabs,
-  CopyButton,
   ActionIcon,
   Alert,
 } from "@mantine/core";
@@ -60,11 +59,6 @@ const NC_TO_CHR: [string, string][] = [
 function toChrId(seqid: string): string {
   if (seqid.startsWith("chr")) return seqid;
   return NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid;
-}
-
-function toNcAcc(chrId: string): string {
-  if (chrId.startsWith("NC_")) return chrId;
-  return NC_TO_CHR.find(([, v]) => v === chrId)?.[0] ?? chrId;
 }
 
 // ── Protein structure access panel ─────────────────────────────────────────────
@@ -423,48 +417,6 @@ export default function GenePage() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `${transcript.transcript_acc || transcript.transcript_id}_cds.fa`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [data]);
-
-  // Download all Proteins as FASTA (with actual sequences when available)
-  const downloadProteinsFasta = useCallback((transcript: TranscriptResult) => {
-    if (!transcript || !data) return;
-
-    const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
-    let fastaContent = '';
-
-    // Add header note
-    fastaContent += `# Proteins for transcript: ${transcript.transcript_acc || transcript.transcript_id}\n`;
-    fastaContent += `# Gene: ${geneSymbol}\n`;
-    fastaContent += `#\n`;
-
-    if (transcript.proteins.length === 0) {
-      fastaContent += `# No proteins available for this transcript\n`;
-    }
-
-    transcript.proteins.forEach((protein) => {
-      const protId = protein.protein_id;
-      const desc = `gene=${geneSymbol} protein_length=${protein.protein_length || 'N/A'}aa cds_length=${protein.cds_length || 'N/A'}bp`;
-      fastaContent += `>${protId} ${desc}\n`;
-      if (protein.protein_description) {
-        fastaContent += `# Description: ${protein.protein_description}\n`;
-      }
-      if (protein.protein_sequence) {
-        const seq = protein.protein_sequence;
-        fastaContent += `${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
-      } else {
-        fastaContent += `# Protein sequence not available\n`;
-      }
-    });
-
-    const blob = new Blob([fastaContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${transcript.transcript_acc || transcript.transcript_id}_proteins.fa`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -1160,7 +1112,7 @@ export default function GenePage() {
                                         Protein Sequence ({protein.protein_length} aa)
                                       </Accordion.Control>
                                       <Accordion.Panel>
-                                        <Tabs defaultValue="seq" variant="pills" size="xs">
+                                        <Tabs defaultValue="seq" variant="pills">
                                           <Tabs.List>
                                             <Tabs.Tab value="seq">Pure Sequence</Tabs.Tab>
                                             <Tabs.Tab value="fasta">FASTA</Tabs.Tab>
@@ -1204,7 +1156,7 @@ export default function GenePage() {
                                                 onClick={() => {
                                                   const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
                                                   const seq = protein.protein_sequence;
-                                                  const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
+                                                  const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq ? (seq.match(/.{1,60}/g)?.join("\n") || seq) : ""}\n`;
                                                   const blob = new Blob([fasta], { type: "text/plain" });
                                                   const url = URL.createObjectURL(blob);
                                                   const a = document.createElement("a");
@@ -1229,7 +1181,7 @@ export default function GenePage() {
                                     proteinId={protein.protein_id}
                                     proteinSequence={protein.protein_sequence}
                                     geneSymbol={data.gene.gene_symbol || data.gene.gene_id}
-                                    transcriptAcc={tx.transcript_accession}
+                                    transcriptAcc={tx.transcript_acc}
                                     proteinLength={protein.protein_length}
                                   />
                                 </>
