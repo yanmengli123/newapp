@@ -729,6 +729,58 @@ def search_genes(request: Request, q: str = Query(..., min_length=1), limit: int
     return {"q": q, "total": len(results), "items": results[:limit]}
 
 
+@app.get("/genes/genomic")
+def get_genomic_sequence(
+    loc: str = Query(..., description="Genomic region, e.g. chr1:944136-944228"),
+):
+    """
+    Fetch genomic DNA sequence for a region.
+    Accepts chr ID (e.g. chr1) and converts to NC_ accession internally.
+    """
+    import re
+    # Parse chr:start-end
+    match = re.match(r"^(chr[\w]+|NC_[0-9.]+):(\d+)-(\d+)$", loc)
+    if not match:
+        raise HTTPException(status_code=400, detail=f"Invalid loc format: {loc!r}. Expected chr1:100-200")
+
+    refname, start_str, end_str = match.groups()
+    start = int(start_str)
+    end = int(end_str)
+    if start < 1 or end < start:
+        raise HTTPException(status_code=400, detail="Invalid coordinates")
+    if end - start + 1 > 1_000_000:
+        raise HTTPException(status_code=400, detail="Region too large (max 1 Mb)")
+
+    # Resolve NC_ accession
+    global _CHR_NC_MAP
+    chr_nc = _get_faidx()
+    if refname.startswith("NC_"):
+        nc_acc = refname
+    elif refname.startswith("chr"):
+        if not _CHR_NC_MAP:
+            _CHR_NC_MAP = _load_chr_nc_map()
+        nc_acc = _CHR_NC_MAP.get(refname)
+        if not nc_acc:
+            raise HTTPException(status_code=400, detail=f"Unknown chr ID: {refname}")
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid refname: {refname}")
+
+    try:
+        seq = chr_nc.fetch(nc_acc, start, end)
+        sequence = str(seq)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Sequence fetch failed: {e}")
+
+    return {
+        "seqid": refname,
+        "nc_accession": nc_acc,
+        "start": start,
+        "end": end,
+        "length": end - start + 1,
+        "seq": sequence,
+    }
+
+
 @app.get("/genes/{gene_id}")
 def get_gene(gene_id: str, request: Request, include_sequences: bool = Query(default=False)):
     state = get_state(request)
@@ -817,58 +869,6 @@ def _get_faidx() -> pyfaidx.Faidx:
             raise RuntimeError(f"Reference genome FASTA not found in {RAWDATA_ROOT.parent}")
         _FAIDX = pyfaidx.Faidx(str(_FASTA_PATH))
     return _FAIDX
-
-
-@app.get("/genes/genomic")
-def get_genomic_sequence(
-    loc: str = Query(..., description="Genomic region, e.g. chr1:944136-944228"),
-):
-    """
-    Fetch genomic DNA sequence for a region.
-    Accepts chr ID (e.g. chr1) and converts to NC_ accession internally.
-    """
-    import re
-    # Parse chr:start-end
-    match = re.match(r"^(chr[\w]+|NC_[0-9.]+):(\d+)-(\d+)$", loc)
-    if not match:
-        raise HTTPException(status_code=400, detail=f"Invalid loc format: {loc!r}. Expected chr1:100-200")
-
-    refname, start_str, end_str = match.groups()
-    start = int(start_str)
-    end = int(end_str)
-    if start < 1 or end < start:
-        raise HTTPException(status_code=400, detail="Invalid coordinates")
-    if end - start + 1 > 1_000_000:
-        raise HTTPException(status_code=400, detail="Region too large (max 1 Mb)")
-
-    # Resolve NC_ accession
-    global _CHR_NC_MAP
-    chr_nc = _get_faidx()
-    if refname.startswith("NC_"):
-        nc_acc = refname
-    elif refname.startswith("chr"):
-        if not _CHR_NC_MAP:
-            _CHR_NC_MAP = _load_chr_nc_map()
-        nc_acc = _CHR_NC_MAP.get(refname)
-        if not nc_acc:
-            raise HTTPException(status_code=400, detail=f"Unknown chr ID: {refname}")
-    else:
-        raise HTTPException(status_code=400, detail=f"Invalid refname: {refname}")
-
-    try:
-        seq = chr_nc.fetch(nc_acc, start, end)
-        sequence = str(seq)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Sequence fetch failed: {e}")
-
-    return {
-        "seqid": refname,
-        "nc_accession": nc_acc,
-        "start": start,
-        "end": end,
-        "length": end - start + 1,
-        "seq": sequence,
-    }
 
 
 @app.get("/datasets")
