@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { Box, Stack, Group, Text, Badge, ActionIcon, Tooltip, Paper } from "@mantine/core";
 import { IconDownload, IconExternalLink } from "@tabler/icons-react";
 import type { TranscriptResult } from "../../lib/geneApi";
