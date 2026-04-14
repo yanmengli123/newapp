@@ -56,6 +56,30 @@ function toChrId(seqid: string): string {
   return NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid;
 }
 
+function toNcAcc(chrId: string): string {
+  if (chrId.startsWith("NC_")) return chrId;
+  return NC_TO_CHR.find(([, v]) => v === chrId)?.[0] ?? chrId;
+}
+
+interface GenomicRegionResult {
+  seqid: string;
+  nc_accession: string;
+  start: number;
+  end: number;
+  length: number;
+  seq: string;
+}
+
+async function fetchGenomicSeq(loc: string): Promise<GenomicRegionResult> {
+  const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  const res = await fetch(`${base}/genes/genomic?loc=${encodeURIComponent(loc)}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Failed to fetch sequence");
+  }
+  return res.json();
+}
+
 export default function GenePage() {
   const { geneId } = useParams<{ geneId: string }>();
   const [data, setData] = useState<GenePageResponse | null>(null);
@@ -64,6 +88,10 @@ export default function GenePage() {
   const [loading, setLoading] = useState(true);
   const [downloadingFasta, setDownloadingFasta] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [exonSeqs, setExonSeqs] = useState<Record<string, GenomicRegionResult[]>>({});
+  const [cdsSeqs, setCdsSeqs] = useState<Record<string, GenomicRegionResult[]>>({});
+  const [fetchingExons, setFetchingExons] = useState<Record<string, boolean>>({});
+  const [fetchingCds, setFetchingCds] = useState<Record<string, boolean>>({});
 
   // ========== Layer 1: Load main page data (no sequences) ==========
   useEffect(() => {
@@ -278,6 +306,55 @@ export default function GenePage() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [data]);
+
+  // Fetch all exon genomic sequences
+  const fetchExonSequences = useCallback(async (tx: TranscriptResult) => {
+    if (!tx.exons.length) return;
+    setFetchingExons(prev => ({ ...prev, [tx.transcript_id]: true }));
+    try {
+      const results = await Promise.all(
+        tx.exons.map(exon => {
+          const loc = `${toChrId(exon.seqid)}:${exon.start}-${exon.end}`;
+          return fetchGenomicSeq(loc);
+        })
+      );
+      setExonSeqs(prev => ({ ...prev, [tx.transcript_id]: results }));
+    } finally {
+      setFetchingExons(prev => ({ ...prev, [tx.transcript_id]: false }));
+    }
+  }, []);
+
+  // Fetch all CDS genomic sequences
+  const fetchCdsSequences = useCallback(async (tx: TranscriptResult) => {
+    if (!tx.cds_segments.length) return;
+    setFetchingCds(prev => ({ ...prev, [tx.transcript_id]: true }));
+    try {
+      const results = await Promise.all(
+        tx.cds_segments.map(cds => {
+          const loc = `${toChrId(cds.seqid)}:${cds.start}-${cds.end}`;
+          return fetchGenomicSeq(loc);
+        })
+      );
+      setCdsSeqs(prev => ({ ...prev, [tx.transcript_id]: results }));
+    } finally {
+      setFetchingCds(prev => ({ ...prev, [tx.transcript_id]: false }));
+    }
+  }, []);
+
+  // Download a single genomic region as FASTA
+  const downloadGenomicRegion = (region: GenomicRegionResult, label: string) => {
+    const geneSymbol = data?.gene.gene_symbol || data?.gene.gene_id || "";
+    const fasta = `>${region.seqid}:${region.start}-${region.end} gene=${geneSymbol} length=${region.length}bp\n${region.seq.match(/.{1,60}/g)?.join("\n") || region.seq}\n`;
+    const blob = new Blob([fasta], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${label}_${region.seqid}_${region.start}-${region.end}.fa`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   if (loading) {
     return (
@@ -723,6 +800,16 @@ export default function GenePage() {
                         >
                           Export Locs
                         </Button>
+                        <Button
+                          variant="light"
+                          size="xs"
+                          color="teal"
+                          leftSection={fetchingExons[tx.transcript_id] ? <Loader size={12} /> : <IconDna2 size={14} />}
+                          onClick={() => fetchExonSequences(tx)}
+                          disabled={fetchingExons[tx.transcript_id]}
+                        >
+                          {fetchingExons[tx.transcript_id] ? "Fetching..." : "Fetch Sequences"}
+                        </Button>
                       </Group>
                       <Stack gap="xs">
                         {tx.exons.map((exon, idx) => (
@@ -734,6 +821,43 @@ export default function GenePage() {
                           </Group>
                         ))}
                       </Stack>
+                      {/* Fetched exon sequences */}
+                      {exonSeqs[tx.transcript_id] && (
+                        <Accordion variant="contained" radius="md" mt="xs">
+                          <Accordion.Item value="exon-seqs">
+                            <Accordion.Control icon={<IconDna2 size={14} />}>
+                              Exon Sequences ({exonSeqs[tx.transcript_id].length})
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                              <Stack gap="xs">
+                                {exonSeqs[tx.transcript_id].map((seq, idx) => (
+                                  <Card key={idx} withBorder padding="xs" radius="sm">
+                                    <Group justify="space-between" mb="xs">
+                                      <Text size="xs" fw={500}>Exon {idx + 1}</Text>
+                                      <Button
+                                        size="xs"
+                                        variant="subtle"
+                                        leftSection={<IconDownload size={11} />}
+                                        onClick={() => downloadGenomicRegion(seq, `exon${idx + 1}`)}
+                                      >
+                                        Download
+                                      </Button>
+                                    </Group>
+                                    <Paper withBorder p="xs" radius="sm" bg="gray.0" style={{ maxHeight: 100, overflow: "auto" }}>
+                                      <Text size="xs" ff="monospace" style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
+                                        {seq.seq}
+                                      </Text>
+                                    </Paper>
+                                    <Text size="xs" c="dimmed" mt={4}>
+                                      {seq.seqid}:{seq.start.toLocaleString()}-{seq.end.toLocaleString()} · {seq.length.toLocaleString()} bp
+                                    </Text>
+                                  </Card>
+                                ))}
+                              </Stack>
+                            </Accordion.Panel>
+                          </Accordion.Item>
+                        </Accordion>
+                      )}
                     </Box>
 
                     <Divider />
@@ -761,6 +885,16 @@ export default function GenePage() {
                         >
                           Export Locs
                         </Button>
+                        <Button
+                          variant="light"
+                          size="xs"
+                          color="teal"
+                          leftSection={fetchingCds[tx.transcript_id] ? <Loader size={12} /> : <IconCode size={14} />}
+                          onClick={() => fetchCdsSequences(tx)}
+                          disabled={fetchingCds[tx.transcript_id]}
+                        >
+                          {fetchingCds[tx.transcript_id] ? "Fetching..." : "Fetch Sequences"}
+                        </Button>
                       </Group>
                       <Stack gap="xs">
                         {tx.cds_segments.map((cds, idx) => (
@@ -777,6 +911,48 @@ export default function GenePage() {
                           </Group>
                         ))}
                       </Stack>
+                      {/* Fetched CDS sequences */}
+                      {cdsSeqs[tx.transcript_id] && (
+                        <Accordion variant="contained" radius="md" mt="xs">
+                          <Accordion.Item value="cds-seqs">
+                            <Accordion.Control icon={<IconCode size={14} />}>
+                              CDS Sequences ({cdsSeqs[tx.transcript_id].length})
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                              <Stack gap="xs">
+                                {cdsSeqs[tx.transcript_id].map((seq, idx) => (
+                                  <Card key={idx} withBorder padding="xs" radius="sm">
+                                    <Group justify="space-between" mb="xs">
+                                      <Group gap="xs">
+                                        <Text size="xs" fw={500}>CDS {idx + 1}</Text>
+                                        {tx.cds_segments[idx]?.protein_id && (
+                                          <Badge size="xs" variant="light">{tx.cds_segments[idx].protein_id}</Badge>
+                                        )}
+                                      </Group>
+                                      <Button
+                                        size="xs"
+                                        variant="subtle"
+                                        leftSection={<IconDownload size={11} />}
+                                        onClick={() => downloadGenomicRegion(seq, `cds${idx + 1}`)}
+                                      >
+                                        Download
+                                      </Button>
+                                    </Group>
+                                    <Paper withBorder p="xs" radius="sm" bg="gray.0" style={{ maxHeight: 100, overflow: "auto" }}>
+                                      <Text size="xs" ff="monospace" style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
+                                        {seq.seq}
+                                      </Text>
+                                    </Paper>
+                                    <Text size="xs" c="dimmed" mt={4}>
+                                      {seq.seqid}:{seq.start.toLocaleString()}-{seq.end.toLocaleString()} · {seq.length.toLocaleString()} bp · phase: {tx.cds_segments[idx]?.phase}
+                                    </Text>
+                                  </Card>
+                                ))}
+                              </Stack>
+                            </Accordion.Panel>
+                          </Accordion.Item>
+                        </Accordion>
+                      )}
                     </Box>
 
                     <Divider />

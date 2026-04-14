@@ -18,6 +18,7 @@ import psycopg2.pool
 from urllib.parse import unquote
 
 import gffutils
+import pyfaidx
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -760,6 +761,114 @@ def get_gene_sequences(gene_id: str, request: Request):
             "proteins": tx_payload["proteins"],
         })
     return {"gene_id": gene.id, "transcript_sequences": items}
+
+
+# ─────────────────────────────────────────────
+# NC_ accession ↔ chr ID mapping (from aliases.txt)
+# ─────────────────────────────────────────────
+def _load_chr_nc_map() -> dict[str, str]:
+    aliases_path = RAWDATA_ROOT.parent / "aliases.txt"
+    if not aliases_path.exists():
+        # Fallback hardcoded mapping (35 main chromosomes)
+        return {
+            "chr1": "NC_006088.5", "chr2": "NC_006089.5", "chr3": "NC_006090.5",
+            "chr4": "NC_006091.5", "chr5": "NC_006092.5", "chr6": "NC_006093.5",
+            "chr7": "NC_006094.5", "chr8": "NC_006095.5", "chr9": "NC_006096.5",
+            "chr10": "NC_006097.5", "chr11": "NC_006098.5", "chr12": "NC_006099.5",
+            "chr13": "NC_006100.5", "chr14": "NC_006101.5", "chr15": "NC_006102.5",
+            "chr16": "NC_006103.5", "chr17": "NC_006104.5", "chr18": "NC_006105.5",
+            "chr19": "NC_006107.5", "chr20": "NC_006107.5", "chr21": "NC_006108.5",
+            "chr22": "NC_006109.5", "chr23": "NC_006110.5", "chr24": "NC_006111.5",
+            "chr25": "NC_006112.4", "chr26": "NC_006113.5", "chr27": "NC_006114.5",
+            "chr28": "NC_006115.5", "chr29": "NC_008465.4", "chr30": "NC_028739.2",
+            "chr31": "NC_028740.2", "chr32": "NC_006119.4",
+            "chrW": "NC_006126.5", "chrZ": "NC_006127.5", "chrMT": "NC_040902.1",
+        }
+    chr_to_nc: dict[str, str] = {}
+    with open(aliases_path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 2:
+                chr_to_nc[parts[0]] = parts[1]
+    return chr_to_nc
+
+
+_CHR_NC_MAP: dict[str, str] = {}
+_FASTA_PATH: Path | None = None
+_FAIDX: pyfaidx.Faidx | None = None
+
+
+def _get_faidx() -> pyfaidx.Faidx:
+    global _FAIDX, _FASTA_PATH, _CHR_NC_MAP
+    if _FAIDX is None:
+        _CHR_NC_MAP = _load_chr_nc_map()
+        candidates = [
+            RAWDATA_ROOT.parent / "GCF_000002315.6_GRCg6a_genomic.chr.fna",
+            RAWDATA_ROOT.parent / "GCF_000002315.6_GRCg6a_genomic.fna",
+        ]
+        for p in candidates:
+            if p.exists():
+                _FASTA_PATH = p
+                break
+        if _FASTA_PATH is None:
+            raise RuntimeError(f"Reference genome FASTA not found in {RAWDATA_ROOT.parent}")
+        _FAIDX = pyfaidx.Faidx(str(_FASTA_PATH))
+    return _FAIDX
+
+
+@app.get("/genes/genomic")
+def get_genomic_sequence(
+    loc: str = Query(..., description="Genomic region, e.g. chr1:944136-944228"),
+):
+    """
+    Fetch genomic DNA sequence for a region.
+    Accepts chr ID (e.g. chr1) and converts to NC_ accession internally.
+    """
+    import re
+    # Parse chr:start-end
+    match = re.match(r"^(chr[\w]+|NC_[0-9.]+):(\d+)-(\d+)$", loc)
+    if not match:
+        raise HTTPException(status_code=400, detail=f"Invalid loc format: {loc!r}. Expected chr1:100-200")
+
+    refname, start_str, end_str = match.groups()
+    start = int(start_str)
+    end = int(end_str)
+    if start < 1 or end < start:
+        raise HTTPException(status_code=400, detail="Invalid coordinates")
+    if end - start + 1 > 1_000_000:
+        raise HTTPException(status_code=400, detail="Region too large (max 1 Mb)")
+
+    # Resolve NC_ accession
+    global _CHR_NC_MAP
+    chr_nc = _get_faidx()
+    if refname.startswith("NC_"):
+        nc_acc = refname
+    elif refname.startswith("chr"):
+        if not _CHR_NC_MAP:
+            _CHR_NC_MAP = _load_chr_nc_map()
+        nc_acc = _CHR_NC_MAP.get(refname)
+        if not nc_acc:
+            raise HTTPException(status_code=400, detail=f"Unknown chr ID: {refname}")
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid refname: {refname}")
+
+    try:
+        seq = chr_nc.fetch(nc_acc, start, end)
+        sequence = str(seq)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Sequence fetch failed: {e}")
+
+    return {
+        "seqid": refname,
+        "nc_accession": nc_acc,
+        "start": start,
+        "end": end,
+        "length": end - start + 1,
+        "seq": sequence,
+    }
 
 
 @app.get("/datasets")
