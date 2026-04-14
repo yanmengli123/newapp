@@ -7,8 +7,6 @@ import type { TranscriptResult } from "../../lib/geneApi";
 interface GeneStructurePlotProps {
   transcripts: TranscriptResult[];
   geneSymbol?: string;
-  geneStart?: number;
-  geneEnd?: number;
 }
 
 interface CdsRegion {
@@ -156,7 +154,6 @@ function bpToX(bp: number, startBp: number, spanBp: number): number {
 // ── Ruler ─────────────────────────────────────────────────────────────────────
 function RulerSvg({ startBp, spanBp }: { startBp: number; spanBp: number }) {
   const innerW = SVG_W - LABEL_W - SUMMARY_W;
-  const pxPerBp = innerW / spanBp;
 
   // Adaptive tick interval: aim for ~8 major ticks across the inner width
   let rawInterval = spanBp / 8;
@@ -168,11 +165,8 @@ function RulerSvg({ startBp, spanBp }: { startBp: number; spanBp: number }) {
   }
 
   const ticks: number[] = [];
-  // align first tick to nearest interval below startBp
   const firstTick = Math.floor(startBp / interval) * interval;
   for (let bp = firstTick; bp <= startBp + spanBp + interval; bp += interval) ticks.push(bp);
-
-  const minorInterval = interval / 5;
 
   return (
     <g>
@@ -192,7 +186,7 @@ function RulerSvg({ startBp, spanBp }: { startBp: number; spanBp: number }) {
             {isMajor && (
               <text x={x} y={HEADER_H + RULER_H - 8} textAnchor="middle"
                 fontSize={9} fill={C.rulerText} fontFamily="monospace">
-                {formatBpAbs(bp)}
+                {formatBp(bp)}
               </text>
             )}
           </g>
@@ -205,14 +199,11 @@ function RulerSvg({ startBp, spanBp }: { startBp: number; spanBp: number }) {
 
 // ── Gene Header Bar ────────────────────────────────────────────────────────────
 function GeneHeaderBar({
-  geneSymbol, seqid, geneStart, geneEnd, strand, startBp, spanBp, trackCount,
+  geneSymbol, seqid, strand, startBp, spanBp, trackCount,
 }: {
-  geneSymbol?: string; seqid: string; geneStart?: number; geneEnd?: number;
+  geneSymbol?: string; seqid: string;
   strand: string; startBp: number; spanBp: number; trackCount: number;
 }) {
-  const chrId = seqid.startsWith("chr") ? seqid : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
-  const endBp = startBp + spanBp;
-  const posLabel = `${chrId}:${startBp.toLocaleString()}–${endBp.toLocaleString()}`;
   const arrow = strand === "+" ? "→" : "←";
 
   return (
@@ -226,7 +217,7 @@ function GeneHeaderBar({
         {arrow} {strand === "+" ? "forward" : "reverse"} strand
       </text>
       <text x={SVG_W - SUMMARY_W - 8} y={HEADER_H - 18} fontSize={10} fill={C.textSecondary} fontFamily="monospace" textAnchor="end">
-        {posLabel}
+        {formatBp(startBp)} – {formatBp(startBp + spanBp)}
       </text>
       <text x={SVG_W - SUMMARY_W - 8} y={HEADER_H - 4} fontSize={9} fill={C.textDim} fontFamily="monospace" textAnchor="end">
         Viewport {formatBp(spanBp)} · {trackCount} transcript{trackCount !== 1 ? "s" : ""}
@@ -517,7 +508,7 @@ function Legend() {
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
-export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, geneEnd }: GeneStructurePlotProps) {
+export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStructurePlotProps) {
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
   const [hoveredTxId, setHoveredTxId] = useState<string | null>(null);
   const [activeExon, setActiveExon] = useState<{
@@ -552,12 +543,16 @@ export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, 
   const displayTracks = (expanded || extraCount <= 0) ? sorted : sorted.slice(0, FOLD_THRESHOLD);
 
   // ── Viewport model: startBp / endBp ─────────────────────────────────────────
-  const [viewport, setViewport] = useState<{ startBp: number; endBp: number }>(() => {
-    const start = geneStart ?? activePt.txStart;
-    const end = geneEnd ?? (activePt.txStart + totalLen);
-    const pad = Math.max(Math.floor((end - start) * 0.05), 50);
-    return { startBp: Math.max(1, start - pad), endBp: end + pad };
+  // ── Viewport model: startBp / endBp in transcript-relative coordinates ────────
+  const [viewport, setViewport] = useState<{ startBp: number; endBp: number }>({
+    startBp: 0,
+    endBp: totalLen,
   });
+
+  // Re-init viewport when active transcript changes
+  useEffect(() => {
+    setViewport({ startBp: 0, endBp: totalLen });
+  }, [activePt.tx.transcript_id, totalLen]);
 
   const startBp = viewport.startBp;
   const spanBp = viewport.endBp - viewport.startBp;
@@ -570,7 +565,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, 
       const center = (v.startBp + v.endBp) / 2;
       const halfSpan = (v.endBp - v.startBp) / 2;
       const newHalf = Math.max(50, halfSpan / 1.5);
-      return { startBp: Math.max(1, Math.floor(center - newHalf)), endBp: Math.ceil(center + newHalf) };
+      return { startBp: Math.floor(center - newHalf), endBp: Math.ceil(center + newHalf) };
     });
     setActiveExon(null);
   }, []);
@@ -580,24 +575,14 @@ export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, 
       const center = (v.startBp + v.endBp) / 2;
       const halfSpan = (v.endBp - v.startBp) / 2;
       const newHalf = halfSpan * 1.5;
-      return { startBp: Math.max(1, Math.floor(center - newHalf)), endBp: Math.ceil(center + newHalf) };
+      return { startBp: Math.max(0, Math.floor(center - newHalf)), endBp: Math.ceil(center + newHalf) };
     });
     setActiveExon(null);
   }, []);
 
-  const zoomReset = useCallback(() => {
-    const start = geneStart ?? activePt.txStart;
-    const end = geneEnd ?? (activePt.txStart + totalLen);
-    const pad = Math.max(Math.floor((end - start) * 0.05), 50);
-    setViewport({ startBp: Math.max(1, start - pad), endBp: end + pad });
-  }, [geneStart, geneEnd, activePt]);
-
   const fitToGene = useCallback(() => {
-    const start = geneStart ?? activePt.txStart;
-    const end = geneEnd ?? (activePt.txStart + totalLen);
-    const pad = Math.max(Math.floor((end - start) * 0.05), 50);
-    setViewport({ startBp: Math.max(1, start - pad), endBp: end + pad });
-  }, [geneStart, geneEnd, activePt]);
+    setViewport({ startBp: 0, endBp: totalLen });
+  }, [totalLen]);
 
   // Close tooltip on viewport change
   const prevViewport = useRef(viewport);
@@ -640,8 +625,8 @@ export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, 
   const jbrowseHref = (() => {
     const { seqid } = activePt.tx;
     if (!seqid) return "#";
-    const start = geneStart ?? activePt.tx.start;
-    const end = geneEnd ?? activePt.tx.end;
+    const start = activePt.tx.start;
+    const end = activePt.tx.end;
     const chrId = seqid.startsWith("chr") ? seqid : (NC_TO_CHR.find(([k]) => k === seqid)?.[1] ?? seqid);
     const loc = `${chrId}:${Math.max(1, start)}..${end}`;
     const gs = geneSymbol ? `&geneSymbol=${encodeURIComponent(geneSymbol)}` : "";
@@ -692,7 +677,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol, geneStart, 
 
           <GeneHeaderBar
             geneSymbol={geneSymbol} seqid={activePt.tx.seqid || ""}
-            geneStart={startBp} geneEnd={startBp + spanBp} strand={activePt.strand}
+            strand={activePt.strand}
             startBp={startBp} spanBp={spanBp} trackCount={processed.length}
           />
 
