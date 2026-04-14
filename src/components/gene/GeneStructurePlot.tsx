@@ -308,6 +308,7 @@ function TranscriptTrackRow({
               rx={3} ry={3}
               fill={C.exonShell} stroke={isHighlighted ? C.highlightBorder : C.exonStroke}
               strokeWidth={isHighlighted ? 1.5 : 0.8}
+              data-exon="true"
               style={{ cursor: isDragging ? "grabbing" : "pointer", transition: "stroke 0.12s, stroke-width 0.12s" }}
               onClick={(e) => handleExonClick(e, ei)}
             />
@@ -317,6 +318,7 @@ function TranscriptTrackRow({
               return (
                 <rect key={ci} x={cX} y={cdsY} width={Math.max(cEndX - cX, 2)} height={CDS_H}
                   rx={2} ry={2} fill={C.cds}
+                  data-exon="true"
                   style={{ cursor: isDragging ? "grabbing" : "pointer", transition: "opacity 0.12s" }}
                   onClick={(e) => handleExonClick(e, ei)}
                 />
@@ -329,6 +331,7 @@ function TranscriptTrackRow({
               return (
                 <rect key={ui} x={uX} y={uY} width={Math.max(uEndX - uX, 2)} height={UTR_H}
                   rx={1} ry={1} fill={C.utr} stroke={C.utrBorder} strokeWidth={0.6}
+                  data-exon="true"
                   style={{ cursor: isDragging ? "grabbing" : "pointer" }}
                   onClick={(e) => handleExonClick(e, ei)}
                 />
@@ -577,8 +580,10 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
   // ── Drag-to-pan ────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const target = e.target as Element;
-    const isTrackElement = target.closest("rect") || target.closest("text") || target.closest("line") || target.closest("polygon");
-    if (isTrackElement) return;
+    // Only block drag on actual exon/CDS/UTR/intron elements (marked with data-exon)
+    // The background rect (data-bg) is explicitly excluded so empty space starts drag
+    const isExonElement = target.closest("[data-exon]");
+    if (isExonElement) return;
 
     setDragState({ active: true, startClientX: e.clientX, startVp: { startBp, endBp: startBp + spanBp } });
     setActiveExon(null);
@@ -733,7 +738,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
 
           {/* Background — close tooltip on click */}
           <rect x={0} y={0} width={SVG_W} height={svgH} fill="transparent"
-            onClick={() => setActiveExon(null)} />
+            data-bg="true" onClick={() => setActiveExon(null)} />
 
           <GeneHeaderBar
             geneSymbol={geneSymbol} seqid={activePt.tx.seqid || ""}
