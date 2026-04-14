@@ -998,19 +998,9 @@ export default function GenePage() {
 
                     {/* Proteins */}
                     <Box>
-                      <Group justify="space-between" mb="sm">
-                        <Group gap="xs">
-                          <IconSquare size={16} />
-                          <Title order={5}>Proteins ({tx.protein_count})</Title>
-                        </Group>
-                        <Button
-                          variant="light"
-                          size="xs"
-                          leftSection={<IconDownload size={14} />}
-                          onClick={() => downloadProteinsFasta(tx)}
-                        >
-                          Export Info
-                        </Button>
+                      <Group gap="xs" mb="sm">
+                        <IconSquare size={16} />
+                        <Title order={5}>Proteins ({tx.protein_count})</Title>
                       </Group>
                       {tx.proteins.length > 0 ? (
                         <Stack gap="sm">
@@ -1056,29 +1046,6 @@ export default function GenePage() {
                                             {protein.protein_sequence}
                                           </Text>
                                         </Paper>
-                                        <Group justify="flex-end" mt="xs">
-                                          <Button
-                                            size="xs"
-                                            variant="light"
-                                            leftSection={<IconDownload size={12} />}
-                                            onClick={() => {
-                                              const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
-                                              const seq = protein.protein_sequence!;
-                                              const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
-                                              const blob = new Blob([fasta], { type: "text/plain" });
-                                              const url = URL.createObjectURL(blob);
-                                              const a = document.createElement("a");
-                                              a.href = url;
-                                              a.download = `${protein.protein_id}.fa`;
-                                              document.body.appendChild(a);
-                                              a.click();
-                                              document.body.removeChild(a);
-                                              URL.revokeObjectURL(url);
-                                            }}
-                                          >
-                                            Download FASTA
-                                          </Button>
-                                        </Group>
                                       </Accordion.Panel>
                                     </Accordion.Item>
                                   </Accordion>
@@ -1103,29 +1070,6 @@ export default function GenePage() {
                                             {protein.cds_sequence}
                                           </Text>
                                         </Paper>
-                                        <Group justify="flex-end" mt="xs">
-                                          <Button
-                                            size="xs"
-                                            variant="light"
-                                            leftSection={<IconDownload size={12} />}
-                                            onClick={() => {
-                                              const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
-                                              const seq = protein.cds_sequence!;
-                                              const fasta = `>${protein.protein_id} gene=${geneSymbol} cds_length=${protein.cds_length}bp\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
-                                              const blob = new Blob([fasta], { type: "text/plain" });
-                                              const url = URL.createObjectURL(blob);
-                                              const a = document.createElement("a");
-                                              a.href = url;
-                                              a.download = `${protein.protein_id}_cds.fa`;
-                                              document.body.appendChild(a);
-                                              a.click();
-                                              document.body.removeChild(a);
-                                              URL.revokeObjectURL(url);
-                                            }}
-                                          >
-                                            Download FASTA
-                                          </Button>
-                                        </Group>
                                       </Accordion.Panel>
                                     </Accordion.Item>
                                   </Accordion>
@@ -1144,9 +1088,19 @@ export default function GenePage() {
                       <>
                         <Divider />
                         <Box>
-                          <Group gap="xs" mb="sm">
-                            <IconDna2 size={16} />
-                            <Title order={5}>RNA Sequence</Title>
+                          <Group justify="space-between" mb="sm">
+                            <Group gap="xs">
+                              <IconDna2 size={16} />
+                              <Title order={5}>RNA Sequence</Title>
+                            </Group>
+                            <Button
+                              variant="light"
+                              size="xs"
+                              leftSection={<IconDownload size={14} />}
+                              onClick={() => downloadTranscriptFasta(tx)}
+                            >
+                              Download FASTA
+                            </Button>
                           </Group>
                           <Paper withBorder p="sm" radius="md" bg="gray.0">
                             <Text
