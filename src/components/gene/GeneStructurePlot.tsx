@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Box, Stack, Group, Text, Badge, ActionIcon, Tooltip, Paper } from "@mantine/core";
 import { IconDownload, IconExternalLink, IconZoomIn, IconZoomOut, IconX } from "@tabler/icons-react";
 import type { TranscriptResult } from "../../lib/geneApi";
@@ -41,7 +41,7 @@ interface ProcessedTranscript {
   strand: "+" | "-";
 }
 
-// ── Scientific Color Palette (restrained, publication-friendly) ──────────────
+// ── Scientific Color Palette ───────────────────────────────────────────────────
 const C = {
   bg: "#ffffff",
   headerBg: "#f8fafc",
@@ -49,8 +49,6 @@ const C = {
   summaryBg: "#f8fafc",
   activeRowBg: "#eaf4ff",
   activeBorder: "#2f6ea3",
-
-  // Tracks
   intron: "#98a2b3",
   exonShell: "#d7dee7",
   exonStroke: "#b0b8c7",
@@ -58,64 +56,35 @@ const C = {
   cdsHover: "#235789",
   utr: "#b8c4d3",
   utrBorder: "#9aacbe",
-
-  // Accents
   hoverRowBg: "#f0f9ff",
-  hoverExon: "#f59f00",
-
-  // Text
   textPrimary: "#1f2937",
   textSecondary: "#6b7280",
   textDim: "#9ca3af",
-
-  // Ruler
   rulerLine: "#c7ced6",
   rulerTick: "#9aa4b2",
   rulerText: "#6b7280",
-
-  // Tooltip
   tooltipBg: "rgba(18,18,24,0.95)",
-
-  // Divider
   border: "#e5e7eb",
 };
 
 // ── Layout constants ───────────────────────────────────────────────────────────
-const LABEL_W = 200;       // left label column
-const SUMMARY_W = 110;    // right summary column
-const TRACK_H = 44;        // track row height
-const TRACK_PAD = 4;       // gap between rows
-const HEADER_H = 60;       // gene locus bar height
-const RULER_H = 28;        // ruler row height
-
-// Exon-track dimensions (all share same center Y)
+const LABEL_W = 200;
+const SUMMARY_W = 110;
+const TRACK_H = 44;
+const TRACK_PAD = 4;
+const HEADER_H = 60;
+const RULER_H = 28;
 const EXON_H = 28;
 const CDS_H = 18;
 const UTR_H = 14;
 const INTRON_H = 2;
 const ARROW_H = 6;
 const ARROW_W = 6;
-
-// Derived
 const TRACK_FULL_H = TRACK_H + TRACK_PAD;
 
-// Center Y of the track body within a row
-function trackMidY(trackIndex: number): number {
-  return HEADER_H + RULER_H + trackIndex * TRACK_FULL_H + TRACK_H / 2;
-}
-
-function exonTopY(trackIndex: number): number {
-  return HEADER_H + RULER_H + trackIndex * TRACK_FULL_H + (TRACK_H - EXON_H) / 2;
-}
-
-function cdsTopY(trackIndex: number): number {
-  return exonTopY(trackIndex) + (EXON_H - CDS_H) / 2; // CDS centered
-}
-
-function utrTopY(trackIndex: number, is5: boolean): number {
-  const ey = exonTopY(trackIndex);
-  return is5 ? ey : ey + EXON_H - UTR_H;
-}
+// Fixed SVG pixel dimensions (outer shell)
+const BASE_TRACK_W = 820;  // inner track content width at zoom=1
+const SVG_W = LABEL_W + BASE_TRACK_W + SUMMARY_W; // 1130
 
 // ── NC_ ↔ chr mapping ──────────────────────────────────────────────────────────
 const NC_TO_CHR: [string, string][] = [
@@ -133,7 +102,7 @@ const NC_TO_CHR: [string, string][] = [
   ["NC_006127.5","chrZ"],["NC_040902.1","chrMT"],
 ];
 
-// ── Data processing (retained verbatim) ──────────────────────────────────────
+// ── Data processing ───────────────────────────────────────────────────────────
 
 function processTranscript(tx: TranscriptResult): ProcessedTranscript {
   const exons = [...tx.exons].sort((a, b) => a.start - b.start);
@@ -145,7 +114,6 @@ function processTranscript(tx: TranscriptResult): ProcessedTranscript {
     const er = { start: exon.start - txStart, end: exon.end - txStart, exon_id: exon.exon_id ?? "" };
     const ov = cdsSegs.filter((c) => c.start < exon.end && c.end > exon.start);
     ov.sort((a, b) => a.start - b.start);
-
     const cdsRegions: CdsRegion[] = ov.map((c) => ({
       start: Math.max(c.start - txStart, er.start),
       end: Math.min(c.end - txStart, er.end),
@@ -153,7 +121,6 @@ function processTranscript(tx: TranscriptResult): ProcessedTranscript {
       cds_id: c.cds_id ?? "",
       protein_id: c.protein_id ?? null,
     }));
-
     const utrRegions: UtrRegion[] = [];
     if (cdsRegions.length === 0) {
       utrRegions.push({ start: er.start, end: er.end, type: "5UTR" as const });
@@ -163,7 +130,6 @@ function processTranscript(tx: TranscriptResult): ProcessedTranscript {
       if (er.start < f.start) utrRegions.push({ start: er.start, end: f.start, type: "5UTR" as const });
       if (l.end < er.end) utrRegions.push({ start: l.end, end: er.end, type: "3UTR" as const });
     }
-
     return { ...er, cdsRegions, utrRegions };
   });
 
@@ -184,25 +150,26 @@ function formatBp(bp: number): string {
   return `${bp}bp`;
 }
 
-// ── Coordinate conversion ──────────────────────────────────────────────────────
-function bpToX(bp: number, svgW: number, totalLen: number): number {
-  return LABEL_W + (bp / totalLen) * (svgW - LABEL_W - SUMMARY_W);
+// bp → SVG pixel X, using current zoom-adjusted viewBox
+function bpToX(bp: number, totalLen: number, zoom: number): number {
+  // viewBox width shrinks as zoom increases → same bp spans more CSS pixels
+  const viewBoxW = SVG_W / zoom;
+  const innerW = viewBoxW - LABEL_W - SUMMARY_W;
+  return LABEL_W + (bp / totalLen) * innerW;
+}
+
+// SVG viewBox height for a given number of tracks
+function svgHeightFor(tracks: number): number {
+  return HEADER_H + RULER_H + tracks * TRACK_FULL_H;
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function GeneHeaderBar({
-  geneSymbol, seqid, geneStart, geneEnd, strand,
-  svgWidth, totalLen, transcriptCount,
+  geneSymbol, seqid, geneStart, geneEnd, strand, zoom, svgH, trackCount,
 }: {
-  geneSymbol?: string;
-  seqid: string;
-  geneStart?: number;
-  geneEnd?: number;
-  strand: string;
-  svgWidth: number;
-  totalLen: number;
-  transcriptCount: number;
+  geneSymbol?: string; seqid: string; geneStart?: number; geneEnd?: number;
+  strand: string; zoom: number; svgH: number; trackCount: number;
 }) {
   const chrId = seqid.startsWith("chr")
     ? seqid
@@ -211,48 +178,37 @@ function GeneHeaderBar({
     ? `${chrId}:${geneStart.toLocaleString()}-${geneEnd.toLocaleString()}`
     : "";
   const span = geneStart && geneEnd ? formatBp(geneEnd - geneStart) : "";
-  const strandArrow = strand === "+" ? "→" : "←";
-  const innerW = svgWidth - LABEL_W - SUMMARY_W;
+  const arrow = strand === "+" ? "→" : "←";
+  const vbW = SVG_W / zoom;
 
   return (
     <g>
-      {/* Background strip */}
-      <rect x={0} y={0} width={svgWidth} height={HEADER_H} fill={C.headerBg} />
-
-      {/* Locus span bar — full width at bottom of header */}
-      <rect
-        x={LABEL_W + 4} y={HEADER_H - 10}
-        width={innerW - 8} height={5}
-        rx={2.5} fill={C.intron}
-      />
-
-      {/* Left side: gene name + strand */}
+      <rect x={0} y={0} width={vbW} height={HEADER_H} fill={C.headerBg} />
+      {/* Locus span bar */}
+      <rect x={LABEL_W + 4} y={HEADER_H - 10} width={vbW - LABEL_W - SUMMARY_W - 8} height={5} rx={2.5} fill={C.intron} />
+      {/* Gene name */}
       <text x={12} y={HEADER_H - 18} fontSize={13} fill={C.textPrimary} fontFamily="monospace" fontWeight={700}>
         {geneSymbol || "Gene"}
       </text>
       <text x={12} y={HEADER_H - 5} fontSize={9} fill={C.textSecondary} fontFamily="monospace">
-        {strandArrow} {strand === "+" ? "forward" : "reverse"} strand
+        {arrow} {strand === "+" ? "forward" : "reverse"} strand
       </text>
-
-      {/* Right side: chr:range · transcripts · span */}
-      <text
-        x={svgWidth - SUMMARY_W - 8} y={HEADER_H - 18}
-        fontSize={10} fill={C.textSecondary} fontFamily="monospace" textAnchor="end"
-      >
+      {/* Right metadata */}
+      <text x={vbW - SUMMARY_W - 8} y={HEADER_H - 18} fontSize={10} fill={C.textSecondary} fontFamily="monospace" textAnchor="end">
         {posLabel}
       </text>
-      <text x={svgWidth - SUMMARY_W - 8} y={HEADER_H - 5} fontSize={9} fill={C.textDim} fontFamily="monospace" textAnchor="end">
-        {transcriptCount} transcript{transcriptCount !== 1 ? "s" : ""} · {span}
+      <text x={vbW - SUMMARY_W - 8} y={HEADER_H - 5} fontSize={9} fill={C.textDim} fontFamily="monospace" textAnchor="end">
+        {trackCount} transcript{trackCount !== 1 ? "s" : ""} · {span}
       </text>
-
       {/* Bottom border */}
-      <line x1={0} y1={HEADER_H} x2={svgWidth} y2={HEADER_H} stroke={C.border} strokeWidth={1} />
+      <line x1={0} y1={HEADER_H} x2={vbW} y2={HEADER_H} stroke={C.border} strokeWidth={1} />
     </g>
   );
 }
 
-function RulerSvg({ totalLength, svgWidth }: { totalLength: number; svgWidth: number }) {
-  const innerW = svgWidth - LABEL_W - SUMMARY_W;
+function RulerSvg({ totalLength, zoom }: { totalLength: number; zoom: number }) {
+  const vbW = SVG_W / zoom;
+  const innerW = vbW - LABEL_W - SUMMARY_W;
   const pxPerBp = innerW / totalLength;
 
   let interval = 100;
@@ -270,53 +226,43 @@ function RulerSvg({ totalLength, svgWidth }: { totalLength: number; svgWidth: nu
 
   return (
     <g>
-      {/* Background */}
-      <rect x={0} y={HEADER_H} width={svgWidth} height={RULER_H} fill={C.bg} />
-      {/* Axis */}
-      <line
-        x1={LABEL_W} y1={HEADER_H + RULER_H}
-        x2={svgWidth - SUMMARY_W} y2={HEADER_H + RULER_H}
-        stroke={C.rulerLine} strokeWidth={1}
-      />
-      {/* Ticks + labels */}
+      <rect x={0} y={HEADER_H} width={vbW} height={RULER_H} fill={C.bg} />
+      <line x1={LABEL_W} y1={HEADER_H + RULER_H} x2={vbW - SUMMARY_W} y2={HEADER_H + RULER_H} stroke={C.rulerLine} strokeWidth={1} />
       {ticks.map((bp) => {
-        const x = bpToX(bp, svgWidth, totalLength);
-        if (x < LABEL_W - 4 || x > svgWidth - SUMMARY_W + 4) return null;
+        const x = bpToX(bp, totalLength, zoom);
+        if (x < LABEL_W - 4 || x > vbW - SUMMARY_W + 4) return null;
         return (
           <g key={bp}>
             <line x1={x} y1={HEADER_H + RULER_H - 4} x2={x} y2={HEADER_H + RULER_H} stroke={C.rulerTick} strokeWidth={1} />
-            <text
-              x={x} y={HEADER_H + RULER_H - 7}
-              textAnchor="middle" fontSize={8} fill={C.rulerText} fontFamily="monospace"
-            >
+            <text x={x} y={HEADER_H + RULER_H - 7} textAnchor="middle" fontSize={8} fill={C.rulerText} fontFamily="monospace">
               {formatBp(bp)}
             </text>
           </g>
         );
       })}
-      {/* Bottom border */}
-      <line x1={0} y1={HEADER_H + RULER_H} x2={svgWidth} y2={HEADER_H + RULER_H} stroke={C.border} strokeWidth={0.5} />
+      <line x1={0} y1={HEADER_H + RULER_H} x2={vbW} y2={HEADER_H + RULER_H} stroke={C.border} strokeWidth={0.5} />
     </g>
   );
 }
 
 function TranscriptTrackRow({
-  pt, trackIndex, totalLen, svgWidth, isActive, isHovered,
+  pt, trackIndex, totalLength, zoom, isActive, isHovered,
   onSelect, onExonClick,
 }: {
   pt: ProcessedTranscript;
   trackIndex: number;
-  totalLen: number;
-  svgWidth: number;
+  totalLength: number;
+  zoom: number;
   isActive: boolean;
   isHovered: boolean;
   onSelect: () => void;
-  onExonClick: (exonIdx: number, absX: number, absY: number) => void;
+  onExonClick: (exonIdx: number) => void;
 }) {
   const y = HEADER_H + RULER_H + trackIndex * TRACK_FULL_H;
-  const exonY = exonTopY(trackIndex);
-  const cdsY = cdsTopY(trackIndex);
-  const my = trackMidY(trackIndex);
+  const exonY = y + (TRACK_H - EXON_H) / 2;
+  const cdsY = exonY + (EXON_H - CDS_H) / 2;
+  const my = y + TRACK_H / 2;
+  const vbW = SVG_W / zoom;
 
   const txAcc = pt.tx.transcript_acc || pt.tx.transcript_id;
   const proteinCount = pt.tx.protein_count ?? 0;
@@ -330,18 +276,11 @@ function TranscriptTrackRow({
 
   return (
     <g onClick={onSelect} style={{ cursor: "pointer" }}>
-      {/* Active row — left blue border */}
-      {isActive && (
-        <rect x={0} y={y} width={3} height={TRACK_H} fill={C.activeBorder} />
-      )}
+      {isActive && <rect x={0} y={y} width={3} height={TRACK_H} fill={C.activeBorder} />}
+      <rect x={0} y={y} width={vbW} height={TRACK_H} fill={rowBg} />
+      <line x1={0} y1={y + TRACK_H} x2={vbW} y2={y + TRACK_H} stroke={C.border} strokeWidth={0.5} />
 
-      {/* Row background */}
-      <rect x={0} y={y} width={svgWidth} height={TRACK_H} fill={rowBg} />
-
-      {/* Row divider */}
-      <line x1={0} y1={y + TRACK_H} x2={svgWidth} y2={y + TRACK_H} stroke={C.border} strokeWidth={0.5} />
-
-      {/* ── Left label column ── */}
+      {/* Left label */}
       <rect x={0} y={y} width={LABEL_W} height={TRACK_H} fill={labelBg} />
       <text x={8} y={y + 16} fontSize={10} fill={C.textPrimary} fontFamily="monospace" fontWeight={600}>
         {txAcc.length > 26 ? txAcc.slice(0, 24) + "…" : txAcc}
@@ -352,27 +291,27 @@ function TranscriptTrackRow({
         {rnaLen > 0 ? ` · ${formatBp(rnaLen)}` : ""}
       </text>
 
-      {/* ── Right summary column ── */}
-      <rect x={svgWidth - SUMMARY_W} y={y} width={SUMMARY_W} height={TRACK_H} fill={C.summaryBg} />
-      <text x={svgWidth - SUMMARY_W + 8} y={y + 17} fontSize={9} fill={C.textPrimary} fontFamily="monospace">
+      {/* Right summary */}
+      <rect x={vbW - SUMMARY_W} y={y} width={SUMMARY_W} height={TRACK_H} fill={C.summaryBg} />
+      <text x={vbW - SUMMARY_W + 8} y={y + 17} fontSize={9} fill={C.textPrimary} fontFamily="monospace">
         E{exonCount}
       </text>
-      <text x={svgWidth - SUMMARY_W + 8} y={y + 30} fontSize={8} fill={C.textSecondary} fontFamily="monospace">
+      <text x={vbW - SUMMARY_W + 8} y={y + 30} fontSize={8} fill={C.textSecondary} fontFamily="monospace">
         CDS {cdsCount}
       </text>
 
-      {/* ── Intron line ── */}
+      {/* Intron line */}
       <line
-        x1={bpToX(0, svgWidth, totalLen)} y1={my}
-        x2={bpToX(pt.totalLength, svgWidth, totalLen)} y2={my}
+        x1={bpToX(0, totalLength, zoom)} y1={my}
+        x2={bpToX(pt.totalLength, totalLength, zoom)} y2={my}
         stroke={C.intron} strokeWidth={INTRON_H}
       />
 
-      {/* ── Direction arrows on intron ── */}
+      {/* Direction arrows */}
       {pt.relativeExons.length > 1 && Array.from({ length: Math.min(pt.relativeExons.length - 1, 16) }).map((_, i) => {
         const frac = (i + 0.5) / Math.min(pt.relativeExons.length - 1, 16);
         const bx = pt.totalLength * frac;
-        const ax = bpToX(bx, svgWidth, totalLen);
+        const ax = bpToX(bx, totalLength, zoom);
         const ay = my - ARROW_H / 2;
         const dir = is5prime ? 1 : -1;
         return (
@@ -381,16 +320,15 @@ function TranscriptTrackRow({
             points={is5prime
               ? `${ax - ARROW_W / 2},${ay} ${ax + ARROW_W / 2},${ay} ${ax + dir * ARROW_W / 2},${ay + ARROW_H}`
               : `${ax - ARROW_W / 2},${ay + ARROW_H} ${ax + ARROW_W / 2},${ay + ARROW_H} ${ax + dir * ARROW_W / 2},${ay}`}
-            fill={C.intron}
-            opacity={0.55}
+            fill={C.intron} opacity={0.55}
           />
         );
       })}
 
-      {/* ── Exon blocks + CDS + UTR ── */}
+      {/* Exon blocks */}
       {pt.relativeExons.map((exon, ei) => {
-        const exStart = bpToX(exon.start, svgWidth, totalLen);
-        const exEnd = bpToX(exon.end, svgWidth, totalLen);
+        const exStart = bpToX(exon.start, totalLength, zoom);
+        const exEnd = bpToX(exon.end, totalLength, zoom);
         const exW = Math.max(exEnd - exStart, 2);
 
         return (
@@ -399,72 +337,45 @@ function TranscriptTrackRow({
             <rect
               x={exStart} y={exonY} width={exW} height={EXON_H}
               rx={3} ry={3}
-              fill={C.exonShell}
-              stroke={C.exonStroke}
-              strokeWidth={0.8}
+              fill={C.exonShell} stroke={C.exonStroke} strokeWidth={0.8}
               style={{ cursor: "pointer" }}
-              onClick={(ev) => {
-                ev.stopPropagation();
-                const rect = (ev.target as SVGRectElement).ownerSVGElement?.getBoundingClientRect();
-                if (!rect) return;
-                onExonClick(ei, ev.clientX - rect.left, ev.clientY - rect.top);
-              }}
+              onClick={(e) => { e.stopPropagation(); onExonClick(ei); }}
             />
-
-            {/* CDS block — centered inside exon */}
+            {/* CDS blocks */}
             {exon.cdsRegions.map((cds, ci) => {
-              const cdsX = bpToX(cds.start, svgWidth, totalLen);
-              const cdsEndX = bpToX(cds.end, svgWidth, totalLen);
-              const cdsW = Math.max(cdsEndX - cdsX, 2);
+              const cdsX = bpToX(cds.start, totalLength, zoom);
+              const cdsEndX = bpToX(cds.end, totalLength, zoom);
               return (
                 <rect
                   key={ci}
-                  x={cdsX} y={cdsY} width={cdsW} height={CDS_H}
-                  rx={2} ry={2}
-                  fill={C.cds}
+                  x={cdsX} y={cdsY} width={Math.max(cdsEndX - cdsX, 2)} height={CDS_H}
+                  rx={2} ry={2} fill={C.cds}
                   style={{ cursor: "pointer" }}
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    const rect = (ev.target as SVGRectElement).ownerSVGElement?.getBoundingClientRect();
-                    if (!rect) return;
-                    onExonClick(ei, ev.clientX - rect.left, ev.clientY - rect.top);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); onExonClick(ei); }}
                 />
               );
             })}
-
             {/* UTR blocks */}
             {exon.utrRegions.map((utr, ui) => {
-              const utrX = bpToX(utr.start, svgWidth, totalLen);
-              const utrEndX = bpToX(utr.end, svgWidth, totalLen);
-              const utrW = Math.max(utrEndX - utrX, 2);
+              const utrX = bpToX(utr.start, totalLength, zoom);
+              const utrEndX = bpToX(utr.end, totalLength, zoom);
+              const utrY = utr.type === "5UTR" ? exonY : exonY + EXON_H - UTR_H;
               return (
                 <rect
                   key={ui}
-                  x={utrX} y={utrTopY(trackIndex, utr.type === "5UTR")}
-                  width={utrW} height={UTR_H}
-                  rx={1} ry={1}
-                  fill={C.utr}
-                  stroke={C.utrBorder}
-                  strokeWidth={0.6}
+                  x={utrX} y={utrY} width={Math.max(utrEndX - utrX, 2)} height={UTR_H}
+                  rx={1} ry={1} fill={C.utr} stroke={C.utrBorder} strokeWidth={0.6}
                   style={{ cursor: "pointer" }}
-                  onClick={(ev) => {
-                    ev.stopPropagation();
-                    const rect = (ev.target as SVGRectElement).ownerSVGElement?.getBoundingClientRect();
-                    if (!rect) return;
-                    onExonClick(ei, ev.clientX - rect.left, ev.clientY - rect.top);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); onExonClick(ei); }}
                 />
               );
             })}
-
-            {/* Exon number label */}
+            {/* Exon number */}
             {exW > 20 && (
               <text
                 x={exStart + exW / 2} y={exonY + EXON_H / 2 + 3}
                 textAnchor="middle" fontSize={8} fill={C.textSecondary}
-                fontFamily="monospace" fontWeight={500}
-                style={{ pointerEvents: "none" }}
+                fontFamily="monospace" fontWeight={500} style={{ pointerEvents: "none" }}
               >
                 E{ei + 1}
               </text>
@@ -477,20 +388,19 @@ function TranscriptTrackRow({
 }
 
 function ExonTooltipCard({
-  region, exonIdx, txStart, strand, onClose,
+  exonIdx, region, txStart,
 }: {
-  region: ExonRegion;
   exonIdx: number;
+  region: ExonRegion;
   txStart: number;
-  strand: string;
   onClose: () => void;
 }) {
   const absStart = txStart + region.start;
   const absEnd = txStart + region.end;
   const absLen = absEnd - absStart;
   const cdsLen = region.cdsRegions.reduce((s, c) => s + (c.end - c.start), 0);
-  const utr5Len = region.utrRegions.filter((u) => u.type === "5UTR").reduce((s, u) => s + (u.end - u.start), 0);
-  const utr3Len = region.utrRegions.filter((u) => u.type === "3UTR").reduce((s, u) => s + (u.end - u.start), 0);
+  const utr5 = region.utrRegions.filter((u) => u.type === "5UTR").reduce((s, u) => s + (u.end - u.start), 0);
+  const utr3 = region.utrRegions.filter((u) => u.type === "3UTR").reduce((s, u) => s + (u.end - u.start), 0);
   const isNonCoding = cdsLen === 0;
 
   return (
@@ -498,57 +408,74 @@ function ExonTooltipCard({
       style={{
         background: C.tooltipBg,
         borderRadius: 10,
-        padding: "10px 14px",
-        minWidth: 240,
+        padding: "10px 16px",
+        minWidth: 260,
         boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
-        pointerEvents: "auto",
         position: "relative",
       }}
     >
-      {/* Close button */}
-      <ActionIcon
-        size="xs"
-        variant="subtle"
+      {/* Close X */}
+      <button
         onClick={onClose}
-        style={{ position: "absolute", top: 6, right: 6 }}
+        style={{
+          position: "absolute", top: 6, right: 8,
+          background: "transparent", border: "none", cursor: "pointer",
+          color: "#9ca3af", fontSize: 14, lineHeight: 1, padding: "2px 4px",
+        }}
         title="Close"
       >
-        <IconX size={11} />
-      </ActionIcon>
+        ✕
+      </button>
 
-      <Group justify="space-between" align="center" mb={6}>
-        <Group gap={4}>
-          <Badge size="xs" color="blue" variant="filled">Exon {exonIdx + 1}</Badge>
-          {isNonCoding && <Badge size="xs" color="gray" variant="light">Non-coding</Badge>}
-        </Group>
-        <Text size="xs" c="#9ca3af" ff="monospace">{absLen.toLocaleString()} bp</Text>
-      </Group>
-      <Text size="xs" c="white" ff="monospace" mb={4}>
+      {/* Exon badge + length */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{
+          background: "#3b82f6", color: "#fff",
+          fontSize: 11, fontWeight: 600, padding: "1px 7px", borderRadius: 4,
+          fontFamily: "monospace",
+        }}>
+          Exon {exonIdx + 1}
+        </span>
+        {isNonCoding && (
+          <span style={{
+            background: "#6b7280", color: "#fff",
+            fontSize: 10, padding: "1px 6px", borderRadius: 3, fontFamily: "monospace",
+          }}>
+            Non-coding
+          </span>
+        )}
+        <span style={{ marginLeft: "auto", color: "#9ca3af", fontSize: 11, fontFamily: "monospace" }}>
+          {absLen.toLocaleString()} bp
+        </span>
+      </div>
+
+      {/* Genomic range */}
+      <div style={{ color: "#fff", fontSize: 12, fontFamily: "monospace", marginBottom: 8 }}>
         {absStart.toLocaleString()} — {absEnd.toLocaleString()}
-      </Text>
-      <Group gap={12} wrap="wrap">
+      </div>
+
+      {/* Structure breakdown */}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
         {cdsLen > 0 ? (
           <>
-            <Text size="xs" c="#90cdf4">CDS: {cdsLen.toLocaleString()} bp ({(cdsLen / absLen * 100).toFixed(0)}%)</Text>
-            {utr5Len > 0 && <Text size="xs" c="#cbd5e0">5&apos; UTR: {utr5Len}</Text>}
-            {utr3Len > 0 && <Text size="xs" c="#a0aec0">3&apos; UTR: {utr3Len}</Text>}
+            <span style={{ color: "#90cdf4", fontSize: 11, fontFamily: "monospace" }}>
+              CDS: {cdsLen.toLocaleString()} bp ({(cdsLen / absLen * 100).toFixed(0)}%)
+            </span>
+            {utr5 > 0 && <span style={{ color: "#cbd5e0", fontSize: 11, fontFamily: "monospace" }}>5&apos; UTR: {utr5.toLocaleString()}</span>}
+            {utr3 > 0 && <span style={{ color: "#a0aec0", fontSize: 11, fontFamily: "monospace" }}>3&apos; UTR: {utr3.toLocaleString()}</span>}
           </>
         ) : (
           <>
-            {utr5Len > 0 && <Text size="xs" c="#cbd5e0">5&apos; UTR: {utr5Len.toLocaleString()} bp</Text>}
-            {utr3Len > 0 && <Text size="xs" c="#a0aec0">3&apos; UTR: {utr3Len.toLocaleString()} bp</Text>}
+            {utr5 > 0 && <span style={{ color: "#cbd5e0", fontSize: 11, fontFamily: "monospace" }}>5&apos; UTR: {utr5.toLocaleString()} bp</span>}
+            {utr3 > 0 && <span style={{ color: "#a0aec0", fontSize: 11, fontFamily: "monospace" }}>3&apos; UTR: {utr3.toLocaleString()} bp</span>}
           </>
         )}
-      </Group>
+      </div>
     </div>
   );
 }
 
-function TranscriptSummaryCard({
-  pt,
-}: {
-  pt: ProcessedTranscript;
-}) {
+function TranscriptSummaryCard({ pt }: { pt: ProcessedTranscript }) {
   const txAcc = pt.tx.transcript_acc || pt.tx.transcript_id;
   const cdsCount = pt.relativeExons.reduce((s, e) => s + e.cdsRegions.length, 0);
   const proteinCount = pt.tx.protein_count ?? 0;
@@ -558,32 +485,18 @@ function TranscriptSummaryCard({
     : (NC_TO_CHR.find(([k]) => k === pt.tx.seqid)?.[1] ?? pt.tx.seqid ?? "");
 
   return (
-    <Box
-      style={{
-        background: C.summaryBg,
-        borderTop: `1px solid ${C.border}`,
-        padding: "10px 16px",
-        display: "flex",
-        gap: 28,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
+    <Box style={{ background: C.summaryBg, borderTop: `1px solid ${C.border}`, padding: "10px 16px", display: "flex", gap: 24, flexWrap: "wrap" as const, alignItems: "center" }}>
       <Group gap={4}>
         <Text size="xs" c="dimmed">Transcript</Text>
         <Text size="xs" fw={600} ff="monospace">{txAcc}</Text>
       </Group>
       <Group gap={4}>
         <Text size="xs" c="dimmed">Location</Text>
-        <Text size="xs" ff="monospace">
-          {chrId}:{pt.tx.start?.toLocaleString() ?? "?"}–{pt.tx.end?.toLocaleString() ?? "?"}
-        </Text>
+        <Text size="xs" ff="monospace">{chrId}:{pt.tx.start?.toLocaleString() ?? "?"}–{pt.tx.end?.toLocaleString() ?? "?"}</Text>
       </Group>
-      <Group gap={4}>
-        <Badge size="xs" color={pt.strand === "+" ? "teal" : "orange"} variant="light">
-          {pt.strand === "+" ? "+ (forward)" : "− (reverse)"}
-        </Badge>
-      </Group>
+      <Badge size="xs" color={pt.strand === "+" ? "teal" : "orange"} variant="light">
+        {pt.strand === "+" ? "+ (forward)" : "− (reverse)"}
+      </Badge>
       <Group gap={4}>
         <Text size="xs" c="dimmed">Exons</Text>
         <Badge size="xs" color="blue" variant="filled">{pt.relativeExons.length}</Badge>
@@ -612,33 +525,23 @@ function Legend() {
   return (
     <Group gap="lg" wrap="wrap">
       <Group gap={5}>
-        <svg width={22} height={14}>
-          <rect x={1} y={1} width={20} height={12} rx={3} fill={C.cds} />
-        </svg>
+        <svg width={22} height={14}><rect x={1} y={1} width={20} height={12} rx={3} fill={C.cds} /></svg>
         <Text size="xs" c="dimmed">CDS</Text>
       </Group>
       <Group gap={5}>
-        <svg width={22} height={14}>
-          <rect x={1} y={2} width={20} height={10} rx={2} fill={C.exonShell} stroke={C.exonStroke} strokeWidth={0.8} />
-        </svg>
+        <svg width={22} height={14}><rect x={1} y={2} width={20} height={10} rx={2} fill={C.exonShell} stroke={C.exonStroke} strokeWidth={0.8} /></svg>
         <Text size="xs" c="dimmed">Exon</Text>
       </Group>
       <Group gap={5}>
-        <svg width={22} height={14}>
-          <rect x={1} y={3} width={20} height={8} rx={1} fill={C.utr} stroke={C.utrBorder} strokeWidth={0.6} />
-        </svg>
+        <svg width={22} height={14}><rect x={1} y={3} width={20} height={8} rx={1} fill={C.utr} stroke={C.utrBorder} strokeWidth={0.6} /></svg>
         <Text size="xs" c="dimmed">5&apos;/3&apos; UTR</Text>
       </Group>
       <Group gap={5}>
-        <svg width={22} height={14}>
-          <line x1={0} y1={7} x2={22} y2={7} stroke={C.intron} strokeWidth={2} />
-        </svg>
+        <svg width={22} height={14}><line x1={0} y1={7} x2={22} y2={7} stroke={C.intron} strokeWidth={2} /></svg>
         <Text size="xs" c="dimmed">Intron</Text>
       </Group>
       <Group gap={5}>
-        <svg width={10} height={10}>
-          <polygon points="2,8 8,8 5,2" fill={C.intron} opacity={0.6} />
-        </svg>
+        <svg width={10} height={10}><polygon points="2,8 8,8 5,2" fill={C.intron} opacity={0.6} /></svg>
         <Text size="xs" c="dimmed">Direction</Text>
       </Group>
     </Group>
@@ -650,37 +553,22 @@ function Legend() {
 export default function GeneStructurePlot({
   transcripts, geneSymbol, geneStart, geneEnd,
 }: GeneStructurePlotProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
   const [hoveredTxId, setHoveredTxId] = useState<string | null>(null);
-  const [clickedExon, setClickedExon] = useState<{
-    exonIdx: number;
-    region: ExonRegion;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [clickedExon, setClickedExon] = useState<{ exonIdx: number; region: ExonRegion } | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [zoom, setZoom] = useState(1);
-  const ZOOM_MIN = 0.3;
-  const ZOOM_MAX = 5;
-  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, parseFloat((z * 1.3).toFixed(2))));
-  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, parseFloat((z / 1.3).toFixed(2))));
-  const zoomReset = () => setZoom(1);
 
   const processed = useMemo(() => transcripts.map(processTranscript), [transcripts]);
   const defaultPt = useMemo(() => pickDefault(processed), [processed]);
 
   const activePt = useMemo(
-    () =>
-      processed.find((p) => p.tx.transcript_id === (selectedTxId ?? defaultPt.tx.transcript_id))
-      ?? defaultPt,
+    () => processed.find((p) => p.tx.transcript_id === (selectedTxId ?? defaultPt.tx.transcript_id)) ?? defaultPt,
     [processed, selectedTxId, defaultPt]
   );
 
   const totalLen = Math.max(activePt.totalLength, 1);
 
-  // Sort: protein-coding first, then RNA, then longer
   const sorted = useMemo(() => {
     return [...processed].sort((a, b) => {
       const aWins = (b.tx.protein_count ?? 0) - (a.tx.protein_count ?? 0);
@@ -696,8 +584,15 @@ export default function GeneStructurePlot({
   const extraCount = sorted.length - FOLD_THRESHOLD;
   const displayTracks = (expanded || extraCount <= 0) ? sorted : sorted.slice(0, FOLD_THRESHOLD);
 
-  const svgWidth = LABEL_W + SUMMARY_W + 820;
-  const svgHeight = HEADER_H + RULER_H + displayTracks.length * TRACK_FULL_H;
+  const vbW = SVG_W / zoom;
+  const svgH = svgHeightFor(displayTracks.length);
+
+  // ── Zoom callbacks ──
+  const ZOOM_MIN = 0.3;
+  const ZOOM_MAX = 5;
+  const zoomIn = () => setZoom((z) => Math.min(ZOOM_MAX, parseFloat((z * 1.3).toFixed(2))));
+  const zoomOut = () => setZoom((z) => Math.max(ZOOM_MIN, parseFloat((z / 1.3).toFixed(2))));
+  const zoomReset = () => setZoom(1);
 
   // ── Export PNG ──
   const exportPng = useCallback(() => {
@@ -750,9 +645,7 @@ export default function GeneStructurePlot({
       {/* ── Header ── */}
       <Group justify="space-between" align="center">
         <Group gap="xs">
-          <Text size="xs" fw={600} c="dimmed">
-            Gene Structure — {geneSymbol ?? "Unknown"}
-          </Text>
+          <Text size="xs" fw={600} c="dimmed">Gene Structure — {geneSymbol ?? "Unknown"}</Text>
           <Badge size="xs" variant="light" color="gray">
             {processed.length} transcript{processed.length !== 1 ? "s" : ""}
           </Badge>
@@ -765,89 +658,56 @@ export default function GeneStructurePlot({
           )}
         </Group>
         <Group gap={4}>
-          <Tooltip label="Zoom out">
-            <ActionIcon size="sm" variant="subtle" onClick={zoomOut}>
-              <IconZoomOut size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Text size="xs" ff="monospace" c="dimmed" w={36} ta="center">
-            {Math.round(zoom * 100)}%
-          </Text>
-          <Tooltip label="Zoom in">
-            <ActionIcon size="sm" variant="subtle" onClick={zoomIn}>
-              <IconZoomIn size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Reset zoom">
-            <ActionIcon size="sm" variant="subtle" onClick={zoomReset}>
-              <IconZoomOut size={12} style={{ transform: "rotate(180deg)" }} />
-            </ActionIcon>
-          </Tooltip>
+          {/* Zoom controls */}
+          <ActionIcon size="sm" variant="subtle" onClick={zoomOut} title="Zoom out">
+            <IconZoomOut size={14} />
+          </ActionIcon>
+          <Text size="xs" ff="monospace" c="dimmed" w={36} ta="center">{Math.round(zoom * 100)}%</Text>
+          <ActionIcon size="sm" variant="subtle" onClick={zoomIn} title="Zoom in">
+            <IconZoomIn size={14} />
+          </ActionIcon>
+          <ActionIcon size="sm" variant="subtle" onClick={zoomReset} title="Reset zoom">
+            <IconZoomOut size={12} style={{ transform: "rotate(180deg)" }} />
+          </ActionIcon>
           <Tooltip label="Export PNG">
             <ActionIcon size="sm" variant="subtle" onClick={exportPng}>
               <IconDownload size={14} />
             </ActionIcon>
           </Tooltip>
           <Tooltip label="Open in JBrowse">
-            <ActionIcon
-              size="sm" variant="subtle" color="blue" component="a"
-              href={jbrowseHref}
-              style={{ display: "inline-flex", cursor: "pointer" }}
-            >
+            <ActionIcon size="sm" variant="subtle" color="blue" component="a" href={jbrowseHref} style={{ display: "inline-flex", cursor: "pointer" }}>
               <IconExternalLink size={14} />
             </ActionIcon>
           </Tooltip>
         </Group>
       </Group>
 
-      {/* ── Legend ── */}
       <Legend />
 
-      {/* ── Plot — zoom scales SVG content via CSS transform ── */}
-      <Box
-        ref={containerRef}
-        style={{
-          background: C.bg,
-          position: "relative",
-          overflow: "hidden",
-          width: svgWidth,
-          height: svgHeight,
-        }}
-      >
+      {/* ── Plot: SVG only, zoom via viewBox width ── */}
+      <Box style={{ background: C.bg, position: "relative", overflowX: "auto" as const, overflowY: "hidden" as const }}>
         <svg
           className="gene-structure-svg"
-          width={svgWidth}
-          height={svgHeight}
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{
-            display: "block",
-            transform: `scale(${zoom})`,
-            transformOrigin: "top left",
-            overflow: "visible",
-          }}
-          onClick={(e) => {
-            const target = e.target as SVGElement;
-            if (target.tagName === "svg") {
-              setClickedExon(null);
-            }
-          }}
+          width={vbW}
+          height={svgH}
+          viewBox={`0 0 ${vbW} ${svgH}`}
+          style={{ display: "block" }}
         >
-          {/* Gene header bar */}
-          <GeneHeaderBar
-            geneSymbol={geneSymbol}
-            seqid={activePt.tx.seqid || ""}
-            geneStart={geneStart}
-            geneEnd={geneEnd}
-            strand={activePt.strand}
-            svgWidth={svgWidth}
-            totalLen={totalLen}
-            transcriptCount={processed.length}
+          {/* Click on SVG background → close tooltip */}
+          <rect
+            x={0} y={0} width={vbW} height={svgH}
+            fill="transparent"
+            onClick={() => setClickedExon(null)}
           />
 
-          {/* Shared ruler */}
-          <RulerSvg totalLength={totalLen} svgWidth={svgWidth} />
+          <GeneHeaderBar
+            geneSymbol={geneSymbol} seqid={activePt.tx.seqid || ""}
+            geneStart={geneStart} geneEnd={geneEnd} strand={activePt.strand}
+            zoom={zoom} svgH={svgH} trackCount={processed.length}
+          />
 
-          {/* Transcript tracks */}
+          <RulerSvg totalLength={totalLen} zoom={zoom} />
+
           {displayTracks.map((pt, trackIndex) => (
             <g
               key={pt.tx.transcript_id}
@@ -855,71 +715,45 @@ export default function GeneStructurePlot({
               onMouseLeave={() => setHoveredTxId(null)}
             >
               <TranscriptTrackRow
-                pt={pt}
-                trackIndex={trackIndex}
-                totalLen={totalLen}
-                svgWidth={svgWidth}
+                pt={pt} trackIndex={trackIndex} totalLength={totalLen} zoom={zoom}
                 isActive={pt.tx.transcript_id === activePt.tx.transcript_id}
                 isHovered={pt.tx.transcript_id === hoveredTxId}
-                onSelect={() => {
-                  setSelectedTxId(pt.tx.transcript_id);
-                  setClickedExon(null);
-                }}
-                onExonClick={(ei, mx, my) => {
-                  if (clickedExon?.exonIdx === ei) {
-                    setClickedExon(null);
-                  } else {
-                    setClickedExon({ exonIdx: ei, region: pt.relativeExons[ei], x: mx, y: my });
-                  }
+                onSelect={() => { setSelectedTxId(pt.tx.transcript_id); setClickedExon(null); }}
+                onExonClick={(ei) => {
+                  setClickedExon((prev) =>
+                    prev?.exonIdx === ei ? null : { exonIdx: ei, region: pt.relativeExons[ei] }
+                  );
                 }}
               />
             </g>
           ))}
 
-          {/* Fold / unfold row */}
+          {/* Fold row */}
           {extraCount > 0 && (
-            <g
-              style={{ cursor: "pointer" }}
-              onClick={() => setExpanded((v) => !v)}
-            >
-              <rect
-                x={0}
-                y={HEADER_H + RULER_H + displayTracks.length * TRACK_FULL_H}
-                width={svgWidth}
-                height={TRACK_H}
-                fill={C.labelBg}
-              />
-              <text
-                x={svgWidth / 2}
-                y={HEADER_H + RULER_H + displayTracks.length * TRACK_FULL_H + TRACK_H / 2 + 4}
-                textAnchor="middle"
-                fontSize={10}
-                fill={C.textSecondary}
-                fontFamily="monospace"
-              >
-                {expanded
-                  ? "Show fewer transcripts"
-                  : `+ ${extraCount} more transcript${extraCount !== 1 ? "s" : ""}`}
+            <g style={{ cursor: "pointer" }} onClick={() => setExpanded((v) => !v)}>
+              <rect x={0} y={svgH - TRACK_H} width={vbW} height={TRACK_H} fill={C.labelBg} />
+              <text x={vbW / 2} y={svgH - TRACK_H / 2 + 4} textAnchor="middle" fontSize={10} fill={C.textSecondary} fontFamily="monospace">
+                {expanded ? "Show fewer transcripts" : `+ ${extraCount} more transcript${extraCount !== 1 ? "s" : ""}`}
               </text>
             </g>
           )}
         </svg>
+
+        {/* Tooltip: rendered inside SVG using foreignObject — always visible, not clipped */}
+        {clickedExon && (
+          <foreignObject x={0} y={svgH + 8} width="100%" height={120}>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <ExonTooltipCard
+                exonIdx={clickedExon.exonIdx}
+                region={clickedExon.region}
+                txStart={activePt.txStart}
+                onClose={() => setClickedExon(null)}
+              />
+            </div>
+          </foreignObject>
+        )}
       </Box>
 
-      {/* Click-triggered exon tooltip — rendered as sibling below the plot box */}
-      {clickedExon && (
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-          <ExonTooltipCard
-            region={clickedExon.region}
-            exonIdx={clickedExon.exonIdx}
-            txStart={activePt.txStart}
-            strand={activePt.strand}
-            onClose={() => setClickedExon(null)}
-          />
-        </div>
-      )}
-
-      {/* ── Selected transcript summary ── */}
       <TranscriptSummaryCard pt={activePt} />
     </Stack>
   );
