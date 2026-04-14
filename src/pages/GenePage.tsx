@@ -1046,6 +1046,29 @@ export default function GenePage() {
                                             {protein.protein_sequence}
                                           </Text>
                                         </Paper>
+                                        <Group justify="flex-end" mt="xs">
+                                          <Button
+                                            size="xs"
+                                            variant="light"
+                                            leftSection={<IconDownload size={12} />}
+                                            onClick={() => {
+                                              const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
+                                              const seq = protein.protein_sequence!;
+                                              const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
+                                              const blob = new Blob([fasta], { type: "text/plain" });
+                                              const url = URL.createObjectURL(blob);
+                                              const a = document.createElement("a");
+                                              a.href = url;
+                                              a.download = `${protein.protein_id}.fa`;
+                                              document.body.appendChild(a);
+                                              a.click();
+                                              document.body.removeChild(a);
+                                              URL.revokeObjectURL(url);
+                                            }}
+                                          >
+                                            Download FASTA
+                                          </Button>
+                                        </Group>
                                       </Accordion.Panel>
                                     </Accordion.Item>
                                   </Accordion>
