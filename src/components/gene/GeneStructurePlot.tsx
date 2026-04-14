@@ -488,7 +488,12 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
   const [activeExon, setActiveExon] = useState<{
     exonIdx: number; region: ExonRegion; anchorRect: DOMRect;
   } | null>(null);
+  const [hoveredExon, setHoveredExon] = useState<{ transcriptId: string; exonIdx: number } | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [dragState, setDragState] = useState<{
+    active: boolean; startClientX: number;
+    startVp: { startBp: number; endBp: number };
+  }>({ active: false, startClientX: 0, startVp: { startBp: 0, endBp: 0 } });
   const containerRef = useRef<HTMLDivElement>(null);
 
   const processed = useMemo(() => transcripts.map(processTranscript), [transcripts]);
@@ -569,33 +574,26 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
   }, [totalLen]);
 
   // ── Drag-to-pan ────────────────────────────────────────────────────────────
-  const dragRef = useRef<{
-    active: boolean;
-    startClientX: number;
-    startVp: { startBp: number; endBp: number };
-  }>({ active: false, startClientX: 0, startVp: { startBp: 0, endBp: totalLen } });
-
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const target = e.target as Element;
     const isTrackElement = target.closest("rect") || target.closest("text") || target.closest("line") || target.closest("polygon");
     if (isTrackElement) return;
 
-    dragRef.current = { active: true, startClientX: e.clientX, startVp: { startBp, endBp: startBp + spanBp } };
+    setDragState({ active: true, startClientX: e.clientX, startVp: { startBp, endBp: startBp + spanBp } });
     setActiveExon(null);
   }, [startBp, spanBp]);
 
   // Global listeners for drag — needed because mouse may leave SVG during drag
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      const d = dragRef.current;
-      if (!d.active) return;
-      const deltaX = e.clientX - d.startClientX;
+      if (!dragState.active) return;
+      const deltaX = e.clientX - dragState.startClientX;
       const bpDelta = (deltaX / innerW) * spanBp;
-      const newStart = clamp(d.startVp.startBp - bpDelta, 0, totalLen - spanBp);
+      const newStart = clamp(dragState.startVp.startBp - bpDelta, 0, totalLen - spanBp);
       setViewport({ startBp: newStart, endBp: newStart + spanBp });
     };
     const onUp = () => {
-      dragRef.current.active = false;
+      setDragState((d) => ({ ...d, active: false }));
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -603,7 +601,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [innerW, spanBp, totalLen]);
+  }, [dragState, innerW, spanBp, totalLen]);
 
   // ── Wheel zoom ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -669,7 +667,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     return `/jbrowse/gene?loc=${encodeURIComponent(loc)}${gs}`;
   })();
 
-  const isDragging = dragRef.current.active;
+  const isDragging = dragState.active;
 
   return (
     <Stack gap="xs">
