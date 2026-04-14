@@ -492,7 +492,6 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     exonIdx: number; region: ExonRegion; anchorRect: DOMRect;
   } | null>(null);
   const [hoveredExon, setHoveredExon] = useState<{ transcriptId: string; exonIdx: number } | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const [dragState, setDragState] = useState<{
     active: boolean; startClientX: number;
     startVp: { startBp: number; endBp: number };
@@ -775,17 +774,6 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
             </g>
           ))}
           </g>
-
-          {/* Fold row */}
-          {extraCount > 0 && (
-            <g style={{ cursor: "pointer" }} onClick={() => setExpanded((v) => !v)}>
-              <rect x={0} y={svgH - TRACK_H} width={SVG_W} height={TRACK_H} fill={C.labelBg} />
-              <text x={SVG_W / 2} y={svgH - TRACK_H / 2 + 4} textAnchor="middle"
-                fontSize={10} fill={C.textSecondary} fontFamily="monospace">
-                {expanded ? "Show fewer transcripts" : `+ ${extraCount} more transcript${extraCount !== 1 ? "s" : ""}`}
-              </text>
-            </g>
-          )}
         </svg>
 
         {/* Tooltip in screen space */}
