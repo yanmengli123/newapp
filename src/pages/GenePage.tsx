@@ -50,8 +50,8 @@ export default function GenePage() {
       setLoading(true);
       setPageError(null);
       try {
-        // Default: no sequences. Load them on demand.
-        const result = await getGenePage(geneId, false);
+        // Load sequences on page view so protein/cds sequences are available.
+        const result = await getGenePage(geneId, true);
         setData(result);
 
         // Chromosome details
@@ -214,7 +214,7 @@ export default function GenePage() {
     URL.revokeObjectURL(url);
   }, [data]);
 
-  // Download all Proteins as FASTA (with info only - no actual sequence from API)
+  // Download all Proteins as FASTA (with actual sequences when available)
   const downloadProteinsFasta = useCallback((transcript: TranscriptResult) => {
     if (!transcript || !data) return;
 
@@ -224,7 +224,6 @@ export default function GenePage() {
     // Add header note
     fastaContent += `# Proteins for transcript: ${transcript.transcript_acc || transcript.transcript_id}\n`;
     fastaContent += `# Gene: ${geneSymbol}\n`;
-    fastaContent += `# Note: Sequence not available from API - showing protein info only\n`;
     fastaContent += `#\n`;
 
     if (transcript.proteins.length === 0) {
@@ -237,6 +236,12 @@ export default function GenePage() {
       fastaContent += `>${protId} ${desc}\n`;
       if (protein.protein_description) {
         fastaContent += `# Description: ${protein.protein_description}\n`;
+      }
+      if (protein.protein_sequence) {
+        const seq = protein.protein_sequence;
+        fastaContent += `${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
+      } else {
+        fastaContent += `# Protein sequence not available\n`;
       }
     });
 
@@ -776,6 +781,101 @@ export default function GenePage() {
                                   <Text size="xs" c="dimmed" tt="uppercase">Description</Text>
                                   <Text size="xs">{protein.protein_description}</Text>
                                 </Box>
+                              )}
+
+                              {/* Protein Sequence */}
+                              {protein.protein_sequence && (
+                                <>
+                                  <Divider mt="sm" />
+                                  <Accordion variant="contained" radius="md">
+                                    <Accordion.Item value={`${protein.protein_id}-prot`}>
+                                      <Accordion.Control icon={<IconCode size={14} />}>
+                                        Protein Sequence ({protein.protein_length} aa)
+                                      </Accordion.Control>
+                                      <Accordion.Panel>
+                                        <Paper withBorder p="sm" radius="md" bg="gray.0" style={{ maxHeight: 200, overflow: "auto" }}>
+                                          <Text
+                                            size="xs"
+                                            ff="monospace"
+                                            style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}
+                                          >
+                                            {protein.protein_sequence}
+                                          </Text>
+                                        </Paper>
+                                        <Group justify="flex-end" mt="xs">
+                                          <Button
+                                            size="xs"
+                                            variant="light"
+                                            leftSection={<IconDownload size={12} />}
+                                            onClick={() => {
+                                              const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
+                                              const seq = protein.protein_sequence!;
+                                              const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
+                                              const blob = new Blob([fasta], { type: "text/plain" });
+                                              const url = URL.createObjectURL(blob);
+                                              const a = document.createElement("a");
+                                              a.href = url;
+                                              a.download = `${protein.protein_id}.fa`;
+                                              document.body.appendChild(a);
+                                              a.click();
+                                              document.body.removeChild(a);
+                                              URL.revokeObjectURL(url);
+                                            }}
+                                          >
+                                            Download FASTA
+                                          </Button>
+                                        </Group>
+                                      </Accordion.Panel>
+                                    </Accordion.Item>
+                                  </Accordion>
+                                </>
+                              )}
+
+                              {/* CDS Sequence */}
+                              {protein.cds_sequence && (
+                                <>
+                                  <Accordion variant="contained" radius="md" mt="xs">
+                                    <Accordion.Item value={`${protein.protein_id}-cds`}>
+                                      <Accordion.Control icon={<IconDna2 size={14} />}>
+                                        CDS Sequence ({protein.cds_length} bp)
+                                      </Accordion.Control>
+                                      <Accordion.Panel>
+                                        <Paper withBorder p="sm" radius="md" bg="gray.0" style={{ maxHeight: 200, overflow: "auto" }}>
+                                          <Text
+                                            size="xs"
+                                            ff="monospace"
+                                            style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}
+                                          >
+                                            {protein.cds_sequence}
+                                          </Text>
+                                        </Paper>
+                                        <Group justify="flex-end" mt="xs">
+                                          <Button
+                                            size="xs"
+                                            variant="light"
+                                            leftSection={<IconDownload size={12} />}
+                                            onClick={() => {
+                                              const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
+                                              const seq = protein.cds_sequence!;
+                                              const fasta = `>${protein.protein_id} gene=${geneSymbol} cds_length=${protein.cds_length}bp\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
+                                              const blob = new Blob([fasta], { type: "text/plain" });
+                                              const url = URL.createObjectURL(blob);
+                                              const a = document.createElement("a");
+                                              a.href = url;
+                                              a.download = `${protein.protein_id}_cds.fa`;
+                                              document.body.appendChild(a);
+                                              a.click();
+                                              document.body.removeChild(a);
+                                              URL.revokeObjectURL(url);
+                                            }}
+                                          >
+                                            Download FASTA
+                                          </Button>
+                                        </Group>
+                                      </Accordion.Panel>
+                                    </Accordion.Item>
+                                  </Accordion>
+                                </>
                               )}
                             </Card>
                           ))}

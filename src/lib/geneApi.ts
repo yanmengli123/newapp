@@ -97,6 +97,8 @@ export interface TranscriptResult {
     has_protein_sequence: boolean;
     protein_length: number | null;
     protein_description: string | null;
+    protein_sequence?: string | null;
+    cds_sequence?: string | null;
   }>;
   rna_sequence: string | null;
 }
