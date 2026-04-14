@@ -12,6 +12,10 @@ import {
   Button,
   Accordion,
   Tooltip,
+  Tabs,
+  CopyButton,
+  ActionIcon,
+  Alert,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -24,6 +28,8 @@ import {
   IconDna2,
   IconApi,
   IconInfoCircle,
+  IconClipboardCopy,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import type {
   GenePageResponse,
@@ -59,6 +65,165 @@ function toChrId(seqid: string): string {
 function toNcAcc(chrId: string): string {
   if (chrId.startsWith("NC_")) return chrId;
   return NC_TO_CHR.find(([, v]) => v === chrId)?.[0] ?? chrId;
+}
+
+// ── Protein structure access panel ─────────────────────────────────────────────
+
+interface ProteinStructureAccessPanelProps {
+  proteinId: string;
+  proteinSequence: string;
+  geneSymbol: string;
+  transcriptAcc: string | null;
+  proteinLength: number | null;
+}
+
+/** Build FASTA text for a protein */
+function buildProteinFasta(
+  proteinId: string,
+  proteinSequence: string,
+  geneSymbol: string,
+  transcriptAcc: string | null,
+): string {
+  const seq = proteinSequence.replace(/\s+/g, "").trim();
+  const header = `>${proteinId} gene=${geneSymbol} transcript=${transcriptAcc || "unknown"}`;
+  const wrapped = seq.match(/.{1,60}/g)?.join("\n") || seq;
+  return `${header}\n${wrapped}\n`;
+}
+
+/** Check if a protein_id looks like a RefSeq accession (for NCBI link) */
+function isRefSeqAccession(proteinId: string): boolean {
+  return /^(NP_|XP_|YP_|WP_|AP_)\d+/i.test(proteinId.trim());
+}
+
+/** ProteinStructureAccessPanel — AlphaFold引导 + 条件NCBI按钮 */
+function ProteinStructureAccessPanel({
+  proteinId,
+  proteinSequence,
+  geneSymbol,
+  transcriptAcc,
+  proteinLength,
+}: ProteinStructureAccessPanelProps) {
+  if (!proteinSequence || proteinSequence.replace(/\s+/g, "").trim().length === 0) {
+    return null;
+  }
+
+  const cleanSeq = proteinSequence.replace(/\s+/g, "").trim();
+  const fastaText = buildProteinFasta(proteinId, proteinSequence, geneSymbol, transcriptAcc);
+  const canShowNcbi = isRefSeqAccession(proteinId);
+  // TODO: replace with actual analytics call
+  // analytics.track("structure_access_view", { protein_id: proteinId, gene_symbol: geneSymbol });
+
+  return (
+    <Box mt="sm">
+      <Divider label="Structure Prediction" labelPosition="left" />
+      <Stack gap="xs" mt="xs">
+        {/* Step instructions */}
+        <Alert
+          variant="light"
+          color="blue"
+          title="How to predict 3D structure"
+          icon={<IconInfoCircle size={14} />}
+          py="xs"
+        >
+          <Text size="xs" mb={4}>
+            <strong>Step 1:</strong> Copy the protein sequence below.
+          </Text>
+          <Text size="xs" mb={4}>
+            <strong>Step 2:</strong> Go to AlphaFold Server at&nbsp;
+            <Text component="span" ff="monospace" size="xs">
+              https://alphafold.ebi.ac.uk/submit
+            </Text>
+          </Text>
+          <Text size="xs" mb={4}>
+            <strong>Step 3:</strong> Paste the sequence and your email.
+          </Text>
+          <Text size="xs">
+            <strong>Step 4:</strong> Wait for the result (email notification).
+          </Text>
+        </Alert>
+
+        {/* Action buttons */}
+        <Group gap="xs">
+          <Button
+            component="a"
+            href="https://alphafold.ebi.ac.uk/submit"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="xs"
+            color="blue"
+            variant="filled"
+            leftSection={<IconExternalLink size={13} />}
+            // TODO: replace with actual analytics call
+            // onClick={() => analytics.track("open_alphafold_server", { protein_id: proteinId })}
+          >
+            AlphaFold Server
+          </Button>
+
+          {canShowNcbi && (
+            <Button
+              component="a"
+              href={`https://www.ncbi.nlm.nih.gov/protein/${proteinId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              size="xs"
+              variant="light"
+              color="green"
+              leftSection={<IconExternalLink size={13} />}
+              // TODO: replace with actual analytics call
+              // onClick={() => analytics.track("open_ncbi_protein", { protein_id: proteinId })}
+            >
+              NCBI Protein
+            </Button>
+          )}
+        </Group>
+
+        {/* Copy sequence shortcut */}
+        <Group gap="xs" align="center">
+          <CopyButton
+            value={cleanSeq}
+          >
+            {({ copied, copy) => (
+              <Tooltip label={copied ? "Copied!" : "Copy pure sequence"}>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color={copied ? "teal" : "gray"}
+                  onClick={() => {
+                    copy();
+                    // TODO: analytics.track("copy_protein_sequence", { protein_id: proteinId });
+                  }}
+                >
+                  <IconClipboardCopy size={14} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </CopyButton>
+          <CopyButton
+            value={fastaText}
+          >
+            {({ copied, copy) => (
+              <Tooltip label={copied ? "Copied!" : "Copy as FASTA"}>
+                <ActionIcon
+                  size="sm"
+                  variant="subtle"
+                  color={copied ? "teal" : "gray"}
+                  onClick={() => {
+                    copy();
+                    // TODO: analytics.track("copy_protein_fasta", { protein_id: proteinId });
+                  }}
+                >
+                  <IconClipboardCopy size={14} />
+                </ActionIcon>
+              </Tooltip>
+            )}
+          </CopyButton>
+          <Text size="xs" c="dimmed">
+            {cleanSeq.length} aa · {proteinLength != null ? `${proteinLength} aa recorded` : "length from DB"}
+          </Text>
+        </Group>
+      </Stack>
+    </Box>
+  );
 }
 
 interface GenomicRegionResult {
@@ -1015,41 +1180,78 @@ export default function GenePage() {
                                         Protein Sequence ({protein.protein_length} aa)
                                       </Accordion.Control>
                                       <Accordion.Panel>
-                                        <Paper withBorder p="sm" radius="md" bg="gray.0" style={{ maxHeight: 200, overflow: "auto" }}>
-                                          <Text
-                                            size="xs"
-                                            ff="monospace"
-                                            style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}
-                                          >
-                                            {protein.protein_sequence}
-                                          </Text>
-                                        </Paper>
-                                        <Group justify="flex-end" mt="xs">
-                                          <Button
-                                            size="xs"
-                                            variant="light"
-                                            leftSection={<IconDownload size={12} />}
-                                            onClick={() => {
-                                              const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
-                                              const seq = protein.protein_sequence!;
-                                              const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
-                                              const blob = new Blob([fasta], { type: "text/plain" });
-                                              const url = URL.createObjectURL(blob);
-                                              const a = document.createElement("a");
-                                              a.href = url;
-                                              a.download = `${protein.protein_id}.fa`;
-                                              document.body.appendChild(a);
-                                              a.click();
-                                              document.body.removeChild(a);
-                                              URL.revokeObjectURL(url);
-                                            }}
-                                          >
-                                            Download FASTA
-                                          </Button>
-                                        </Group>
+                                        <Tabs defaultValue="seq" variant="pills" size="xs">
+                                          <Tabs.List>
+                                            <Tabs.Tab value="seq">Pure Sequence</Tabs.Tab>
+                                            <Tabs.Tab value="fasta">FASTA</Tabs.Tab>
+                                          </Tabs.List>
+                                          <Tabs.Panel value="seq">
+                                            <Paper withBorder p="sm" radius="md" bg="gray.0" style={{ maxHeight: 200, overflow: "auto" }}>
+                                              <Text size="xs" ff="monospace" style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
+                                                {protein.protein_sequence}
+                                              </Text>
+                                            </Paper>
+                                            <Group justify="flex-end" mt="xs">
+                                              <CopyButton value={protein.protein_sequence.replace(/\s+/g, "").trim()}>
+                                                {({ copied, copy }) => (
+                                                  <Button size="xs" variant="light" leftSection={<IconClipboardCopy size={12} />} onClick={copy}>
+                                                    {copied ? "Copied!" : "Copy Sequence"}
+                                                  </Button>
+                                                )}
+                                              </CopyButton>
+                                            </Group>
+                                          </Tabs.Panel>
+                                          <Tabs.Panel value="fasta">
+                                            <Paper withBorder p="sm" radius="md" bg="gray.0" style={{ maxHeight: 200, overflow: "auto" }}>
+                                              <Text size="xs" ff="monospace" style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}>
+                                                {`>${protein.protein_id} gene=${data.gene.gene_symbol || data.gene.gene_id} length=${protein.protein_length}aa\n${protein.protein_sequence.match(/.{1,60}/g)?.join("\n") || protein.protein_sequence}`}
+                                              </Text>
+                                            </Paper>
+                                            <Group justify="flex-end" mt="xs">
+                                              <CopyButton
+                                                value={`>${protein.protein_id} gene=${data.gene.gene_symbol || data.gene.gene_id} length=${protein.protein_length}aa\n${protein.protein_sequence}\n`}
+                                              >
+                                                {({ copied, copy }) => (
+                                                  <Button size="xs" variant="light" leftSection={<IconClipboardCopy size={12} />} onClick={copy}>
+                                                    {copied ? "Copied!" : "Copy FASTA"}
+                                                  </Button>
+                                                )}
+                                              </CopyButton>
+                                              <Button
+                                                size="xs"
+                                                variant="light"
+                                                leftSection={<IconDownload size={12} />}
+                                                onClick={() => {
+                                                  const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
+                                                  const seq = protein.protein_sequence;
+                                                  const fasta = `>${protein.protein_id} gene=${geneSymbol} length=${protein.protein_length}aa\n${seq.match(/.{1,60}/g)?.join("\n") || seq}\n`;
+                                                  const blob = new Blob([fasta], { type: "text/plain" });
+                                                  const url = URL.createObjectURL(blob);
+                                                  const a = document.createElement("a");
+                                                  a.href = url;
+                                                  a.download = `${protein.protein_id}.fa`;
+                                                  document.body.appendChild(a);
+                                                  a.click();
+                                                  document.body.removeChild(a);
+                                                  URL.revokeObjectURL(url);
+                                                }}
+                                              >
+                                                Download FASTA
+                                              </Button>
+                                            </Group>
+                                          </Tabs.Panel>
+                                        </Tabs>
                                       </Accordion.Panel>
                                     </Accordion.Item>
                                   </Accordion>
+                                  {/* Structure Prediction Access */}
+                                  <ProteinStructureAccessPanel
+                                    proteinId={protein.protein_id}
+                                    proteinSequence={protein.protein_sequence}
+                                    geneSymbol={data.gene.gene_symbol || data.gene.gene_id}
+                                    transcriptAcc={tx.transcript_accession}
+                                    proteinLength={protein.protein_length}
+                                  />
                                 </>
                               )}
                             </Card>
