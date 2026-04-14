@@ -126,7 +126,7 @@ export default function GenePage() {
   // Note: sequences can be loaded on demand when user expands a transcript
   // Currently sequences come from the full page load if include_sequences=true
 
-  // Download FASTA file
+  // Download FASTA file — prefers rna_sequence from DB, falls back to /genes/genomic
   const downloadFasta = useCallback(async () => {
     if (!geneId) return;
 
@@ -134,29 +134,41 @@ export default function GenePage() {
     try {
       const result = await getGenePage(geneId, true);
 
-      // Build FASTA content
-      let fastaContent = '';
-
-      // Gene-level FASTA (using transcript sequences if available)
       const geneSymbol = result.gene.gene_symbol || result.gene.gene_id;
-      const geneDesc = `${result.gene.seqid}:${result.gene.start}-${result.gene.end} strand=${result.gene.strand} gene=${geneSymbol}`;
+      const geneDesc = `${toChrId(result.gene.seqid)}:${result.gene.start}-${result.gene.end} strand=${result.gene.strand} gene=${geneSymbol}`;
 
-      // Try to get RNA sequence from first transcript
-      const transcriptWithSeq = result.transcripts.find(tx => tx.rna_sequence);
-
-      if (transcriptWithSeq?.rna_sequence) {
-        fastaContent = `>${transcriptWithSeq.transcript_acc || transcriptWithSeq.transcript_id} ${geneDesc}\n`;
-        // Format sequence with 80 characters per line
-        const seq = transcriptWithSeq.rna_sequence;
-        for (let i = 0; i < seq.length; i += 80) {
-          fastaContent += seq.slice(i, i + 80) + '\n';
+      // Try rna_sequence from DB first, pick longest
+      let bestSeq: string | null = null;
+      let bestTxId = result.transcripts[0]?.transcript_acc || result.transcripts[0]?.transcript_id || result.gene.gene_id;
+      for (const tx of result.transcripts) {
+        if (tx.rna_sequence && (!bestSeq || tx.rna_sequence.length > bestSeq.length)) {
+          bestSeq = tx.rna_sequence;
+          bestTxId = tx.transcript_acc || tx.transcript_id;
         }
+      }
+
+      // Fall back to genomic fetch for the longest transcript
+      if (!bestSeq) {
+        const longestTx = result.transcripts.reduce((a, b) =>
+          (a.end - a.start) > (b.end - b.start) ? a : b
+        );
+        try {
+          const loc = `${toChrId(longestTx.seqid)}:${longestTx.start}-${longestTx.end}`;
+          const region = await fetchGenomicSeq(loc);
+          bestSeq = region.seq;
+          bestTxId = longestTx.transcript_acc || longestTx.transcript_id;
+        } catch { /* bestSeq stays null */ }
+      }
+
+      let fastaContent: string;
+      if (bestSeq) {
+        fastaContent = `>${bestTxId} ${geneDesc}\n`;
+        const wrapped = bestSeq.match(/.{1,80}/g)?.join('\n') || bestSeq;
+        fastaContent += wrapped + '\n';
       } else {
-        // If no sequence available, create a placeholder FASTA
         fastaContent = `>${result.gene.gene_id} ${geneDesc} [No sequence available]\nNNNN\n`;
       }
 
-      // Create and download file
       const blob = new Blob([fastaContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -173,21 +185,32 @@ export default function GenePage() {
     }
   }, [geneId]);
 
-  // Download Transcript FASTA
-  const downloadTranscriptFasta = useCallback((transcript: TranscriptResult) => {
+  // Download Transcript FASTA — uses rna_sequence from DB, falls back to /genes/genomic
+  const downloadTranscriptFasta = useCallback(async (transcript: TranscriptResult) => {
     if (!transcript || !data) return;
 
     const txId = transcript.transcript_acc || transcript.transcript_id;
     const geneSymbol = data?.gene.gene_symbol || data?.gene.gene_id || '';
-    const geneDesc = `${transcript.seqid}:${transcript.start}-${transcript.end} strand=${transcript.strand} gene=${geneSymbol}`;
+    const geneDesc = `${toChrId(transcript.seqid)}:${transcript.start}-${transcript.end} strand=${transcript.strand} gene=${geneSymbol}`;
+
+    let seq: string | null = transcript.rna_sequence;
+
+    // Fall back to genomic fetch if DB has no rna_sequence
+    if (!seq) {
+      try {
+        const loc = `${toChrId(transcript.seqid)}:${transcript.start}-${transcript.end}`;
+        const region = await fetchGenomicSeq(loc);
+        seq = region.seq;
+      } catch {
+        seq = null;
+      }
+    }
 
     let fastaContent: string;
-    if (transcript.rna_sequence) {
+    if (seq) {
       fastaContent = `>${txId} ${geneDesc}\n`;
-      const seq = transcript.rna_sequence;
-      for (let i = 0; i < seq.length; i += 80) {
-        fastaContent += seq.slice(i, i + 80) + '\n';
-      }
+      const wrapped = seq.match(/.{1,80}/g)?.join('\n') || seq;
+      fastaContent += wrapped + '\n';
     } else {
       fastaContent = `>${txId} ${geneDesc} [No sequence available]\nNNNN\n`;
     }
@@ -203,25 +226,33 @@ export default function GenePage() {
     URL.revokeObjectURL(url);
   }, [data]);
 
-  // Download all Exons as FASTA (with location info only - no actual sequence from API)
-  const downloadExonsFasta = useCallback((transcript: TranscriptResult) => {
+  // Download all Exons as FASTA (actual genomic sequences)
+  const downloadExonsFasta = useCallback(async (transcript: TranscriptResult) => {
     if (!transcript || !data) return;
 
     const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
     let fastaContent = '';
 
-    // Add header note
     fastaContent += `# Exons for transcript: ${transcript.transcript_acc || transcript.transcript_id}\n`;
     fastaContent += `# Gene: ${geneSymbol}\n`;
-    fastaContent += `# Note: Sequence not available from API - showing location coordinates only\n`;
     fastaContent += `#\n`;
 
-    transcript.exons.forEach((exon, idx) => {
+    for (let idx = 0; idx < transcript.exons.length; idx++) {
+      const exon = transcript.exons[idx];
       const exonId = exon.exon_id || `exon_${idx + 1}`;
-      const desc = `${exon.seqid}:${exon.start}-${exon.end} strand=${exon.strand} exon=${idx + 1} length=${exon.length}bp`;
-      fastaContent += `>${exonId} ${desc}\n`;
-      fastaContent += `# Coordinates: ${exon.start}-${exon.end} on ${exon.seqid}\n`;
-    });
+      const chrId = toChrId(exon.seqid);
+      const loc = `${chrId}:${exon.start}-${exon.end}`;
+      const desc = `${chrId}:${exon.start}-${exon.end} strand=${exon.strand} exon=${idx + 1} length=${exon.length}bp`;
+
+      try {
+        const region = await fetchGenomicSeq(loc);
+        fastaContent += `>${exonId} ${desc}\n`;
+        const wrapped = region.seq.match(/.{1,80}/g)?.join('\n') || region.seq;
+        fastaContent += wrapped + '\n';
+      } catch {
+        fastaContent += `>${exonId} ${desc} [Sequence unavailable]\nNNNN\n`;
+      }
+    }
 
     const blob = new Blob([fastaContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -234,25 +265,33 @@ export default function GenePage() {
     URL.revokeObjectURL(url);
   }, [data]);
 
-  // Download all CDS as FASTA (with location info only - no actual sequence from API)
-  const downloadCdsFasta = useCallback((transcript: TranscriptResult) => {
+  // Download all CDS as FASTA (actual genomic sequences)
+  const downloadCdsFasta = useCallback(async (transcript: TranscriptResult) => {
     if (!transcript || !data) return;
 
     const geneSymbol = data.gene.gene_symbol || data.gene.gene_id;
     let fastaContent = '';
 
-    // Add header note
     fastaContent += `# CDS Segments for transcript: ${transcript.transcript_acc || transcript.transcript_id}\n`;
     fastaContent += `# Gene: ${geneSymbol}\n`;
-    fastaContent += `# Note: Sequence not available from API - showing location coordinates only\n`;
     fastaContent += `#\n`;
 
-    transcript.cds_segments.forEach((cds, idx) => {
+    for (let idx = 0; idx < transcript.cds_segments.length; idx++) {
+      const cds = transcript.cds_segments[idx];
       const cdsId = cds.cds_id || `cds_${idx + 1}`;
-      const desc = `${cds.seqid}:${cds.start}-${cds.end} strand=${cds.strand} cds=${idx + 1} phase=${cds.phase} length=${cds.length}bp`;
-      fastaContent += `>${cdsId} ${desc}\n`;
-      fastaContent += `# Coordinates: ${cds.start}-${cds.end} on ${cds.seqid}\n`;
-    });
+      const chrId = toChrId(cds.seqid);
+      const loc = `${chrId}:${cds.start}-${cds.end}`;
+      const desc = `${chrId}:${cds.start}-${cds.end} strand=${cds.strand} cds=${idx + 1} phase=${cds.phase} length=${cds.length}bp`;
+
+      try {
+        const region = await fetchGenomicSeq(loc);
+        fastaContent += `>${cdsId} ${desc}\n`;
+        const wrapped = region.seq.match(/.{1,80}/g)?.join('\n') || region.seq;
+        fastaContent += wrapped + '\n';
+      } catch {
+        fastaContent += `>${cdsId} ${desc} [Sequence unavailable]\nNNNN\n`;
+      }
+    }
 
     const blob = new Blob([fastaContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -798,7 +837,7 @@ export default function GenePage() {
                           leftSection={<IconDownload size={14} />}
                           onClick={() => downloadExonsFasta(tx)}
                         >
-                          Export Locs
+                          Export FASTA
                         </Button>
                         <Button
                           variant="light"
@@ -883,7 +922,7 @@ export default function GenePage() {
                           leftSection={<IconDownload size={14} />}
                           onClick={() => downloadCdsFasta(tx)}
                         >
-                          Export Locs
+                          Export FASTA
                         </Button>
                         <Button
                           variant="light"
