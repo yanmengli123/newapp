@@ -732,6 +732,7 @@ def search_genes(request: Request, q: str = Query(..., min_length=1), limit: int
 @app.get("/genes/genomic")
 def get_genomic_sequence(
     loc: str = Query(..., description="Genomic region, e.g. chr1:944136-944228"),
+    revcomp: bool = Query(default=False, description="If true, return reverse-complement (for negative-strand genes)"),
 ):
     """
     Fetch genomic DNA sequence for a region.
@@ -770,6 +771,10 @@ def get_genomic_sequence(
         sequence = str(seq)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Sequence fetch failed: {e}")
+
+    if revcomp:
+        # Reverse complement: swap AT/TG pairs, then reverse
+        sequence = sequence.translate(str.maketrans("ACGTacgt", "TGCAtgca"))[::-1]
 
     return {
         "seqid": refname,

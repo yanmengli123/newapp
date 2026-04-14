@@ -70,9 +70,10 @@ interface GenomicRegionResult {
   seq: string;
 }
 
-async function fetchGenomicSeq(loc: string): Promise<GenomicRegionResult> {
+async function fetchGenomicSeq(loc: string, revcomp = false): Promise<GenomicRegionResult> {
   const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-  const res = await fetch(`${base}/genes/genomic?loc=${encodeURIComponent(loc)}`);
+  const url = `${base}/genes/genomic?loc=${encodeURIComponent(loc)}${revcomp ? "&revcomp=true" : ""}`;
+  const res = await fetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || "Failed to fetch sequence");
@@ -154,7 +155,7 @@ export default function GenePage() {
         );
         try {
           const loc = `${toChrId(longestTx.seqid)}:${longestTx.start}-${longestTx.end}`;
-          const region = await fetchGenomicSeq(loc);
+          const region = await fetchGenomicSeq(loc, longestTx.strand === "-");
           bestSeq = region.seq;
           bestTxId = longestTx.transcript_acc || longestTx.transcript_id;
         } catch { /* bestSeq stays null */ }
@@ -199,7 +200,7 @@ export default function GenePage() {
     if (!seq) {
       try {
         const loc = `${toChrId(transcript.seqid)}:${transcript.start}-${transcript.end}`;
-        const region = await fetchGenomicSeq(loc);
+        const region = await fetchGenomicSeq(loc, transcript.strand === "-");
         seq = region.seq;
       } catch {
         seq = null;
@@ -245,7 +246,7 @@ export default function GenePage() {
       const desc = `${chrId}:${exon.start}-${exon.end} strand=${exon.strand} exon=${idx + 1} length=${exon.length}bp`;
 
       try {
-        const region = await fetchGenomicSeq(loc);
+        const region = await fetchGenomicSeq(loc, transcript.strand === "-");
         fastaContent += `>${exonId} ${desc}\n`;
         const wrapped = region.seq.match(/.{1,80}/g)?.join('\n') || region.seq;
         fastaContent += wrapped + '\n';
@@ -284,7 +285,7 @@ export default function GenePage() {
       const desc = `${chrId}:${cds.start}-${cds.end} strand=${cds.strand} cds=${idx + 1} phase=${cds.phase} length=${cds.length}bp`;
 
       try {
-        const region = await fetchGenomicSeq(loc);
+        const region = await fetchGenomicSeq(loc, transcript.strand === "-");
         fastaContent += `>${cdsId} ${desc}\n`;
         const wrapped = region.seq.match(/.{1,80}/g)?.join('\n') || region.seq;
         fastaContent += wrapped + '\n';
@@ -354,7 +355,7 @@ export default function GenePage() {
       const results = await Promise.all(
         tx.exons.map(exon => {
           const loc = `${toChrId(exon.seqid)}:${exon.start}-${exon.end}`;
-          return fetchGenomicSeq(loc);
+          return fetchGenomicSeq(loc, tx.strand === "-");
         })
       );
       setExonSeqs(prev => ({ ...prev, [tx.transcript_id]: results }));
@@ -371,7 +372,7 @@ export default function GenePage() {
       const results = await Promise.all(
         tx.cds_segments.map(cds => {
           const loc = `${toChrId(cds.seqid)}:${cds.start}-${cds.end}`;
-          return fetchGenomicSeq(loc);
+          return fetchGenomicSeq(loc, tx.strand === "-");
         })
       );
       setCdsSeqs(prev => ({ ...prev, [tx.transcript_id]: results }));
