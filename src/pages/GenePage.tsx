@@ -136,7 +136,10 @@ export default function GenePage() {
       const result = await getGenePage(geneId, true);
 
       const geneSymbol = result.gene.gene_symbol || result.gene.gene_id;
-      const geneDesc = `${toChrId(result.gene.seqid)}:${result.gene.start}-${result.gene.end} strand=${result.gene.strand} gene=${geneSymbol}`;
+      // For negative strand, swap coords so header shows mRNA 5'→3' orientation
+      const geneStart = result.gene.strand === "-" ? Math.max(result.gene.start, result.gene.end) : Math.min(result.gene.start, result.gene.end);
+      const geneEnd = result.gene.strand === "-" ? Math.min(result.gene.start, result.gene.end) : Math.max(result.gene.start, result.gene.end);
+      const geneDesc = `${toChrId(result.gene.seqid)}:${geneStart}-${geneEnd} strand=${result.gene.strand} gene=${geneSymbol}`;
 
       // Try rna_sequence from DB first, pick longest
       let bestSeq: string | null = null;
@@ -192,7 +195,10 @@ export default function GenePage() {
 
     const txId = transcript.transcript_acc || transcript.transcript_id;
     const geneSymbol = data?.gene.gene_symbol || data?.gene.gene_id || '';
-    const geneDesc = `${toChrId(transcript.seqid)}:${transcript.start}-${transcript.end} strand=${transcript.strand} gene=${geneSymbol}`;
+    // For negative strand, swap coords so header shows mRNA 5'→3' orientation
+    const txStart = transcript.strand === "-" ? Math.max(transcript.start, transcript.end) : Math.min(transcript.start, transcript.end);
+    const txEnd = transcript.strand === "-" ? Math.min(transcript.start, transcript.end) : Math.max(transcript.start, transcript.end);
+    const geneDesc = `${toChrId(transcript.seqid)}:${txStart}-${txEnd} strand=${transcript.strand} gene=${geneSymbol}`;
 
     let seq: string | null = transcript.rna_sequence;
 
