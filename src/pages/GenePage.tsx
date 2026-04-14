@@ -1051,30 +1051,6 @@ export default function GenePage() {
                                   </Accordion>
                                 </>
                               )}
-
-                              {/* CDS Sequence */}
-                              {protein.cds_sequence && (
-                                <>
-                                  <Accordion variant="contained" radius="md" mt="xs">
-                                    <Accordion.Item value={`${protein.protein_id}-cds`}>
-                                      <Accordion.Control icon={<IconDna2 size={14} />}>
-                                        CDS Sequence ({protein.cds_length} bp)
-                                      </Accordion.Control>
-                                      <Accordion.Panel>
-                                        <Paper withBorder p="sm" radius="md" bg="gray.0" style={{ maxHeight: 200, overflow: "auto" }}>
-                                          <Text
-                                            size="xs"
-                                            ff="monospace"
-                                            style={{ wordBreak: "break-all", whiteSpace: "pre-wrap" }}
-                                          >
-                                            {protein.cds_sequence}
-                                          </Text>
-                                        </Paper>
-                                      </Accordion.Panel>
-                                    </Accordion.Item>
-                                  </Accordion>
-                                </>
-                              )}
                             </Card>
                           ))}
                         </Stack>
