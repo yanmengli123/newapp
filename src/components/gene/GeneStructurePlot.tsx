@@ -523,22 +523,23 @@ function ExonTooltipCard({
         </Group>
         <Text size="xs" c="#9ca3af" ff="monospace">{absLen.toLocaleString()} bp</Text>
       </Group>
-        <Text size="xs" c="white" ff="monospace" mb={4}>
-          {absStart.toLocaleString()} — {absEnd.toLocaleString()}
-        </Text>
-        <Group gap={12} wrap="wrap">
-          {cdsLen > 0 ? (
-            <>
-              <Text size="xs" c="#90cdf4">CDS: {cdsLen.toLocaleString()} bp {cdsLen > 0 ? `(${(cdsLen / absLen * 100).toFixed(0)}%)` : ""}</Text>
-              {utr5Len > 0 && <Text size="xs" c="#cbd5e0">5&apos; UTR {utr5Len}</Text>}
-              {utr3Len > 0 && <Text size="xs" c="#a0aec0">3&apos; UTR {utr3Len}</Text>}
-            </>
-          ) : (
-            utr5Len > 0 && <Text size="xs" c="#cbd5e0">5&apos; UTR: {utr5Len.toLocaleString()} bp</Text>,
-            utr3Len > 0 && <Text size="xs" c="#a0aec0">3&apos; UTR: {utr3Len.toLocaleString()} bp</Text>
-          )}
-        </Group>
-      </div>
+      <Text size="xs" c="white" ff="monospace" mb={4}>
+        {absStart.toLocaleString()} — {absEnd.toLocaleString()}
+      </Text>
+      <Group gap={12} wrap="wrap">
+        {cdsLen > 0 ? (
+          <>
+            <Text size="xs" c="#90cdf4">CDS: {cdsLen.toLocaleString()} bp ({(cdsLen / absLen * 100).toFixed(0)}%)</Text>
+            {utr5Len > 0 && <Text size="xs" c="#cbd5e0">5&apos; UTR: {utr5Len}</Text>}
+            {utr3Len > 0 && <Text size="xs" c="#a0aec0">3&apos; UTR: {utr3Len}</Text>}
+          </>
+        ) : (
+          <>
+            {utr5Len > 0 && <Text size="xs" c="#cbd5e0">5&apos; UTR: {utr5Len.toLocaleString()} bp</Text>}
+            {utr3Len > 0 && <Text size="xs" c="#a0aec0">3&apos; UTR: {utr3Len.toLocaleString()} bp</Text>}
+          </>
+        )}
+      </Group>
     </div>
   );
 }
@@ -697,8 +698,6 @@ export default function GeneStructurePlot({
 
   const svgWidth = LABEL_W + SUMMARY_W + 820;
   const svgHeight = HEADER_H + RULER_H + displayTracks.length * TRACK_FULL_H;
-  const scaledWidth = svgWidth * zoom;
-  const scaledHeight = svgHeight * zoom;
 
   // ── Export PNG ──
   const exportPng = useCallback(() => {
@@ -804,23 +803,28 @@ export default function GeneStructurePlot({
       {/* ── Legend ── */}
       <Legend />
 
-      {/* ── Plot — no border box, freely positioned ── */}
+      {/* ── Plot — zoom scales SVG content via CSS transform ── */}
       <Box
         ref={containerRef}
         style={{
-          overflow: "visible",
           background: C.bg,
           position: "relative",
-          width: scaledWidth,
-          maxWidth: "100%",
+          overflow: "hidden",
+          width: svgWidth,
+          height: svgHeight,
         }}
       >
         <svg
           className="gene-structure-svg"
-          width={scaledWidth}
-          height={scaledHeight}
+          width={svgWidth}
+          height={svgHeight}
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ display: "block", overflow: "visible" }}
+          style={{
+            display: "block",
+            transform: `scale(${zoom})`,
+            transformOrigin: "top left",
+            overflow: "visible",
+          }}
           onClick={(e) => {
             const target = e.target as SVGElement;
             if (target.tagName === "svg") {
@@ -900,20 +904,20 @@ export default function GeneStructurePlot({
             </g>
           )}
         </svg>
-
-        {/* Click-triggered exon tooltip — floats outside SVG */}
-        {clickedExon && (
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
-            <ExonTooltipCard
-              region={clickedExon.region}
-              exonIdx={clickedExon.exonIdx}
-              txStart={activePt.txStart}
-              strand={activePt.strand}
-              onClose={() => setClickedExon(null)}
-            />
-          </div>
-        )}
       </Box>
+
+      {/* Click-triggered exon tooltip — rendered as sibling below the plot box */}
+      {clickedExon && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+          <ExonTooltipCard
+            region={clickedExon.region}
+            exonIdx={clickedExon.exonIdx}
+            txStart={activePt.txStart}
+            strand={activePt.strand}
+            onClose={() => setClickedExon(null)}
+          />
+        </div>
+      )}
 
       {/* ── Selected transcript summary ── */}
       <TranscriptSummaryCard pt={activePt} />
