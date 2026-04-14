@@ -494,6 +494,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     active: boolean; startClientX: number;
     startVp: { startBp: number; endBp: number };
   }>({ active: false, startClientX: 0, startVp: { startBp: 0, endBp: 0 } });
+  const dragStateRef = useRef(dragState);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const processed = useMemo(() => transcripts.map(processTranscript), [transcripts]);
@@ -584,16 +585,24 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
   }, [startBp, spanBp]);
 
   // Global listeners for drag — needed because mouse may leave SVG during drag
+  // Use dragStateRef so listener always reads fresh values without needing dragState in deps
+  useEffect(() => {
+    dragStateRef.current = dragState;
+  });
+
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      if (!dragState.active) return;
-      const deltaX = e.clientX - dragState.startClientX;
-      const bpDelta = (deltaX / innerW) * spanBp;
-      const newStart = clamp(dragState.startVp.startBp - bpDelta, 0, totalLen - spanBp);
-      setViewport({ startBp: newStart, endBp: newStart + spanBp });
+      const d = dragStateRef.current;
+      if (!d.active) return;
+      const deltaX = e.clientX - d.startClientX;
+      const currentSpan = viewport.endBp - viewport.startBp;
+      const bpDelta = (deltaX / innerW) * currentSpan;
+      const newStart = clamp(d.startVp.startBp - bpDelta, 0, totalLen - currentSpan);
+      setViewport({ startBp: newStart, endBp: newStart + currentSpan });
     };
     const onUp = () => {
-      setDragState((d) => ({ ...d, active: false }));
+      dragStateRef.current = { ...dragStateRef.current, active: false };
+      setDragState((prev) => ({ ...prev, active: false }));
     };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
@@ -601,7 +610,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [dragState, innerW, spanBp, totalLen]);
+  }, [innerW, totalLen, viewport]);
 
   // ── Wheel zoom ─────────────────────────────────────────────────────────────
   useEffect(() => {
