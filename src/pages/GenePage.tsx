@@ -131,7 +131,7 @@ function ProteinStructureAccessPanel({
           <Text size="xs" mb={4}>
             <strong>Step 2:</strong> Go to AlphaFold Server at&nbsp;
             <Text component="span" ff="monospace" size="xs">
-              https://alphafold.ebi.ac.uk/submit
+              https://alphafoldserver.com/
             </Text>
           </Text>
           <Text size="xs" mb={4}>
@@ -146,7 +146,7 @@ function ProteinStructureAccessPanel({
         <Group gap="xs">
           <Button
             component="a"
-            href="https://alphafold.ebi.ac.uk/submit"
+            href="https://alphafoldserver.com/"
             target="_blank"
             rel="noopener noreferrer"
             size="xs"
@@ -179,44 +179,26 @@ function ProteinStructureAccessPanel({
 
         {/* Copy sequence shortcut */}
         <Group gap="xs" align="center">
-          <CopyButton
-            value={cleanSeq}
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            onClick={() => {
+              navigator.clipboard.writeText(cleanSeq).catch(() => {});
+            }}
+            title="Copy pure sequence"
           >
-            {({ copied, copy) => (
-              <Tooltip label={copied ? "Copied!" : "Copy pure sequence"}>
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color={copied ? "teal" : "gray"}
-                  onClick={() => {
-                    copy();
-                    // TODO: analytics.track("copy_protein_sequence", { protein_id: proteinId });
-                  }}
-                >
-                  <IconClipboardCopy size={14} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </CopyButton>
-          <CopyButton
-            value={fastaText}
+            <IconClipboardCopy size={14} />
+          </ActionIcon>
+          <ActionIcon
+            size="sm"
+            variant="subtle"
+            onClick={() => {
+              navigator.clipboard.writeText(fastaText).catch(() => {});
+            }}
+            title="Copy as FASTA"
           >
-            {({ copied, copy) => (
-              <Tooltip label={copied ? "Copied!" : "Copy as FASTA"}>
-                <ActionIcon
-                  size="sm"
-                  variant="subtle"
-                  color={copied ? "teal" : "gray"}
-                  onClick={() => {
-                    copy();
-                    // TODO: analytics.track("copy_protein_fasta", { protein_id: proteinId });
-                  }}
-                >
-                  <IconClipboardCopy size={14} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-          </CopyButton>
+            <IconClipboardCopy size={14} />
+          </ActionIcon>
           <Text size="xs" c="dimmed">
             {cleanSeq.length} aa · {proteinLength != null ? `${proteinLength} aa recorded` : "length from DB"}
           </Text>
@@ -1192,13 +1174,14 @@ export default function GenePage() {
                                               </Text>
                                             </Paper>
                                             <Group justify="flex-end" mt="xs">
-                                              <CopyButton value={protein.protein_sequence.replace(/\s+/g, "").trim()}>
-                                                {({ copied, copy }) => (
-                                                  <Button size="xs" variant="light" leftSection={<IconClipboardCopy size={12} />} onClick={copy}>
-                                                    {copied ? "Copied!" : "Copy Sequence"}
+                                              {(() => {
+                                                const clean = protein.protein_sequence.replace(/\s+/g, "").trim();
+                                                return (
+                                                  <Button size="xs" variant="light" leftSection={<IconClipboardCopy size={12} />} onClick={() => navigator.clipboard.writeText(clean).catch(() => {})}>
+                                                    Copy Sequence
                                                   </Button>
-                                                )}
-                                              </CopyButton>
+                                                );
+                                              })()}
                                             </Group>
                                           </Tabs.Panel>
                                           <Tabs.Panel value="fasta">
@@ -1208,15 +1191,14 @@ export default function GenePage() {
                                               </Text>
                                             </Paper>
                                             <Group justify="flex-end" mt="xs">
-                                              <CopyButton
-                                                value={`>${protein.protein_id} gene=${data.gene.gene_symbol || data.gene.gene_id} length=${protein.protein_length}aa\n${protein.protein_sequence}\n`}
-                                              >
-                                                {({ copied, copy }) => (
-                                                  <Button size="xs" variant="light" leftSection={<IconClipboardCopy size={12} />} onClick={copy}>
-                                                    {copied ? "Copied!" : "Copy FASTA"}
+                                              {(() => {
+                                                const fastaVal = `>${protein.protein_id} gene=${data.gene.gene_symbol || data.gene.gene_id} length=${protein.protein_length}aa\n${protein.protein_sequence}\n`;
+                                                return (
+                                                  <Button size="xs" variant="light" leftSection={<IconClipboardCopy size={12} />} onClick={() => navigator.clipboard.writeText(fastaVal).catch(() => {})}>
+                                                    Copy FASTA
                                                   </Button>
-                                                )}
-                                              </CopyButton>
+                                                );
+                                              })()}
                                               <Button
                                                 size="xs"
                                                 variant="light"
