@@ -492,6 +492,7 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     exonIdx: number; region: ExonRegion; anchorRect: DOMRect;
   } | null>(null);
   const [hoveredExon, setHoveredExon] = useState<{ transcriptId: string; exonIdx: number } | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const [dragState, setDragState] = useState<{
     active: boolean; startClientX: number;
     startVp: { startBp: number; endBp: number };
@@ -520,10 +521,11 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     });
   }, [processed]);
 
-  // Always show only the selected transcript (single-track view)
+  // Display tracks: all when showAll=true, otherwise only the selected one
   const displayTracks = useMemo(() => {
+    if (showAll) return sorted;
     return sorted.filter((pt) => pt.tx.transcript_id === (selectedTxId ?? defaultPt.tx.transcript_id));
-  }, [sorted, selectedTxId, defaultPt]);
+  }, [sorted, selectedTxId, defaultPt, showAll]);
 
   // ── Viewport state ─────────────────────────────────────────────────────────
   const [viewport, setViewport] = useState<{ startBp: number; endBp: number }>({
@@ -691,13 +693,24 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
           <Text size="xs" fw={600} c="dimmed">Gene Structure — {geneSymbol ?? "Unknown"}</Text>
           <Select
             size="xs"
-            w={240}
-            value={selectedTxId ?? defaultPt.tx.transcript_id}
-            onChange={(val) => { setSelectedTxId(val); setActiveExon(null); }}
-            data={sorted.map((pt) => ({
-              value: pt.tx.transcript_id,
-              label: `${pt.tx.transcript_acc || pt.tx.transcript_id} (${pt.relativeExons.length}E, ${formatBp(pt.totalLength)})`,
-            }))}
+            w={260}
+            value={showAll ? "__all__" : (selectedTxId ?? defaultPt.tx.transcript_id)}
+            onChange={(val) => {
+              if (val === "__all__") {
+                setShowAll(true);
+              } else {
+                setShowAll(false);
+                setSelectedTxId(val);
+                setActiveExon(null);
+              }
+            }}
+            data={[
+              { value: "__all__", label: `All transcripts (${sorted.length})` },
+              ...sorted.map((pt) => ({
+                value: pt.tx.transcript_id,
+                label: `${pt.tx.transcript_acc || pt.tx.transcript_id} (${pt.relativeExons.length}E, ${formatBp(pt.totalLength)})`,
+              })),
+            ]}
             styles={{ input: { fontFamily: "monospace", fontSize: 11 } }}
           />
           <Badge size="xs" variant="light" color="gray">{processed.length} total</Badge>
