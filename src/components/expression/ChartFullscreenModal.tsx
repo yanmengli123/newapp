@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ActionIcon, Box, Button, Drawer, Group, Loader, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from "@mantine/core";
+import { ActionIcon, Box, Button, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from "@mantine/core";
 import { IconX, IconDownload } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { FullscreenState } from "./chartFullscreen.types";
 import type { GeneExpressionResponse, ExpressionSample } from "../../lib/geneApi";
 import type { ResolvedChartStyle } from "./chartCustomizer.types";
@@ -149,42 +149,15 @@ export default function ChartFullscreenModal({
   const [customHeight, setCustomHeight] = useState<number>(800);
   const [filename, setFilename] = useState<string>(DEFAULT_FILENAME(chartType));
   const [background, setBackground] = useState<"white" | "transparent">("white");
-  const [chartReady, setChartReady] = useState(false);
 
   const selectedPreset = SIZE_PRESETS.find(p => p.value === sizePreset) ?? SIZE_PRESETS[0];
   const exportWidth = sizePreset === "custom" ? customWidth : selectedPreset.width;
   const exportHeight = sizePreset === "custom" ? customHeight : selectedPreset.height;
   const exportScale = 2;
 
-  // Reset chart ready state when drawer opens or chart type changes
-  useEffect(() => {
-    if (!isOpen) {
-      setChartReady(false);
-      return;
-    }
-    setChartReady(false);
-
-    // Wait for Plotly to render — listen for plotly_relayout event
-    const plotDiv = document.getElementById(`fullscreen-plot-${chartType}`);
-    if (!plotDiv) return;
-
-    const handleReady = () => setChartReady(true);
-
-    // Plotly fires 'plotly_relayout' when it finishes a render
-    (plotDiv as any).once("plotly_relayout", handleReady);
-
-    // Fallback: if event already fired or doesn't fire, use a generous timeout
-    const fallback = setTimeout(() => setChartReady(true), 1500);
-    return () => {
-      clearTimeout(fallback);
-      try { (plotDiv as any).off("plotly_relayout", handleReady); } catch (_) { /* ignore */ }
-    };
-  }, [isOpen, chartType]);
-
   const getPlotDiv = useCallback(() => document.getElementById(`fullscreen-plot-${chartType}`) as any, [chartType]);
 
   const handleDownload = useCallback(() => {
-    if (!chartReady) return;
     const plotDiv = getPlotDiv();
     if (!plotDiv) return;
 
@@ -215,7 +188,7 @@ export default function ChartFullscreenModal({
     if (!success) {
       console.warn("[ChartFullscreenModal] Plotly download unavailable for:", chartType);
     }
-  }, [chartReady, chartType, exportWidth, exportHeight, filename, background, getPlotDiv]);
+  }, [chartType, exportWidth, exportHeight, filename, background, getPlotDiv]);
 
   const renderPlotContent = () => {
     const commonProps = {
@@ -279,12 +252,6 @@ export default function ChartFullscreenModal({
           id={`fullscreen-plot-${chartType}`}
           style={{ width: "100%", flex: 1, minHeight: 0 }}
         >
-          {!chartReady && (
-            <Stack align="center" justify="center" h={chartHeight}>
-              <Loader size="md" />
-              <Text size="xs" c="dimmed">Rendering chart…</Text>
-            </Stack>
-          )}
           {renderPlotContent()}
         </Box>
 
@@ -354,7 +321,6 @@ export default function ChartFullscreenModal({
             size="xs"
             leftSection={<IconDownload size={14} />}
             onClick={handleDownload}
-            disabled={!chartReady}
           >
             Download
           </Button>
