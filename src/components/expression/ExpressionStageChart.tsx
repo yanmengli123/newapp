@@ -3,6 +3,7 @@ import { Box, Paper, Stack, Text } from "@mantine/core";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { GeneExpressionResponse } from "../../lib/geneApi";
+import type { ResolvedChartStyle } from "./chartCustomizer.types";
 
 const Plot = createPlotlyComponent(PlotlyModule);
 
@@ -10,6 +11,7 @@ interface ExpressionStageChartProps {
   summary: GeneExpressionResponse["summary"];
   dataset: string;
   metric: string;
+  styleConfig?: ResolvedChartStyle;
 }
 
 const DATASET_DISPLAY_NAMES: Record<string, string> = {
@@ -82,8 +84,21 @@ export default function ExpressionStageChart({
   summary,
   dataset,
   metric,
+  styleConfig,
 }: ExpressionStageChartProps) {
   const { stages, maleValues, femaleValues, meanValues } = resolveStageMeans(summary?.stage_means ?? null);
+
+  // Resolve style config with defaults
+  const fontSize = styleConfig?.fontSize ?? 10;
+  const chartHeight = styleConfig?.chartHeight ?? 220;
+  const showLegend = styleConfig?.showLegend ?? true;
+  const showGrid = styleConfig?.showGrid ?? true;
+  const showMeanLine = styleConfig?.chartSpecific?.showMeanLine ?? true;
+  const showValueLabel = styleConfig?.chartSpecific?.showValueLabel ?? false;
+  const maleColor = styleConfig?.colors?.male ?? "#228BE6";
+  const femaleColor = styleConfig?.colors?.female ?? "#E64980";
+  const gridColor = styleConfig?.colors?.grid ?? "#f0f0f0";
+  const titleOverride = styleConfig?.title;
 
   const hasData = stages.length > 0 && (
     maleValues.some(v => v > 0) ||
@@ -105,46 +120,46 @@ export default function ExpressionStageChart({
       y: maleValues.map(v => isValidNumber(v) ? v : 0),
       name: "Male",
       type: "bar",
-      marker: { color: "#228BE6", opacity: 0.85 },
-      text: maleValues.map(v => (isValidNumber(v) ? v : 0).toFixed(2)),
-      textposition: "outside",
-      textfont: { size: 9, color: "#228BE6" },
+      marker: { color: maleColor, opacity: 0.85 },
+      text: showValueLabel ? maleValues.map(v => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined,
+      textposition: showValueLabel ? "outside" : "none",
+      textfont: { size: fontSize - 1, color: maleColor },
     },
     {
       x: stages,
       y: femaleValues.map(v => isValidNumber(v) ? v : 0),
       name: "Female",
       type: "bar",
-      marker: { color: "#E64980", opacity: 0.85 },
-      text: femaleValues.map(v => (isValidNumber(v) ? v : 0).toFixed(2)),
-      textposition: "outside",
-      textfont: { size: 9, color: "#E64980" },
+      marker: { color: femaleColor, opacity: 0.85 },
+      text: showValueLabel ? femaleValues.map(v => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined,
+      textposition: showValueLabel ? "outside" : "none",
+      textfont: { size: fontSize - 1, color: femaleColor },
     },
-    {
+    ...(showMeanLine ? [{
       x: stages,
       y: meanValues.map(v => isValidNumber(v) ? v : 0),
       name: "Total Mean",
-      type: "scatter",
-      mode: "lines+markers",
+      type: "scatter" as const,
+      mode: "lines+markers" as const,
       line: { color: "#7950F2", width: 2, dash: "dot" },
       marker: { color: "#7950F2", size: 7 },
       yaxis: "y2",
-    },
+    }] : []),
   ];
 
   const layout: any = {
     barmode: "group",
     margin: { t: 8, b: 48, l: 56, r: 16 },
     yaxis: {
-      title: { text: metric === "tpm" || metric === "fpkm" ? metric.toUpperCase() : "Normalized Count", font: { size: 10 } },
-      gridcolor: "#f0f0f0",
-      tickfont: { size: 9 },
+      title: { text: metric === "tpm" || metric === "fpkm" ? metric.toUpperCase() : "Normalized Count", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      tickfont: { size: fontSize - 1 },
       domain: [0, 0.72],
     },
     yaxis2: {
-      title: { text: "Mean (dot)", font: { size: 10, color: "#7950F2" } },
-      gridcolor: "#f0f0f0",
-      tickfont: { size: 9, color: "#7950F2" },
+      title: { text: "Mean (dot)", font: { size: fontSize, color: "#7950F2" } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      tickfont: { size: fontSize - 1, color: "#7950F2" },
       anchor: "free",
       side: "right",
       overlaying: "y",
@@ -152,20 +167,20 @@ export default function ExpressionStageChart({
       domain: [0, 1],
     },
     xaxis: {
-      tickfont: { size: 9 },
-      gridcolor: "#f8f8f8",
+      tickfont: { size: fontSize - 1 },
+      gridcolor: "transparent",
     },
     legend: {
       orientation: "h",
       x: 0.5,
       xanchor: "center",
       y: -0.22,
-      font: { size: 9 },
+      font: { size: fontSize - 1 },
     },
-    font: { family: "sans-serif", size: 10 },
+    font: { family: "sans-serif", size: fontSize },
     paper_bgcolor: "white",
     plot_bgcolor: "white",
-    showlegend: true,
+    showlegend: showLegend,
     hovermode: "x unified",
   };
 
@@ -179,14 +194,14 @@ export default function ExpressionStageChart({
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
-          Stage Means — {getDatasetDisplayName(dataset)}
+          {titleOverride ?? `Stage Means — ${getDatasetDisplayName(dataset)}`}
         </Text>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
             config={config}
-            style={{ width: "100%", height: 220 }}
+            style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
         </Box>

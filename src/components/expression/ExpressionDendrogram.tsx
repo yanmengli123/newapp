@@ -3,6 +3,7 @@ import { Box, Paper, Stack, Text } from "@mantine/core";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
+import type { ResolvedChartStyle } from "./chartCustomizer.types";
 import {
   groupSamplesByStageSex, sortStages, isValidNumber,
   getDatasetDisplayName, PLOT_CONFIG, PAPER_STYLE,
@@ -13,9 +14,21 @@ const Plot = createPlotlyComponent(PlotlyModule);
 interface ExpressionDendrogramProps {
   samples: ExpressionSample[];
   dataset: string;
+  styleConfig?: ResolvedChartStyle;
 }
 
-export default function ExpressionDendrogram({ samples, dataset }: ExpressionDendrogramProps) {
+export default function ExpressionDendrogram({ samples, dataset, styleConfig }: ExpressionDendrogramProps) {
+  const fontSize = styleConfig?.fontSize ?? 10;
+  const chartHeight = styleConfig?.chartHeight ?? 200;
+  const showLegend = styleConfig?.showLegend ?? true;
+  const showGrid = styleConfig?.showGrid ?? true;
+  const pointSize = styleConfig?.chartSpecific?.pointSize ?? 8;
+  const showLabels = styleConfig?.chartSpecific?.showLabels ?? true;
+  const maleColor = styleConfig?.colors?.male ?? "#228BE6";
+  const femaleColor = styleConfig?.colors?.female ?? "#E64980";
+  const gridColor = styleConfig?.colors?.grid ?? "#f0f0f0";
+  const titleOverride = styleConfig?.title;
+
   const grouped = groupSamplesByStageSex(samples);
   const stages = sortStages(Object.keys(grouped));
 
@@ -61,10 +74,6 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
   const STAGE_X: Record<string, number> = {};
   stages.forEach((s, i) => { STAGE_X[s] = i; });
 
-  // Marker sizes proportional to replicate count (within reasonable range)
-  const sizeMale = maleData.map(d => Math.min(6 + d.count * 3, 18));
-  const sizeFemale = femaleData.map(d => Math.min(6 + d.count * 3, 18));
-
   // Hover text
   const hoverMale = maleData.map(d =>
     `<b>${d.stage} Male</b><br>Mean: ${d.mean.toFixed(3)}<br>n = ${d.count}`
@@ -77,11 +86,11 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
     // Male — line + scatter
     {
       type: "scatter",
-      mode: "lines+markers",
+      mode: showLabels ? "lines+markers" : "lines",
       x: maleData.map(d => STAGE_X[d.stage]),
       y: maleData.map(d => d.mean),
-      line: { color: "#228BE6", width: 1.5, dash: "solid" },
-      marker: { color: "#228BE6", size: sizeMale, symbol: "circle" },
+      line: { color: maleColor, width: 1.5, dash: "solid" },
+      marker: { color: maleColor, size: pointSize, symbol: "circle" },
       text: hoverMale,
       hovertemplate: "%{text}<extra>Male</extra>",
       name: "Male",
@@ -89,11 +98,11 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
     // Female — line + scatter
     {
       type: "scatter",
-      mode: "lines+markers",
+      mode: showLabels ? "lines+markers" : "lines",
       x: femaleData.map(d => STAGE_X[d.stage]),
       y: femaleData.map(d => d.mean),
-      line: { color: "#E64980", width: 1.5, dash: "solid" },
-      marker: { color: "#E64980", size: sizeFemale, symbol: "circle" },
+      line: { color: femaleColor, width: 1.5, dash: "solid" },
+      marker: { color: femaleColor, size: pointSize, symbol: "circle" },
       text: hoverFemale,
       hovertemplate: "%{text}<extra>Female</extra>",
       name: "Female",
@@ -106,23 +115,23 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
       tickmode: "array",
       tickvals: stages.map((_, i) => i),
       ticktext: stages,
-      tickfont: { size: 9 },
-      title: { text: "Stage", font: { size: 10 } },
-      gridcolor: "#f8f8f8",
-      showgrid: true,
+      tickfont: { size: fontSize - 1 },
+      title: { text: "Stage", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      showgrid: showGrid,
       dtick: 1,
     },
     yaxis: {
-      title: { text: "Mean Expression", font: { size: 10 } },
-      gridcolor: "#f0f0f0",
-      tickfont: { size: 9 },
+      title: { text: "Mean Expression", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      tickfont: { size: fontSize - 1 },
       zeroline: false,
     },
-    showlegend: true,
+    showlegend: showLegend,
     legend: {
       orientation: "h",
       x: 0.5, xanchor: "center", y: -0.22,
-      font: { size: 9 },
+      font: { size: fontSize - 1 },
     },
     hovermode: "closest" as const,
     ...PAPER_STYLE,
@@ -132,14 +141,14 @@ export default function ExpressionDendrogram({ samples, dataset }: ExpressionDen
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
-          Sample Clustering by Stage/Sex — {getDatasetDisplayName(dataset)}
+          {titleOverride ?? `Sample Clustering by Stage/Sex — ${getDatasetDisplayName(dataset)}`}
         </Text>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
             config={PLOT_CONFIG}
-            style={{ width: "100%", height: 200 }}
+            style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
         </Box>

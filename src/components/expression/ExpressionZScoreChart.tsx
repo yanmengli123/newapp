@@ -3,6 +3,7 @@ import { Box, Paper, Stack, Text } from "@mantine/core";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
+import type { ResolvedChartStyle } from "./chartCustomizer.types";
 import { normalizeSex, isValidNumber, getDatasetDisplayName, PLOT_CONFIG, PAPER_STYLE } from "./utils";
 
 const Plot = createPlotlyComponent(PlotlyModule);
@@ -10,9 +11,22 @@ const Plot = createPlotlyComponent(PlotlyModule);
 interface ExpressionZScoreChartProps {
   samples: ExpressionSample[];
   dataset: string;
+  styleConfig?: ResolvedChartStyle;
 }
 
-export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZScoreChartProps) {
+export default function ExpressionZScoreChart({ samples, dataset, styleConfig }: ExpressionZScoreChartProps) {
+  const fontSize = styleConfig?.fontSize ?? 10;
+  const chartHeight = styleConfig?.chartHeight ?? 220;
+  const showLegend = styleConfig?.showLegend ?? true;
+  const showGrid = styleConfig?.showGrid ?? true;
+  const lineWidth = styleConfig?.chartSpecific?.lineWidth ?? 2;
+  const markerSize = styleConfig?.chartSpecific?.markerSize ?? 6;
+  const maleColor = styleConfig?.colors?.male ?? "#228BE6";
+  const femaleColor = styleConfig?.colors?.female ?? "#E64980";
+  const neutralColor = styleConfig?.colors?.neutral ?? "#7950F6";
+  const gridColor = styleConfig?.colors?.grid ?? "#f0f0f0";
+  const titleOverride = styleConfig?.title;
+
   // Filter samples with valid z_score
   const validSamples = samples
     .filter(s => isValidNumber(s.z_score))
@@ -56,8 +70,8 @@ export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZS
       x: labels,
       y: zScores,
       name: "All",
-      line: { color: "#7950F2", width: 0.8, dash: "dot" },
-      marker: { color: "#7950F2", size: 4, opacity: 0.4 },
+      line: { color: neutralColor, width: 0.8, dash: "dot" },
+      marker: { color: neutralColor, size: 4, opacity: 0.4 },
       text: validSamples.map(s =>
         `${s.sample_name ?? s.stage}\nz = ${s.z_score!.toFixed(3)}`
       ),
@@ -72,8 +86,8 @@ export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZS
       x: maleIdx.map(i => labels[i]),
       y: maleIdx.map(i => zScores[i]),
       name: "Male",
-      line: { color: "#228BE6", width: 2 },
-      marker: { color: "#228BE6", size: 6 },
+      line: { color: maleColor, width: lineWidth },
+      marker: { color: maleColor, size: markerSize },
       text: maleIdx.map(i =>
         `${validSamples[i].sample_name}\nz = ${zScores[i].toFixed(3)}`
       ),
@@ -85,8 +99,8 @@ export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZS
       x: femaleIdx.map(i => labels[i]),
       y: femaleIdx.map(i => zScores[i]),
       name: "Female",
-      line: { color: "#E64980", width: 2 },
-      marker: { color: "#E64980", size: 6 },
+      line: { color: femaleColor, width: lineWidth },
+      marker: { color: femaleColor, size: markerSize },
       text: femaleIdx.map(i =>
         `${validSamples[i].sample_name}\nz = ${zScores[i].toFixed(3)}`
       ),
@@ -98,14 +112,14 @@ export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZS
     margin: { t: 8, b: 56, l: 56, r: 16 },
     xaxis: {
       tickangle: -40,
-      tickfont: { size: 8 },
-      gridcolor: "#f8f8f8",
+      tickfont: { size: fontSize - 2 },
+      gridcolor: "transparent",
       dtick: 1,
     },
     yaxis: {
-      title: { text: "Z-Score", font: { size: 10 } },
-      gridcolor: "#f0f0f0",
-      tickfont: { size: 9 },
+      title: { text: "Z-Score", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      tickfont: { size: fontSize - 1 },
       zeroline: true,
       zerolinecolor: "#ccc",
       zerolinewidth: 1,
@@ -114,10 +128,10 @@ export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZS
       orientation: "h" as const,
       x: 0.5, xanchor: "center" as const,
       y: -0.3,
-      font: { size: 9 },
+      font: { size: fontSize - 1 },
     },
-    font: { family: "sans-serif", size: 10 },
-    showlegend: maleIdx.length > 0 && femaleIdx.length > 0,
+    font: { family: "sans-serif", size: fontSize },
+    showlegend: showLegend && maleIdx.length > 0 && femaleIdx.length > 0,
     hovermode: "closest" as const,
     ...PAPER_STYLE,
   };
@@ -126,14 +140,14 @@ export default function ExpressionZScoreChart({ samples, dataset }: ExpressionZS
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
-          Z-Score Profile — {getDatasetDisplayName(dataset)}
+          {titleOverride ?? `Z-Score Profile — ${getDatasetDisplayName(dataset)}`}
         </Text>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
             config={PLOT_CONFIG}
-            style={{ width: "100%", height: 220 }}
+            style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
         </Box>

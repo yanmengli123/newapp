@@ -3,15 +3,27 @@ import { Box, Paper, Stack, Text } from "@mantine/core";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { GeneExpressionResponse } from "../../lib/geneApi";
+import type { ResolvedChartStyle } from "./chartCustomizer.types";
 import { isValidNumber, PLOT_CONFIG, PAPER_STYLE } from "./utils";
 
 const Plot = createPlotlyComponent(PlotlyModule);
 
 interface ExpressionFoldChangeBarProps {
   summary: GeneExpressionResponse["summary"];
+  styleConfig?: ResolvedChartStyle;
 }
 
-export default function ExpressionFoldChangeBar({ summary }: ExpressionFoldChangeBarProps) {
+export default function ExpressionFoldChangeBar({ summary, styleConfig }: ExpressionFoldChangeBarProps) {
+  const fontSize = styleConfig?.fontSize ?? 10;
+  const chartHeight = styleConfig?.chartHeight ?? 220;
+  const showGrid = styleConfig?.showGrid ?? true;
+  const showValueLabel = styleConfig?.chartSpecific?.showValueLabel ?? true;
+  const barWidth = styleConfig?.chartSpecific?.barWidth ?? 0.6;
+  const upColor = styleConfig?.colors?.up ?? "#12b886";
+  const downColor = styleConfig?.colors?.down ?? "#fa5252";
+  const gridColor = styleConfig?.colors?.grid ?? "#f0f0f0";
+  const titleOverride = styleConfig?.title;
+
   const foldTop = summary?.fold_change_top;
   const foldBottom = summary?.fold_change_bottom;
   const topStage = summary?.top_stage;
@@ -62,12 +74,13 @@ export default function ExpressionFoldChangeBar({ summary }: ExpressionFoldChang
       type: "bar",
       x: foldData.map(d => d.label),
       y: foldData.map(d => d.log2),
-      text: foldData.map(d => `${d.raw.toFixed(2)}x`),
-      textposition: "outside",
-      textfont: { size: 9, color: foldData.map(d => d.direction === "up" ? "#12b886" : "#fa5252") },
+      text: showValueLabel ? foldData.map(d => `${d.raw.toFixed(2)}x`) : undefined,
+      textposition: showValueLabel ? "outside" : "none",
+      textfont: { size: fontSize - 1, color: foldData.map(d => d.direction === "up" ? upColor : downColor) },
       marker: {
-        color: foldData.map(d => d.direction === "up" ? "#12b886" : "#fa5252"),
+        color: foldData.map(d => d.direction === "up" ? upColor : downColor),
         opacity: 0.85,
+        width: barWidth,
       },
       hovertemplate: "%{x}: %{text} (log2: %{y:.2f})<extra></extra>",
       orientation: "v" as const,
@@ -77,13 +90,13 @@ export default function ExpressionFoldChangeBar({ summary }: ExpressionFoldChang
   const layout: any = {
     margin: { t: 8, b: 52, l: 80, r: 16 },
     yaxis: {
-      title: { text: "log2(Fold Change)", font: { size: 10 } },
-      gridcolor: "#f0f0f0",
+      title: { text: "log2(Fold Change)", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
       zeroline: true,
       zerolinecolor: "#ccc",
-      tickfont: { size: 9 },
+      tickfont: { size: fontSize - 1 },
     },
-    xaxis: { tickfont: { size: 9 }, gridcolor: "#f8f8f8" },
+    xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" },
     showlegend: false,
     ...PAPER_STYLE,
   };
@@ -92,14 +105,14 @@ export default function ExpressionFoldChangeBar({ summary }: ExpressionFoldChang
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
-          Fold Change (Max vs Min Stage)
+          {titleOverride ?? "Fold Change (Max vs Min Stage)"}
         </Text>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
             config={PLOT_CONFIG}
-            style={{ width: "100%", height: 220 }}
+            style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
         </Box>

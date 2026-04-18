@@ -3,6 +3,7 @@ import { Box, Paper, Stack, Text } from "@mantine/core";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
+import type { ResolvedChartStyle } from "./chartCustomizer.types";
 import {
   groupSamplesByStageSex, sortStages, isValidNumber,
   getDatasetDisplayName, PLOT_CONFIG, PAPER_STYLE,
@@ -13,9 +14,21 @@ const Plot = createPlotlyComponent(PlotlyModule);
 interface ExpressionFoldChangeTrajectoryProps {
   samples: ExpressionSample[];
   dataset: string;
+  styleConfig?: ResolvedChartStyle;
 }
 
-export default function ExpressionFoldChangeTrajectory({ samples, dataset }: ExpressionFoldChangeTrajectoryProps) {
+export default function ExpressionFoldChangeTrajectory({ samples, dataset, styleConfig }: ExpressionFoldChangeTrajectoryProps) {
+  const fontSize = styleConfig?.fontSize ?? 10;
+  const chartHeight = styleConfig?.chartHeight ?? 200;
+  const showLegend = styleConfig?.showLegend ?? true;
+  const showGrid = styleConfig?.showGrid ?? true;
+  const showValueLabel = styleConfig?.chartSpecific?.showValueLabel ?? true;
+  const barWidth = styleConfig?.chartSpecific?.barWidth ?? 0.6;
+  const maleColor = styleConfig?.colors?.male ?? "#228BE6";
+  const femaleColor = styleConfig?.colors?.female ?? "#E64980";
+  const gridColor = styleConfig?.colors?.grid ?? "#f0f0f0";
+  const titleOverride = styleConfig?.title;
+
   const grouped = groupSamplesByStageSex(samples);
   const stages = sortStages(Object.keys(grouped));
 
@@ -85,9 +98,10 @@ export default function ExpressionFoldChangeTrajectory({ samples, dataset }: Exp
       y: maleFc,
       name: "Male",
       marker: {
-        color: maleFc.map(v => v != null ? (v > 0 ? "#228BE6" : "#4dabf7") : "#ccc"),
+        color: maleFc.map(v => v != null ? (v > 0 ? maleColor : maleColor + "99") : "#ccc"),
+        width: barWidth,
       },
-      text: maleFc.map(v => v != null ? `log2FC: ${v.toFixed(3)}` : "N/A"),
+      text: showValueLabel ? maleFc.map(v => v != null ? `log2FC: ${v.toFixed(3)}` : "N/A") : undefined,
       hovertemplate: "%{text}<extra>Male</extra>",
       showlegend: true,
     });
@@ -100,9 +114,10 @@ export default function ExpressionFoldChangeTrajectory({ samples, dataset }: Exp
       y: femaleFc,
       name: "Female",
       marker: {
-        color: femaleFc.map(v => v != null ? (v > 0 ? "#E64980" : "#f783ac") : "#ccc"),
+        color: femaleFc.map(v => v != null ? (v > 0 ? femaleColor : femaleColor + "99") : "#ccc"),
+        width: barWidth,
       },
-      text: femaleFc.map(v => v != null ? `log2FC: ${v.toFixed(3)}` : "N/A"),
+      text: showValueLabel ? femaleFc.map(v => v != null ? `log2FC: ${v.toFixed(3)}` : "N/A") : undefined,
       hovertemplate: "%{text}<extra>Female</extra>",
       showlegend: true,
     });
@@ -112,13 +127,13 @@ export default function ExpressionFoldChangeTrajectory({ samples, dataset }: Exp
     margin: { t: 8, b: 56, l: 56, r: 16 },
     xaxis: {
       tickangle: -30,
-      tickfont: { size: 8 },
-      gridcolor: "#f8f8f8",
+      tickfont: { size: fontSize - 2 },
+      gridcolor: "transparent",
     },
     yaxis: {
-      title: { text: "log₂ Fold Change", font: { size: 10 } },
-      gridcolor: "#f0f0f0",
-      tickfont: { size: 9 },
+      title: { text: "log₂ Fold Change", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      tickfont: { size: fontSize - 1 },
       zeroline: true,
       zerolinecolor: "#ccc",
       zerolinewidth: 1,
@@ -127,11 +142,12 @@ export default function ExpressionFoldChangeTrajectory({ samples, dataset }: Exp
       orientation: "h" as const,
       x: 0.5, xanchor: "center" as const,
       y: -0.28,
-      font: { size: 9 },
+      font: { size: fontSize - 1 },
     },
-    font: { family: "sans-serif", size: 10 },
+    font: { family: "sans-serif", size: fontSize },
     barmode: "group",
     hovermode: "closest" as const,
+    showlegend: showLegend,
     ...PAPER_STYLE,
   };
 
@@ -139,14 +155,14 @@ export default function ExpressionFoldChangeTrajectory({ samples, dataset }: Exp
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
-          Fold Change Trajectory — {getDatasetDisplayName(dataset)}
+          {titleOverride ?? `Fold Change Trajectory — ${getDatasetDisplayName(dataset)}`}
         </Text>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
             config={PLOT_CONFIG}
-            style={{ width: "100%", height: 200 }}
+            style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
         </Box>

@@ -1,5 +1,5 @@
-import { Badge, Box, Group, Loader, Select, Stack, Text } from "@mantine/core";
-import { IconChartBar, IconChevronDown, IconChevronUp } from "@tabler/icons-react";
+import { Badge, Box, Button, Group, Loader, Select, Stack, Text, Tooltip } from "@mantine/core";
+import { IconChartBar, IconChevronDown, IconChevronUp, IconPalette } from "@tabler/icons-react";
 import type { DatasetInfo, GeneExpressionResponse } from "../../lib/geneApi";
 
 interface ExpressionHeaderProps {
@@ -17,6 +17,8 @@ interface ExpressionHeaderProps {
   // 元信息
   sampleCount: number;
   summary: GeneExpressionResponse["summary"];
+  // Chart Customizer
+  onOpenCustomizer?: () => void;
 }
 
 const DATASET_LABELS: Record<string, string> = {
@@ -43,6 +45,7 @@ export default function ExpressionHeader({
   onToggleExpand,
   sampleCount,
   summary,
+  onOpenCustomizer,
 }: ExpressionHeaderProps) {
   const datasetOptions = availableDatasets.map((d) => ({
     value: d.dataset_code,
@@ -101,6 +104,22 @@ export default function ExpressionHeader({
         </Group>
 
         <Group gap="xs">
+          {/* Customize Charts */}
+          {onOpenCustomizer && (
+            <Tooltip label="Customize chart styles" position="bottom">
+              <Button
+                variant="light"
+                color="violet"
+                size="xs"
+                leftSection={<IconPalette size={13} />}
+                onClick={onOpenCustomizer}
+                style={{ padding: "4px 8px" }}
+              >
+                Customize
+              </Button>
+            </Tooltip>
+          )}
+
           {/* Expand All */}
           <Badge
             variant={isExpanded ? "filled" : "outline"}

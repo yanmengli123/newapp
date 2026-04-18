@@ -3,6 +3,7 @@ import { Box, Paper, Stack, Text } from "@mantine/core";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
+import type { ResolvedChartStyle } from "./chartCustomizer.types";
 
 const Plot = createPlotlyComponent(PlotlyModule);
 
@@ -10,6 +11,7 @@ interface ExpressionLineChartProps {
   samples: ExpressionSample[];
   dataset: string;
   metric: string;
+  styleConfig?: ResolvedChartStyle;
 }
 
 function isValidNumber(v: unknown): v is number {
@@ -67,7 +69,21 @@ export default function ExpressionLineChart({
   samples,
   dataset,
   metric,
+  styleConfig,
 }: ExpressionLineChartProps) {
+  const fontSize = styleConfig?.fontSize ?? 10;
+  const chartHeight = styleConfig?.chartHeight ?? 220;
+  const showLegend = styleConfig?.showLegend ?? true;
+  const showGrid = styleConfig?.showGrid ?? true;
+  const showReplicates = styleConfig?.chartSpecific?.showReplicates ?? true;
+  const lineWidth = styleConfig?.chartSpecific?.lineWidth ?? 2;
+  const markerSize = styleConfig?.chartSpecific?.markerSize ?? 6;
+  const maleColor = styleConfig?.colors?.male ?? "#228BE6";
+  const femaleColor = styleConfig?.colors?.female ?? "#E64980";
+  const gridColor = styleConfig?.colors?.grid ?? "#f0f0f0";
+  const neutralColor = styleConfig?.colors?.neutral ?? "#7950F2";
+  const titleOverride = styleConfig?.title;
+
   if (!samples || samples.length === 0) {
     return (
       <Paper withBorder p="md" radius="md">
@@ -83,19 +99,19 @@ export default function ExpressionLineChart({
   const maleIdx = sorted.map((s, idx) => (normalizeSex(s.sex) === "Male" ? idx : -1)).filter((i) => i >= 0);
   const femaleIdx = sorted.map((s, idx) => (normalizeSex(s.sex) === "Female" ? idx : -1)).filter((i) => i >= 0);
 
-  const traces: any[] = [
+  const traces: any[] = showReplicates ? [
     {
       x: xLabels,
       y: values,
       type: "scatter",
       mode: "lines+markers",
       name: "All Samples",
-      line: { color: "#7950F2", width: 0.8, dash: "dot" },
-      marker: { color: "#7950F2", size: 4, opacity: 0.45 },
+      line: { color: neutralColor, width: 0.8, dash: "dot" },
+      marker: { color: neutralColor, size: 4, opacity: 0.45 },
       text: sorted.map((s) => `${s.sample_name ?? s.stage ?? "?"}\n${isValidNumber(s.value) ? s.value.toFixed(3) : "?"}`),
       hoverinfo: "text+x",
     },
-  ];
+  ] : [];
 
   if (maleIdx.length > 0 && femaleIdx.length > 0) {
     traces.push({
@@ -104,8 +120,8 @@ export default function ExpressionLineChart({
       type: "scatter",
       mode: "lines+markers",
       name: "Male",
-      line: { color: "#228BE6", width: 2 },
-      marker: { color: "#228BE6", size: 6 },
+      line: { color: maleColor, width: lineWidth },
+      marker: { color: maleColor, size: markerSize },
       text: maleIdx.map((i) => `${sorted[i].sample_name ?? "?"}: ${isValidNumber(values[i]) ? values[i].toFixed(3) : "?"}`),
       hoverinfo: "text+x",
     });
@@ -115,8 +131,8 @@ export default function ExpressionLineChart({
       type: "scatter",
       mode: "lines+markers",
       name: "Female",
-      line: { color: "#E64980", width: 2 },
-      marker: { color: "#E64980", size: 6 },
+      line: { color: femaleColor, width: lineWidth },
+      marker: { color: femaleColor, size: markerSize },
       text: femaleIdx.map((i) => `${sorted[i].sample_name ?? "?"}: ${isValidNumber(values[i]) ? values[i].toFixed(3) : "?"}`),
       hoverinfo: "text+x",
     });
@@ -126,15 +142,15 @@ export default function ExpressionLineChart({
     margin: { t: 8, b: 52, l: 56, r: 16 },
     xaxis: {
       tickangle: -40,
-      tickfont: { size: 8 },
-      gridcolor: "#f8f8f8",
-      showgrid: true,
+      tickfont: { size: fontSize - 1 },
+      gridcolor: showGrid ? gridColor : "transparent",
+      showgrid: showGrid,
       dtick: 1,
     },
     yaxis: {
-      title: { text: metric === "tpm" || metric === "fpkm" ? metric.toUpperCase() : "Normalized Count", font: { size: 10 } },
-      gridcolor: "#f0f0f0",
-      tickfont: { size: 9 },
+      title: { text: metric === "tpm" || metric === "fpkm" ? metric.toUpperCase() : "Normalized Count", font: { size: fontSize } },
+      gridcolor: showGrid ? gridColor : "transparent",
+      tickfont: { size: fontSize - 1 },
       zeroline: false,
     },
     legend: {
@@ -142,12 +158,12 @@ export default function ExpressionLineChart({
       x: 0.5,
       xanchor: "center" as const,
       y: -0.26,
-      font: { size: 9 },
+      font: { size: fontSize - 1 },
     },
-    font: { family: "sans-serif", size: 10 },
+    font: { family: "sans-serif", size: fontSize },
     paper_bgcolor: "white",
     plot_bgcolor: "white",
-    showlegend: true,
+    showlegend: showLegend,
     hovermode: "closest" as const,
   };
 
@@ -161,14 +177,14 @@ export default function ExpressionLineChart({
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
         <Text size="xs" fw={600} c="dimmed">
-          Expression Profile — {getDatasetDisplayName(dataset)}
+          {titleOverride ?? `Expression Profile — ${getDatasetDisplayName(dataset)}`}
         </Text>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
             config={config}
-            style={{ width: "100%", height: 220 }}
+            style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
         </Box>

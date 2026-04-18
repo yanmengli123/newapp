@@ -27,6 +27,9 @@ import ExpressionDendrogram from "./ExpressionDendrogram";
 import ExpressionZScoreChart from "./ExpressionZScoreChart";
 import ExpressionFoldChangeTrajectory from "./ExpressionFoldChangeTrajectory";
 import ExpressionReplicateConsistency from "./ExpressionReplicateConsistency";
+import { useChartCustomizer } from "./useChartCustomizer";
+import ChartCustomizerDrawer from "./ChartCustomizerDrawer";
+import { resolveChartStyle } from "./chartStyleResolver";
 
 interface ExpressionSectionProps {
   geneId: string;
@@ -41,6 +44,10 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
   const [expandData, setExpandData] = useState<GeneExpressionExpandResponse | null>(null);
   const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
   const [loadingExpression, setLoadingExpression] = useState(false);
+  const [customizerOpened, setCustomizerOpened] = useState(false);
+
+  // Chart customizer hook
+  const customizerHook = useChartCustomizer();
 
   // Seed from page data on mount / geneId change
   useEffect(() => {
@@ -155,6 +162,7 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
           onToggleExpand={handleToggleExpand}
           sampleCount={effectiveSamples.length}
           summary={effectiveSummary}
+          onOpenCustomizer={() => setCustomizerOpened(true)}
         />
 
         {/* Expand All: Cross-Dataset Compare Panel */}
@@ -195,11 +203,13 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     summary={effectiveSummary}
                     dataset={selectedDataset}
                     metric={selectedMetric}
+                    styleConfig={resolveChartStyle("stage", customizerHook.config)}
                   />
                   <ExpressionLineChart
                     samples={effectiveSamples}
                     dataset={selectedDataset}
                     metric={selectedMetric}
+                    styleConfig={resolveChartStyle("line", customizerHook.config)}
                   />
                 </Group>
 
@@ -208,11 +218,13 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     samples={effectiveSamples}
                     dataset={selectedDataset}
                     metric={selectedMetric}
+                    styleConfig={resolveChartStyle("violin", customizerHook.config)}
                   />
                   <ExpressionStackedArea
                     summary={effectiveSummary}
                     dataset={selectedDataset}
                     metric={selectedMetric}
+                    styleConfig={resolveChartStyle("area", customizerHook.config)}
                   />
                 </Group>
 
@@ -220,11 +232,13 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                   <ExpressionRadarChart
                     summary={effectiveSummary}
                     dataset={selectedDataset}
+                    styleConfig={resolveChartStyle("radar", customizerHook.config)}
                   />
                   <ExpressionHeatmap
                     summary={effectiveSummary}
                     dataset={selectedDataset}
                     metric={selectedMetric}
+                    styleConfig={resolveChartStyle("heatmap", customizerHook.config)}
                   />
                 </Group>
 
@@ -232,9 +246,11 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                   <ExpressionZScoreChart
                     samples={effectiveSamples}
                     dataset={selectedDataset}
+                    styleConfig={resolveChartStyle("zscore", customizerHook.config)}
                   />
                   <ExpressionFoldChangeBar
                     summary={effectiveSummary}
+                    styleConfig={resolveChartStyle("fcbar", customizerHook.config)}
                   />
                 </Group>
 
@@ -242,10 +258,12 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                   <ExpressionFoldChangeTrajectory
                     samples={effectiveSamples}
                     dataset={selectedDataset}
+                    styleConfig={resolveChartStyle("fctraj", customizerHook.config)}
                   />
                   <ExpressionDendrogram
                     samples={effectiveSamples}
                     dataset={selectedDataset}
+                    styleConfig={resolveChartStyle("dendrogram", customizerHook.config)}
                   />
                 </Group>
 
@@ -264,6 +282,12 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
           </>
         )}
       </Stack>
+
+      <ChartCustomizerDrawer
+        opened={customizerOpened}
+        onClose={() => setCustomizerOpened(false)}
+        hook={customizerHook}
+      />
     </Paper>
   );
 }
