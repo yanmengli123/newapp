@@ -29,7 +29,9 @@ import ExpressionFoldChangeTrajectory from "./ExpressionFoldChangeTrajectory";
 import ExpressionReplicateConsistency from "./ExpressionReplicateConsistency";
 import { useChartCustomizer } from "./useChartCustomizer";
 import ChartCustomizerDrawer from "./ChartCustomizerDrawer";
+import ChartFullscreenModal from "./ChartFullscreenModal";
 import { resolveChartStyle } from "./chartStyleResolver";
+import type { FullscreenState } from "./chartFullscreen.types";
 
 interface ExpressionSectionProps {
   geneId: string;
@@ -45,6 +47,7 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
   const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
   const [loadingExpression, setLoadingExpression] = useState(false);
   const [customizerOpened, setCustomizerOpened] = useState(false);
+  const [fullscreenState, setFullscreenState] = useState<FullscreenState | null>(null);
 
   // Chart customizer hook
   const customizerHook = useChartCustomizer();
@@ -204,12 +207,16 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     dataset={selectedDataset}
                     metric={selectedMetric}
                     styleConfig={resolveChartStyle("stage", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "stage" })}
                   />
                   <ExpressionLineChart
                     samples={effectiveSamples}
                     dataset={selectedDataset}
                     metric={selectedMetric}
                     styleConfig={resolveChartStyle("line", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "line" })}
                   />
                 </Group>
 
@@ -219,12 +226,16 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     dataset={selectedDataset}
                     metric={selectedMetric}
                     styleConfig={resolveChartStyle("violin", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "violin" })}
                   />
                   <ExpressionStackedArea
                     summary={effectiveSummary}
                     dataset={selectedDataset}
                     metric={selectedMetric}
                     styleConfig={resolveChartStyle("area", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "area" })}
                   />
                 </Group>
 
@@ -233,12 +244,16 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     summary={effectiveSummary}
                     dataset={selectedDataset}
                     styleConfig={resolveChartStyle("radar", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "radar" })}
                   />
                   <ExpressionHeatmap
                     summary={effectiveSummary}
                     dataset={selectedDataset}
                     metric={selectedMetric}
                     styleConfig={resolveChartStyle("heatmap", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "heatmap" })}
                   />
                 </Group>
 
@@ -247,10 +262,14 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     samples={effectiveSamples}
                     dataset={selectedDataset}
                     styleConfig={resolveChartStyle("zscore", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "zscore" })}
                   />
                   <ExpressionFoldChangeBar
                     summary={effectiveSummary}
                     styleConfig={resolveChartStyle("fcbar", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "fcbar" })}
                   />
                 </Group>
 
@@ -259,11 +278,15 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
                     samples={effectiveSamples}
                     dataset={selectedDataset}
                     styleConfig={resolveChartStyle("fctraj", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "fctraj" })}
                   />
                   <ExpressionDendrogram
                     samples={effectiveSamples}
                     dataset={selectedDataset}
                     styleConfig={resolveChartStyle("dendrogram", customizerHook.config)}
+                    renderMode="card"
+                    onOpenFullscreen={() => setFullscreenState({ chartType: "dendrogram" })}
                   />
                 </Group>
 
@@ -287,6 +310,16 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
         opened={customizerOpened}
         onClose={() => setCustomizerOpened(false)}
         hook={customizerHook}
+      />
+
+      <ChartFullscreenModal
+        fullscreenState={fullscreenState}
+        onClose={() => setFullscreenState(null)}
+        summary={effectiveSummary}
+        samples={effectiveSamples}
+        dataset={selectedDataset}
+        metric={selectedMetric}
+        resolveStyle={(chartType) => resolveChartStyle(chartType as any, customizerHook.config)}
       />
     </Paper>
   );

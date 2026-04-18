@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Box, Paper, Stack, Text } from "@mantine/core";
+import { ActionIcon, Box, Group, Paper, Stack, Text } from "@mantine/core";
+import { IconMaximize } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { GeneExpressionResponse } from "../../lib/geneApi";
@@ -12,6 +13,8 @@ interface ExpressionStageChartProps {
   dataset: string;
   metric: string;
   styleConfig?: ResolvedChartStyle;
+  renderMode?: "card" | "fullscreen";
+  onOpenFullscreen?: () => void;
 }
 
 const DATASET_DISPLAY_NAMES: Record<string, string> = {
@@ -85,6 +88,8 @@ export default function ExpressionStageChart({
   dataset,
   metric,
   styleConfig,
+  renderMode,
+  onOpenFullscreen,
 }: ExpressionStageChartProps) {
   const { stages, maleValues, femaleValues, meanValues } = resolveStageMeans(summary?.stage_means ?? null);
 
@@ -185,7 +190,7 @@ export default function ExpressionStageChart({
   };
 
   const config: any = {
-    displayModeBar: false,
+    displayModeBar: renderMode === "fullscreen",
     responsive: true,
     locale: "en",
   };
@@ -193,9 +198,16 @@ export default function ExpressionStageChart({
   return (
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
-        <Text size="xs" fw={600} c="dimmed">
-          {titleOverride ?? `Stage Means — ${getDatasetDisplayName(dataset)}`}
-        </Text>
+        <Group justify="space-between" align="center">
+          <Text size="xs" fw={600} c="dimmed">
+            {titleOverride ?? `Stage Means — ${getDatasetDisplayName(dataset)}`}
+          </Text>
+          {renderMode !== "fullscreen" && onOpenFullscreen && (
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={onOpenFullscreen}>
+              <IconMaximize size={14} />
+            </ActionIcon>
+          )}
+        </Group>
         <Box w="100%">
           <Plot
             data={traces}

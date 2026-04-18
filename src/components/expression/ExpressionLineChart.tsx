@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Box, Paper, Stack, Text } from "@mantine/core";
+import { ActionIcon, Box, Group, Paper, Stack, Text } from "@mantine/core";
+import { IconMaximize } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
@@ -12,6 +13,8 @@ interface ExpressionLineChartProps {
   dataset: string;
   metric: string;
   styleConfig?: ResolvedChartStyle;
+  renderMode?: "card" | "fullscreen";
+  onOpenFullscreen?: () => void;
 }
 
 function isValidNumber(v: unknown): v is number {
@@ -70,6 +73,8 @@ export default function ExpressionLineChart({
   dataset,
   metric,
   styleConfig,
+  renderMode,
+  onOpenFullscreen,
 }: ExpressionLineChartProps) {
   const fontSize = styleConfig?.fontSize ?? 10;
   const chartHeight = styleConfig?.chartHeight ?? 220;
@@ -168,7 +173,7 @@ export default function ExpressionLineChart({
   };
 
   const config: any = {
-    displayModeBar: false,
+    displayModeBar: renderMode === "fullscreen",
     responsive: true,
     locale: "en",
   };
@@ -176,9 +181,16 @@ export default function ExpressionLineChart({
   return (
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
-        <Text size="xs" fw={600} c="dimmed">
-          {titleOverride ?? `Expression Profile — ${getDatasetDisplayName(dataset)}`}
-        </Text>
+        <Group justify="space-between" align="center">
+          <Text size="xs" fw={600} c="dimmed">
+            {titleOverride ?? `Expression Profile — ${getDatasetDisplayName(dataset)}`}
+          </Text>
+          {renderMode !== "fullscreen" && onOpenFullscreen && (
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={onOpenFullscreen}>
+              <IconMaximize size={14} />
+            </ActionIcon>
+          )}
+        </Group>
         <Box w="100%">
           <Plot
             data={traces}

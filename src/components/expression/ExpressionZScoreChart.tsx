@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Box, Paper, Stack, Text } from "@mantine/core";
+import { ActionIcon, Box, Group, Paper, Stack, Text } from "@mantine/core";
+import { IconMaximize } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import type { ExpressionSample } from "../../lib/geneApi";
@@ -12,9 +13,11 @@ interface ExpressionZScoreChartProps {
   samples: ExpressionSample[];
   dataset: string;
   styleConfig?: ResolvedChartStyle;
+  renderMode?: "card" | "fullscreen";
+  onOpenFullscreen?: () => void;
 }
 
-export default function ExpressionZScoreChart({ samples, dataset, styleConfig }: ExpressionZScoreChartProps) {
+export default function ExpressionZScoreChart({ samples, dataset, styleConfig, renderMode, onOpenFullscreen }: ExpressionZScoreChartProps) {
   const fontSize = styleConfig?.fontSize ?? 10;
   const chartHeight = styleConfig?.chartHeight ?? 220;
   const showLegend = styleConfig?.showLegend ?? true;
@@ -136,17 +139,28 @@ export default function ExpressionZScoreChart({ samples, dataset, styleConfig }:
     ...PAPER_STYLE,
   };
 
+  const plotConfig = renderMode === "fullscreen"
+    ? { displayModeBar: true, responsive: true, locale: "en" }
+    : PLOT_CONFIG;
+
   return (
     <Paper withBorder p="md" radius="md">
       <Stack gap="xs">
-        <Text size="xs" fw={600} c="dimmed">
-          {titleOverride ?? `Z-Score Profile — ${getDatasetDisplayName(dataset)}`}
-        </Text>
+        <Group justify="space-between" align="center">
+          <Text size="xs" fw={600} c="dimmed">
+            {titleOverride ?? `Z-Score Profile — ${getDatasetDisplayName(dataset)}`}
+          </Text>
+          {renderMode !== "fullscreen" && onOpenFullscreen && (
+            <ActionIcon variant="subtle" color="gray" size="sm" onClick={onOpenFullscreen}>
+              <IconMaximize size={14} />
+            </ActionIcon>
+          )}
+        </Group>
         <Box w="100%">
           <Plot
             data={traces}
             layout={layout}
-            config={PLOT_CONFIG}
+            config={plotConfig}
             style={{ width: "100%", height: chartHeight }}
             useResizeHandler
           />
