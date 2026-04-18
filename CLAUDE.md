@@ -108,8 +108,15 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
-- **Expression components** — `src/components/expression/`: 14 个组件
+- **Expression components** — `src/components/expression/`: 15 chart components + 2 structural components
   - `utils.ts` — 共享工具 (`isValidNumber`/`normalizeSex`/`STAGE_ORDER`/`resolveStageMeans`/`groupSamplesByStageSex`/`groupSamplesByStageSexReplicate`/`PLOT_CONFIG`)
+  - `chartCustomizer.types.ts` — `ChartType`, `ResolvedChartStyle`, `ChartStyleConfig` 类型
+  - `chartCustomizer.defaults.ts` — `CHART_TYPE_LABELS`, 各 chart type 的默认 style
+  - `chartStyleResolver.ts` — `resolveChartStyle()` 根据 chart type + user config 合并出最终 `ResolvedChartStyle`
+  - `useChartCustomizer` — `useDisclosure` hook 返回 `customizerOpened`/`setCustomizerOpened`，`config` 持有所有 per-chart style 配置，`setChartStyle` 更新单个 chart
+  - `ChartCustomizerDrawer` — 全量样式编辑抽屉（fontSize/chartHeight/colors/chartSpecific），按 chart type 分类选择要编辑哪个
+  - `ChartFullscreenModal` — 全屏弹窗（Mantine `Modal fullScreen`），捕获 Plotly graph div via `onInitialized`/`onUpdate` → `graphDivRef`，提供 Export Settings（Size/Filename/Background/Download）。**下载走 `PlotlyModule.downloadImage`** + `window.Plotly.relayout` 透明背景
+  - `chartFullscreen.types.ts` — `FullscreenChartType` union 和 `FullscreenState` 接口
   - `ExpressionHeader` — Dataset/Metric 选择器 + Expand All 切换
   - `ExpressionStatsRow` — 7 张统计卡片（Max/Min/Mean±Std/CV/Expressed/Top Stage/Sex Bias）
   - `ExpressionStageChart` — Plotly 分组柱状图（Male/Female + Total Mean 折线，双 Y 轴）
@@ -125,6 +132,8 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `ExpressionZScoreChart` — Z-Score 样本谱图（折线图，M/F 分色 + 零线参考）
   - `ExpressionFoldChangeTrajectory` — 相邻阶段 log2FC 分组柱状图
   - `ExpressionReplicateConsistency` — 纯 Mantine 布局：Progress 条 + CV% 预警 Badge + 一致性标签；CV 按 stage×sex 组内 3 个 replicate 计算，附详细分析说明 Popover
+  - `ExpressionSection` — 整合所有 Expression 组件，`fullscreenState` state 管理全屏弹窗开关
+  - `EscOverviewSection` — ESC Atlas 首页区域，8 个 chart card 点击开 Drawer 全屏（`useDisclosure` + `useHotkeys`）
 - **Gene components** — `src/components/gene/`:
   - `GeneStructurePlot` — SVG gene structure visualization (black body line, blue CDS blocks, gray UTR, intron lines, GT/AG splice triangles, drag-pan, scroll-zoom, hover tooltip in English, PNG export). "Open in JBrowse" button navigates to `/jbrowse?loc=chrN:start..end`. Single-transcript selector above transcript accordion in GenePage.
 - **Chat**: `src/components/chat/` — ChatWidget (floating), ChatWindow, ChatLauncher, ChatMessageBubble. All responses are grounded in database queries, no hardcoded facts.
@@ -476,6 +485,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **KEGG Interactive Viewer**：`KeggInteractiveViewer` 使用 Drawer + CSS fullscreen（`size="100%"` 切换）实现全屏。PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 高亮基因。`viewBox="0 0 ${pngW} ${pngH}"` 使用后端原始像素坐标，`ResizeObserver` 监听 img 尺寸变化。点击节点 `window.open(node.url)` 跳转 KEGG。highlighted 判断：kegg_gene_id 精确匹配。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
 - **KEGG image paths**: `_get_asset_path()` in `kegg_image_router.py` resolves `png_relpath` using `GRCG6A_STATIC_ROOT.parent` (project root), not filesystem root.
 - **Plotly charts**: `plotly.js-dist-min` + `react-plotly.js`; types declared in `src/plotly.d.ts` (required because `@types/plotly.js` does not cover the dist bundle). Expression chart components use `any[]` for trace/layout/config to avoid type conflicts; keep eslint-disable annotations nearby if adding new traces.
+- **Plotly image export** (ChartFullscreenModal): Use `react-plotly`'s `onInitialized`/`onUpdate` callbacks to capture the real Plotly `graphDiv` DOM node into a `useRef`. Download sequence: save original `paper_bgcolor`/`plot_bgcolor` → `window.Plotly.relayout(gd, {paper_bgcolor:"rgba(0,0,0,0)", plot_bgcolor:"rgba(0,0,0,0)"})` → `PlotlyModule.downloadImage(gd, {format:"png", width, height, scale:2})` → restore original bg. `PlotlyModule.downloadImage` is the primary API (direct import); `window.Plotly.downloadImage` is the fallback. `PlotlyModule.relayout` does not exist on the module type — always use `window.Plotly.relayout` for the relayout calls.
 
 ## Git
 
