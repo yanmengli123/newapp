@@ -212,7 +212,7 @@ interface GenomicRegionResult {
 }
 
 async function fetchGenomicSeq(loc: string, revcomp = false): Promise<GenomicRegionResult> {
-  const base = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+  const base = import.meta.env.VITE_API_BASE || "";
   const url = `${base}/genes/genomic?loc=${encodeURIComponent(loc)}${revcomp ? "&revcomp=true" : ""}`;
   const res = await fetch(url);
   if (!res.ok) {
