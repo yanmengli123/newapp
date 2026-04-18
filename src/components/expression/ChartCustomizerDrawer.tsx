@@ -465,8 +465,8 @@ export default function ChartCustomizerDrawer({
     <Drawer
       opened={opened}
       onClose={onClose}
-      position="bottom"
-      size="auto"
+      position="right"
+      size="xl"
       padding="md"
       title={
         <Group gap="xs">
@@ -475,12 +475,8 @@ export default function ChartCustomizerDrawer({
         </Group>
       }
       withCloseButton={false}
-      styles={{
-        content: { width: "100%", maxWidth: "100vw" },
-        body: { width: "100%" },
-      }}
     >
-      <Stack gap="md" style={{ height: "100%" }}>
+      <Stack gap="md" style={{ height: "calc(100vh - 80px)", display: "flex", flexDirection: "column" }}>
         {/* Subtitle */}
         <Text size="xs" c="dimmed">
           Adjust visual settings without changing expression data. Changes apply immediately.
