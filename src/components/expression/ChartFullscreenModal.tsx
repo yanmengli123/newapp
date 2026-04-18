@@ -1,9 +1,20 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ActionIcon, Box, Button, Drawer, Group, NumberInput, SegmentedControl, Select, Stack, Text, TextInput } from "@mantine/core";
-import { IconX, IconDownload } from "@tabler/icons-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ActionIcon,
+  Box,
+  Button,
+  Group,
+  Modal,
+  SegmentedControl,
+  Select,
+  Stack,
+  Text,
+  TextInput,
+} from "@mantine/core";
+import { IconDownload, IconX } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
-import { useCallback, useState } from "react";
 import type { FullscreenState } from "./chartFullscreen.types";
 import type { GeneExpressionResponse, ExpressionSample } from "../../lib/geneApi";
 import type { ResolvedChartStyle } from "./chartCustomizer.types";
@@ -12,12 +23,12 @@ import { CHART_TYPE_LABELS } from "./chartCustomizer.defaults";
 const Plot = createPlotlyComponent(PlotlyModule);
 
 const PLOT_CONFIG_FULLSCREEN: any = {
+  responsive: true,
   displayModeBar: true,
   displayLogo: false,
-  responsive: true,
   scrollZoom: true,
-  modeBarButtonsToRemove: ["toImage"],
   locale: "en",
+  modeBarButtonsToRemove: ["toImage"],
 };
 
 interface ChartFullscreenModalProps {
@@ -30,103 +41,20 @@ interface ChartFullscreenModalProps {
   resolveStyle: (chartType: string) => ResolvedChartStyle | undefined;
 }
 
-const CHART_LABELS = CHART_TYPE_LABELS;
+type ExportSizePreset = "1200x800" | "1600x1000" | "2000x1200";
 
-const SIZE_PRESETS = [
-  { label: "1200×800", value: "1200x800", width: 1200, height: 800 },
-  { label: "1600×1000", value: "1600x1000", width: 1600, height: 1000 },
-  { label: "2000×1200", value: "2000x1200", width: 2000, height: 1200 },
-  { label: "Custom", value: "custom", width: 0, height: 0 },
+const EXPORT_SIZE_OPTIONS = [
+  { value: "1200x800", label: "1200×800" },
+  { value: "1600x1000", label: "1600×1000" },
+  { value: "2000x1200", label: "2000×1200" },
 ];
 
-const DEFAULT_FILENAME = (chartType: string) => `chart-${chartType}`;
-
-// Download strategy: PlotlyModule (direct import) → window.Plotly → manual anchor
-function downloadChartImage(
-  plotDiv: any,
-  options: { format: string; width: number; height: number; filename: string; scale: number },
-  transparentBg: boolean,
-  onRestore?: () => void
-) {
-  // Strategy 1: PlotlyModule (direct import) — primary downloadImage
-  if (typeof (PlotlyModule as any).downloadImage === "function") {
-    if (transparentBg) {
-      (window as any).Plotly?.relayout(plotDiv, {
-        paper_bgcolor: "rgba(0,0,0,0)",
-        plot_bgcolor: "rgba(0,0,0,0)",
-      }).then(() => {
-        (PlotlyModule as any).downloadImage(plotDiv, options);
-        if (onRestore) setTimeout(onRestore, 200);
-      });
-    } else {
-      (PlotlyModule as any).downloadImage(plotDiv, options);
-    }
-    return true;
-  }
-
-  // Strategy 2: PlotlyModule.toImage → manual anchor
-  if (typeof (PlotlyModule as any).toImage === "function") {
-    if (transparentBg) {
-      (window as any).Plotly?.relayout(plotDiv, {
-        paper_bgcolor: "rgba(0,0,0,0)",
-        plot_bgcolor: "rgba(0,0,0,0)",
-      }).then(() => {
-        (PlotlyModule as any).toImage(plotDiv, { ...options, format: "png" })
-          .then((url: string) => triggerDownload(url, options.filename))
-          .finally(() => { if (onRestore) onRestore(); });
-      });
-    } else {
-      (PlotlyModule as any).toImage(plotDiv, { ...options, format: "png" })
-        .then((url: string) => triggerDownload(url, options.filename));
-    }
-    return true;
-  }
-
-  // Strategy 3: window.Plotly.downloadImage — fallback
-  if ((window as any).Plotly?.downloadImage) {
-    if (transparentBg) {
-      (window as any).Plotly.relayout(plotDiv, {
-        paper_bgcolor: "rgba(0,0,0,0)",
-        plot_bgcolor: "rgba(0,0,0,0)",
-      }).then(() => {
-        (window as any).Plotly.downloadImage(plotDiv, options);
-        if (onRestore) setTimeout(onRestore, 200);
-      });
-    } else {
-      (window as any).Plotly.downloadImage(plotDiv, options);
-    }
-    return true;
-  }
-
-  // Strategy 4: window.Plotly.toImage → manual anchor — last resort
-  if ((window as any).Plotly?.toImage) {
-    if (transparentBg) {
-      (window as any).Plotly.relayout(plotDiv, {
-        paper_bgcolor: "rgba(0,0,0,0)",
-        plot_bgcolor: "rgba(0,0,0,0)",
-      }).then(() => {
-        (window as any).Plotly.toImage(plotDiv, { ...options, format: "png" })
-          .then((url: string) => triggerDownload(url, options.filename))
-          .finally(() => { if (onRestore) onRestore(); });
-      });
-    } else {
-      (window as any).Plotly.toImage(plotDiv, { ...options, format: "png" })
-        .then((url: string) => triggerDownload(url, options.filename));
-    }
-    return true;
-  }
-
-  return false;
+function parsePresetSize(preset: ExportSizePreset) {
+  const [width, height] = preset.split("x").map(Number);
+  return { width, height };
 }
 
-function triggerDownload(url: string, fallbackName: string) {
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${fallbackName}.png`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-}
+const CHART_LABELS = CHART_TYPE_LABELS;
 
 export default function ChartFullscreenModal({
   fullscreenState,
@@ -137,66 +65,118 @@ export default function ChartFullscreenModal({
   metric,
   resolveStyle,
 }: ChartFullscreenModalProps) {
-  const isOpen = fullscreenState !== null;
-  const chartType = fullscreenState?.chartType ?? "";
-
-  const styleConfig = resolveStyle(chartType);
-  const chartHeight = styleConfig?.chartHeight ?? 520;
-  const titleOverride = styleConfig?.title;
-
-  const [sizePreset, setSizePreset] = useState<string>("1200x800");
-  const [customWidth, setCustomWidth] = useState<number>(1200);
-  const [customHeight, setCustomHeight] = useState<number>(800);
-  const [filename, setFilename] = useState<string>(DEFAULT_FILENAME(chartType));
+  const graphDivRef = useRef<any>(null);
+  const [plotReady, setPlotReady] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [sizePreset, setSizePreset] = useState<ExportSizePreset>("1200x800");
   const [background, setBackground] = useState<"white" | "transparent">("white");
+  const [filename, setFilename] = useState("");
 
-  const selectedPreset = SIZE_PRESETS.find(p => p.value === sizePreset) ?? SIZE_PRESETS[0];
-  const exportWidth = sizePreset === "custom" ? customWidth : selectedPreset.width;
-  const exportHeight = sizePreset === "custom" ? customHeight : selectedPreset.height;
-  const exportScale = 2;
+  useEffect(() => {
+    if (!fullscreenState) {
+      graphDivRef.current = null;
+      setPlotReady(false);
+      setIsDownloading(false);
+      setSizePreset("1200x800");
+      setBackground("white");
+      setFilename("");
+      return;
+    }
 
-  const getPlotDiv = useCallback(() => document.getElementById(`fullscreen-plot-${chartType}`) as any, [chartType]);
+    setPlotReady(false);
+    setIsDownloading(false);
+    setSizePreset("1200x800");
+    setBackground("white");
+    setFilename(`chart-${fullscreenState.chartType}`);
+  }, [fullscreenState]);
 
-  const handleDownload = useCallback(() => {
-    const plotDiv = getPlotDiv();
-    if (!plotDiv) return;
+  if (!fullscreenState) return null;
 
-    const downloadOptions = {
-      format: "png" as const,
-      width: exportWidth,
-      height: exportHeight,
-      filename: filename || DEFAULT_FILENAME(chartType),
-      scale: exportScale,
-    };
+  const { chartType } = fullscreenState;
+  const styleConfig = resolveStyle(chartType);
+  const chartHeight = styleConfig?.chartHeight ?? 560;
+  const titleOverride = styleConfig?.title;
+  const { width: exportWidth, height: exportHeight } = parsePresetSize(sizePreset);
 
-    const restoreBg = () => {
-      if (plotDiv) {
-        (window as any).Plotly?.relayout(plotDiv, {
+  const bindPlotLifecycle = {
+    onInitialized: (_figure: any, graphDiv: any) => {
+      graphDivRef.current = graphDiv;
+      setPlotReady(true);
+    },
+    onUpdate: (_figure: any, graphDiv: any) => {
+      graphDivRef.current = graphDiv;
+      setPlotReady(true);
+    },
+  };
+
+  const handleDownload = async () => {
+    const gd = graphDivRef.current;
+    if (!gd || isDownloading) return;
+
+    setIsDownloading(true);
+
+    const originalPaperBg = gd.layout?.paper_bgcolor ?? "white";
+    const originalPlotBg = gd.layout?.plot_bgcolor ?? "white";
+
+    try {
+      if (background === "transparent") {
+        await (window as any).Plotly.relayout(gd, {
+          paper_bgcolor: "rgba(0,0,0,0)",
+          plot_bgcolor: "rgba(0,0,0,0)",
+        });
+      } else {
+        await (window as any).Plotly.relayout(gd, {
           paper_bgcolor: "white",
           plot_bgcolor: "white",
         });
       }
-    };
 
-    const success = downloadChartImage(
-      plotDiv,
-      downloadOptions,
-      background === "transparent",
-      restoreBg
-    );
+      if (typeof (PlotlyModule as any).downloadImage === "function") {
+        await (PlotlyModule as any).downloadImage(gd, {
+          format: "png",
+          width: exportWidth,
+          height: exportHeight,
+          filename: filename.trim() || `chart-${chartType}`,
+          scale: 2,
+        });
+      } else if (typeof (PlotlyModule as any).toImage === "function") {
+        const url = await (PlotlyModule as any).toImage(gd, {
+          format: "png",
+          width: exportWidth,
+          height: exportHeight,
+          scale: 2,
+        });
 
-    if (!success) {
-      console.warn("[ChartFullscreenModal] Plotly download unavailable for:", chartType);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${filename.trim() || `chart-${chartType}`}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error("Failed to export plot image:", error);
+    } finally {
+      try {
+        await (window as any).Plotly.relayout(gd, {
+          paper_bgcolor: originalPaperBg,
+          plot_bgcolor: originalPlotBg,
+        });
+      } catch {
+        // ignore restore failure
+      }
+      setIsDownloading(false);
     }
-  }, [chartType, exportWidth, exportHeight, filename, background, getPlotDiv]);
+  };
+
+  const commonProps = {
+    style: { width: "100%", height: chartHeight } as const,
+    useResizeHandler: true as const,
+    config: PLOT_CONFIG_FULLSCREEN,
+    ...bindPlotLifecycle,
+  };
 
   const renderPlotContent = () => {
-    const commonProps = {
-      style: { width: "100%", height: chartHeight } as const,
-      useResizeHandler: true as const,
-      config: PLOT_CONFIG_FULLSCREEN,
-    };
-
     switch (chartType) {
       case "stage":
         return <StageChart summary={summary} dataset={dataset} metric={metric} styleConfig={styleConfig} {...commonProps} />;
@@ -224,113 +204,101 @@ export default function ChartFullscreenModal({
   };
 
   return (
-    <Drawer
-      opened={isOpen}
+    <Modal
+      opened
       onClose={onClose}
-      size="90%"
+      fullScreen
       withCloseButton={false}
-      styles={{ body: { padding: 0, display: "flex", flexDirection: "column" }, content: { height: "90vh" } }}
+      styles={{
+        header: { paddingBottom: 8 },
+        body: { padding: "8px 16px 16px" },
+      }}
+      title={
+        <Group gap="xs">
+          <Text size="sm" fw={600}>
+            {CHART_LABELS[chartType] ?? chartType}
+          </Text>
+          <Text size="xs" c="dimmed">
+            {titleOverride || "Fullscreen View"}
+          </Text>
+        </Group>
+      }
     >
-      <Stack gap="xs" h="100%" justify="space-between">
-        {/* Top bar */}
-        <Group justify="space-between" align="center" px="md" pt="md">
+      <Stack gap="sm">
+        <Group justify="space-between" align="center">
+          <Text size="xs" c="dimmed">
+            {plotReady ? "Interactive controls ready" : "Loading chart..."}
+          </Text>
           <Group gap="xs">
-            <Text size="sm" fw={600}>
-              {CHART_LABELS[chartType] ?? chartType}
-            </Text>
-            {titleOverride && (
-              <Text size="xs" c="dimmed">— {titleOverride}</Text>
-            )}
+            <Button
+              variant="light"
+              size="xs"
+              leftSection={<IconDownload size={14} />}
+              onClick={handleDownload}
+              disabled={!plotReady || isDownloading}
+              loading={isDownloading}
+            >
+              Download PNG
+            </Button>
+            <ActionIcon variant="subtle" color="gray" onClick={onClose}>
+              <IconX size={16} />
+            </ActionIcon>
           </Group>
-          <ActionIcon variant="subtle" color="gray" onClick={onClose}>
-            <IconX size={16} />
-          </ActionIcon>
         </Group>
 
-        {/* Plot area */}
-        <Box
-          id={`fullscreen-plot-${chartType}`}
-          style={{ width: "100%", flex: 1, minHeight: 0 }}
-        >
+        <Box style={{ width: "100%", minHeight: chartHeight }}>
           {renderPlotContent()}
         </Box>
 
-        {/* Export Settings bar */}
-        <Group gap="md" px="md" pb="md" align="flex-end">
-          <Box>
-            <Text size="xs" fw={500} mb={4}>Size</Text>
+        <Group justify="space-between" align="end" wrap="wrap">
+          <Group gap="sm" align="end" wrap="wrap">
             <Select
+              label="Export Size"
               size="xs"
-              data={SIZE_PRESETS.map(p => ({ value: p.value, label: p.label }))}
+              w={140}
+              data={EXPORT_SIZE_OPTIONS}
               value={sizePreset}
-              onChange={(v) => v && setSizePreset(v)}
-              styles={{ input: { minHeight: 28, height: 28 } }}
+              onChange={(value) => value && setSizePreset(value as ExportSizePreset)}
             />
-          </Box>
-
-          {sizePreset === "custom" && (
-            <>
-              <NumberInput
-                label="Width"
-                size="xs"
-                value={customWidth}
-                onChange={(v) => setCustomWidth(Number(v) || 1200)}
-                min={400}
-                max={4000}
-                step={100}
-                styles={{ input: { minHeight: 28, height: 28 } }}
-                w={80}
-              />
-              <NumberInput
-                label="Height"
-                size="xs"
-                value={customHeight}
-                onChange={(v) => setCustomHeight(Number(v) || 800)}
-                min={300}
-                max={3000}
-                step={100}
-                styles={{ input: { minHeight: 28, height: 28 } }}
-                w={80}
-              />
-            </>
-          )}
-
-          <TextInput
-            label="Filename"
-            size="xs"
-            value={filename}
-            onChange={(e) => setFilename(e.target.value || DEFAULT_FILENAME(chartType))}
-            styles={{ input: { minHeight: 28, height: 28 } }}
-            w={160}
-          />
-
-          <Box>
-            <Text size="xs" fw={500} mb={4}>Background</Text>
-            <SegmentedControl
+            <TextInput
+              label="Filename"
               size="xs"
-              data={[
-                { label: "White", value: "white" },
-                { label: "Transparent", value: "transparent" },
-              ]}
-              value={background}
-              onChange={(v) => setBackground(v as "white" | "transparent")}
+              w={220}
+              value={filename}
+              onChange={(event) => setFilename(event.currentTarget.value)}
+              placeholder={`chart-${chartType}`}
             />
-          </Box>
+            <Box>
+              <Text size="xs" mb={6}>
+                Background
+              </Text>
+              <SegmentedControl
+                size="xs"
+                value={background}
+                onChange={(value) => setBackground(value as "white" | "transparent")}
+                data={[
+                  { value: "white", label: "White" },
+                  { value: "transparent", label: "Transparent" },
+                ]}
+              />
+            </Box>
+          </Group>
 
           <Button
-            size="xs"
             leftSection={<IconDownload size={14} />}
             onClick={handleDownload}
+            disabled={!plotReady || isDownloading}
+            loading={isDownloading}
           >
             Download
           </Button>
         </Group>
       </Stack>
-    </Drawer>
+    </Modal>
   );
 }
 
-// Helper functions
+// ─── Helper functions ──────────────────────────────────────────────────────────
 
 function isValidNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -347,7 +315,7 @@ function getMetricLabel(metric: string): string {
   return MAP[metric] ?? metric;
 }
 
-const STAGE_ORDER_MAP: { [k: string]: number } = { E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8 };
+const STAGE_ORDER_MAP: Record<string, number> = { E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8 };
 
 function resolveStageMeans(
   stageMeans: Record<string, Record<string, number> | number | null> | null | undefined
@@ -424,6 +392,8 @@ const PAPER_STYLE_FULLSCREEN = {
   plot_bgcolor: "white",
 };
 
+// ─── Chart components ────────────────────────────────────────────────────────
+
 // Stage Chart
 function StageChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const { stages, maleValues, femaleValues, meanValues } = resolveStageMeans(summary?.stage_means ?? null);
@@ -437,9 +407,9 @@ function StageChart({ summary, dataset, metric, styleConfig, ...plotProps }: { s
   if (!hasData) return <Text>No data</Text>;
 
   const traces: any[] = [
-    { x: stages, y: maleValues.map((v: number) => isValidNumber(v) ? v : 0), name: "Male", type: "bar", marker: { color: maleColor, opacity: 0.85 }, text: showValueLabel ? maleValues.map((v: number) => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined, textposition: showValueLabel ? "outside" : "none" },
-    { x: stages, y: femaleValues.map((v: number) => isValidNumber(v) ? v : 0), name: "Female", type: "bar", marker: { color: femaleColor, opacity: 0.85 }, text: showValueLabel ? femaleValues.map((v: number) => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined, textposition: showValueLabel ? "outside" : "none" },
-    ...(showMeanLine ? [{ x: stages, y: meanValues.map((v: number) => isValidNumber(v) ? v : 0), name: "Total Mean", type: "scatter" as const, mode: "lines+markers" as const, line: { color: "#7950F2", width: 2, dash: "dot" }, marker: { color: "#7950F2", size: 7 }, yaxis: "y2" }] : []),
+    { x: stages, y: maleValues, name: "Male", type: "bar", marker: { color: maleColor, opacity: 0.85 }, text: showValueLabel ? maleValues.map((v: number) => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined, textposition: showValueLabel ? "outside" : "none" },
+    { x: stages, y: femaleValues, name: "Female", type: "bar", marker: { color: femaleColor, opacity: 0.85 }, text: showValueLabel ? femaleValues.map((v: number) => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined, textposition: showValueLabel ? "outside" : "none" },
+    ...(showMeanLine ? [{ x: stages, y: meanValues, name: "Total Mean", type: "scatter" as const, mode: "lines+markers" as const, line: { color: "#7950F2", width: 2, dash: "dot" }, marker: { color: "#7950F2", size: 7 }, yaxis: "y2" }] : []),
   ];
   const layout: any = { barmode: "group", margin: { t: 8, b: 56, l: 64, r: 32 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: "#f0f0f0", tickfont: { size: fontSize - 1 }, domain: [0, 0.72] }, yaxis2: { title: { text: "Mean (dot)", font: { size: fontSize, color: "#7950F2" } }, gridcolor: "#f0f0f0", tickfont: { size: fontSize - 1, color: "#7950F2" }, anchor: "free", side: "right", overlaying: "y", position: 0.98, domain: [0, 1] }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "x unified", ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
