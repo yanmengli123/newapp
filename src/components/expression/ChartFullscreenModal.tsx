@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ActionIcon, Box, Button, Group, Modal, Stack, Text } from "@mantine/core";
+import { ActionIcon, Box, Button, Group, NumberInput, SegmentedControl, Select, Text, TextInput } from "@mantine/core";
 import { IconX, IconDownload } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
@@ -7,12 +7,16 @@ import type { FullscreenState } from "./chartFullscreen.types";
 import type { GeneExpressionResponse, ExpressionSample } from "../../lib/geneApi";
 import type { ResolvedChartStyle } from "./chartCustomizer.types";
 import { CHART_TYPE_LABELS } from "./chartCustomizer.defaults";
+import { useState } from "react";
 
 const Plot = createPlotlyComponent(PlotlyModule);
 
 const PLOT_CONFIG_FULLSCREEN: any = {
+  displayModeBar: true,
+  displayLogo: false,
   responsive: true,
-  displayModeBar: false,
+  scrollZoom: true,
+  modeBarButtonsToRemove: ["toImage"],
   locale: "en",
 };
 
@@ -27,6 +31,15 @@ interface ChartFullscreenModalProps {
 }
 
 const CHART_LABELS = CHART_TYPE_LABELS;
+
+const SIZE_PRESETS = [
+  { label: "1200×800", value: "1200x800", width: 1200, height: 800 },
+  { label: "1600×1000", value: "1600x1000", width: 1600, height: 1000 },
+  { label: "2000×1200", value: "2000x1200", width: 2000, height: 1200 },
+  { label: "Custom", value: "custom", width: 0, height: 0 },
+];
+
+const DEFAULT_FILENAME = (chartType: string) => `chart-${chartType}`;
 
 export default function ChartFullscreenModal({
   fullscreenState,
@@ -44,11 +57,78 @@ export default function ChartFullscreenModal({
   const chartHeight = styleConfig?.chartHeight ?? 420;
   const titleOverride = styleConfig?.title;
 
+  const [sizePreset, setSizePreset] = useState<string>("1200x800");
+  const [customWidth, setCustomWidth] = useState<number>(1200);
+  const [customHeight, setCustomHeight] = useState<number>(800);
+  const [filename, setFilename] = useState<string>(DEFAULT_FILENAME(chartType));
+  const [background, setBackground] = useState<"white" | "transparent">("white");
+
+  const selectedPreset = SIZE_PRESETS.find(p => p.value === sizePreset) ?? SIZE_PRESETS[0];
+  const exportWidth = sizePreset === "custom" ? customWidth : selectedPreset.width;
+  const exportHeight = sizePreset === "custom" ? customHeight : selectedPreset.height;
+  const exportScale = 2;
+
+  const getPlotDiv = () => document.getElementById(`fullscreen-plot-${chartType}`) as any;
+
   const handleDownload = () => {
-    // Use Plotly's downloadImage via the react-plotly component's downloadImage method
-    const plotDiv = document.getElementById(`fullscreen-plot-${chartType}`) as any;
-    if (plotDiv && plotDiv.downloadImage) {
-      plotDiv.downloadImage({ format: "png", width: 1200, height: 800, filename: `chart-${chartType}-fullscreen` });
+    const plotDiv = getPlotDiv();
+    if (!plotDiv) return;
+
+    const layoutBackup: any = {};
+
+    // Handle transparent background: temporarily set bg to transparent
+    if (background === "transparent") {
+      layoutBackup.paper_bgcolor = plotDiv._fullLayout?.paper_bgcolor;
+      layoutBackup.plot_bgcolor = plotDiv._fullLayout?.plot_bgcolor;
+      plotDiv._plotly?.relayout(plotDiv, {
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+      });
+    }
+
+    const downloadOptions = {
+      format: "png" as const,
+      width: exportWidth,
+      height: exportHeight,
+      filename: filename || DEFAULT_FILENAME(chartType),
+      scale: exportScale,
+    };
+
+    const doDownload = () => {
+      // Primary: _plotly instance downloadImage
+      const plotly = plotDiv._plotly;
+      if (plotly?.downloadImage) {
+        plotly.downloadImage(downloadOptions);
+        return true;
+      }
+      // Fallback: _plotly toImage + manual anchor click
+      if (plotly?.toImage) {
+        plotly.toImage(downloadOptions).then((url: string) => {
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${filename || DEFAULT_FILENAME(chartType)}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        });
+        return true;
+      }
+      return false;
+    };
+
+    const success = doDownload();
+
+    // If transparent mode, restore background after delay
+    if (background === "transparent") {
+      setTimeout(() => {
+        if (Object.keys(layoutBackup).length > 0) {
+          plotDiv._plotly?.relayout(plotDiv, layoutBackup);
+        }
+      }, 150);
+    }
+
+    if (!success) {
+      console.warn("Plotly download not available for chart:", chartType);
     }
   };
 
@@ -86,54 +166,107 @@ export default function ChartFullscreenModal({
   };
 
   return (
-    <Modal
-      opened={!!fullscreenState}
-      onClose={onClose}
-      size="95vw"
-      padding="md"
-      title={
+    <Box>
+      {/* Top bar */}
+      <Group justify="space-between" align="center" mb="xs">
         <Group gap="xs">
           <Text size="sm" fw={600}>
             {CHART_LABELS[chartType] ?? chartType}
           </Text>
-          <Text size="xs" c="dimmed">
-            {titleOverride ? `— ${titleOverride}` : "Fullscreen View"}
-          </Text>
+          {titleOverride && (
+            <Text size="xs" c="dimmed">— {titleOverride}</Text>
+          )}
         </Group>
-      }
-      withCloseButton={false}
-      styles={{
-        header: { paddingBottom: 8 },
-        body: { padding: "8px 0" },
-      }}
-    >
-      <Stack gap="xs">
-        <Group justify="flex-end" gap="xs">
-          <Button
-            variant="subtle"
-            color="gray"
-            size="xs"
-            leftSection={<IconDownload size={14} />}
-            onClick={handleDownload}
-          >
-            Download PNG
-          </Button>
+        <Group gap="xs">
           <ActionIcon variant="subtle" color="gray" onClick={onClose}>
             <IconX size={16} />
           </ActionIcon>
         </Group>
-        <Box
-          id={`fullscreen-plot-${chartType}`}
-          style={{ width: "100%", minHeight: chartHeight }}
-        >
-          {renderPlotContent()}
+      </Group>
+
+      {/* Plot area */}
+      <Box
+        id={`fullscreen-plot-${chartType}`}
+        style={{ width: "100%", minHeight: chartHeight }}
+      >
+        {renderPlotContent()}
+      </Box>
+
+      {/* Export Settings */}
+      <Group gap="md" mt="md" align="flex-end">
+        <Box>
+          <Text size="xs" fw={500} mb={4}>Size</Text>
+          <Select
+            size="xs"
+            data={SIZE_PRESETS.map(p => ({ value: p.value, label: p.label }))}
+            value={sizePreset}
+            onChange={(v) => v && setSizePreset(v)}
+            styles={{ input: { minHeight: 28, height: 28 } }}
+          />
         </Box>
-      </Stack>
-    </Modal>
+
+        {sizePreset === "custom" && (
+          <>
+            <NumberInput
+              label="Width"
+              size="xs"
+              value={customWidth}
+              onChange={(v) => setCustomWidth(Number(v) || 1200)}
+              min={400}
+              max={4000}
+              step={100}
+              styles={{ input: { minHeight: 28, height: 28 } }}
+              w={80}
+            />
+            <NumberInput
+              label="Height"
+              size="xs"
+              value={customHeight}
+              onChange={(v) => setCustomHeight(Number(v) || 800)}
+              min={300}
+              max={3000}
+              step={100}
+              styles={{ input: { minHeight: 28, height: 28 } }}
+              w={80}
+            />
+          </>
+        )}
+
+        <TextInput
+          label="Filename"
+          size="xs"
+          value={filename}
+          onChange={(e) => setFilename(e.target.value || DEFAULT_FILENAME(chartType))}
+          styles={{ input: { minHeight: 28, height: 28 } }}
+          w={160}
+        />
+
+        <Box>
+          <Text size="xs" fw={500} mb={4}>Background</Text>
+          <SegmentedControl
+            size="xs"
+            data={[
+              { label: "White", value: "white" },
+              { label: "Transparent", value: "transparent" },
+            ]}
+            value={background}
+            onChange={(v) => setBackground(v as "white" | "transparent")}
+          />
+        </Box>
+
+        <Button
+          size="xs"
+          leftSection={<IconDownload size={14} />}
+          onClick={handleDownload}
+        >
+          Download
+        </Button>
+      </Group>
+    </Box>
   );
 }
 
-// Inline chart components for fullscreen rendering
+// Helper functions
 
 function isValidNumber(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
