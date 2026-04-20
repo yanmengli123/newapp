@@ -155,8 +155,6 @@ export default function PictureMakerPage() {
   const commonChartProps = {
     renderMode: "card" as const,
     styleConfig,
-    onOpenFullscreen: (ct: FullscreenState["chartType"]) =>
-      setFullscreenState({ chartType: ct }),
   };
 
   const renderChart = () => {
