@@ -19,16 +19,18 @@ from urllib.parse import unquote
 
 import gffutils
 import pyfaidx
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from backend.config import (
     GRCG6A_DB_PATH as DB_PATH,
     GRCG6A_PG_DSN as PG_DSN,
     GRCG6A_STATIC_ROOT as STATIC_ROOT,
     GRCG6A_RAWDATA_ROOT as RAWDATA_ROOT,
+    GRCG6A_BWDATA_ROOT as BWDATA_ROOT,
     KEGG_IMAGE_DIR,
     GRCG6A_GENOME_OUTPUT as GENOME_OUTPUT_DIR,
 )
@@ -284,6 +286,15 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(STATIC_ROOT)), name="static")
 # Genome files (FASTA/GFF/aliases) — JBrowse 用
 app.mount("/genome", StaticFiles(directory=str(RAWDATA_ROOT.parent)), name="genome")
+# BigWig coverage tracks — JBrowse2 QuantitativeTrack 用 (custom route to force binary MIME)
+bwdata_router = APIRouter()
+@bwdata_router.get("/{filename:path}")
+async def serve_bwdata(filename: str):
+    file_path = BWDATA_ROOT / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(file_path, media_type="application/octet-stream", filename=filename)
+app.include_router(bwdata_router, prefix="/bwdata")
 
 # ─────────────────────────────────────────────
 # 路由注册（唯一入口）

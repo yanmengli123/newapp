@@ -51,6 +51,11 @@ GRCG6A_PG_DSN: str = os.getenv(
     "postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a"
 )
 
+# BigWig coverage tracks (for JBrowse2 QuantitativeTrack)
+GRCG6A_BWDATA_ROOT: Path = Path(
+    os.getenv("GRCG6A_BWDATA_ROOT", str(_BASE / "bwdata"))
+).resolve()
+
 # HMMER/Pfam database (for domain search)
 GRCG6A_HMMER_DB: Path = Path(
     os.getenv("GRCG6A_HMMER_DB", str(_BASE / "hmmer_db" / "Pfam-A.hmm"))

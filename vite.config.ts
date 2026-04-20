@@ -17,6 +17,7 @@ export default defineConfig({
       '/datasets': 'http://localhost:8001',
       '/genes':    'http://localhost:8001',
       '/overview': 'http://localhost:8001',
+      '/bwdata':  'http://localhost:8001',
     },
   },
 })
