@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeScript frontend with FastAPI backend. Frontend runs on port 5173, backend on port 8000.
+Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeScript frontend with FastAPI backend. Frontend runs on port 5173, backend on port 8001.
 
 **Architecture model**: `C:\Users\32110\Desktop\newapp\backend\` is the development/main copy. `D:\jbrowsedata\projectdata\` is the production data/execution drive. The two directories have different structures — C has a `backend/` subdirectory that D does not. Python code lives in C; data, Docker, and genome files live in D. Only C is synced to Git; D is outside the repo.
 
@@ -98,13 +98,15 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `GenePage` — Gene detail: gene header (xref/aliases), **GeneStructurePlot** (SVG transcript visualization with drag-pan/scroll-zoom/PNG export), transcripts accordion with exons/CDS/UTR, GO (Accordion), KEGG Pathways, **Expression 模块**
     - **Data loading**: Four-layer concept — (1) Load main page via `getGenePage(geneId, false)` (no sequences), (2) Hydrate expression from `response.expression`, (3) Annotations consumed directly from `response.annotations` (no separate API calls), (4) Sequences loaded on-demand via `getGenePage(geneId, true)`
   - `ChromosomePage` — Chromosome view with gene list
-  - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2
+  - `JBrowsePage` — Linear genome browser via @jbrowse/react-linear-genome-view2; 35 chromosome buttons, navigation via `?loc=` param; **BigWig QuantitativeTrack** integration with 29 tracks from `/bwdata/` (GRCg6a_BWDATA_ROOT config, served via `application/octet-stream` custom route)
+  - `PictureMakerPage` — Single-chart generator: Gene Search + Chart Type/Dataset/Metric dropdowns + Run button → renders one of 10 expression charts. Reuses all Expression* components; includes ChartCustomizerDrawer and ChartFullscreenModal. Route: `/picture-maker`
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
 - **`EscOverviewSection.tsx`** — ESC Gene Expression Atlas homepage section: 8 clickable chart cards (Sample Composition / Sex-Biased Genes / Female vs Male Scatter / Stage DEG Count / Expression Distribution / PCA / Top50 Heatmap / Trajectory Clusters). Each card opens in a `Drawer` fullscreen view via `useDisclosure` + `useHotkeys`. Heatmap uses agglomerative hierarchical clustering (pure TypeScript, single linkage) for gene ordering.
 - **`DownloadsPage.tsx`** — CSV download cards for all 8 overview charts. Download via `fetch` + `Blob` + `createObjectURL` pattern hitting `/overview/<id>/csv` endpoints.
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis — **all paths use `/genome-api/` prefix**), `src/lib/chatApi.ts` (chat)
-  - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `http://localhost:8000`). Never hardcode URLs in components.
+  - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `http://localhost:8000`; **dev proxy routes most paths to port 8001**). Never hardcode URLs in components.
+- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.**
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
@@ -264,6 +266,7 @@ All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowse
 | `GRCG6A_DB_PATH` | `.../grcg6a_nc.db` | SQLite gene DB |
 | `GRCG6A_STATIC_ROOT` | `.../static` | KEGG images |
 | `GRCG6A_RAWDATA_ROOT` | `.../rawdata` | Raw TSV matrices only (FPKM/TPM); genome FASTA/GFF/aliases live in `RAWDATA_ROOT.parent` and are served via `/genome/` |
+| `GRCG6A_BWDATA_ROOT` | `.../bwdata` | BigWig coverage track files (29 .bw files); served via `/bwdata/` with `application/octet-stream` MIME type (custom APIRouter, not StaticFiles) |
 | `GRCG6A_GENOME_OUTPUT` | `.../outputs/jobs` | Analysis job outputs |
 | `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
 | `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
@@ -475,7 +478,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **Genome API paths**: All `genomeApi.ts` functions use `/genome-api/` prefix (changed from `/genome/`). Frontend components only call `genomeApi.ts` functions — never hardcode `/genome-api/` paths directly.
 - **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id. Use `resolveGeneId()` to canonicalize before API calls — geneApi functions call this internally, components should NOT call search separately.
 - **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
-- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Gene-specific navigation via `?loc=chrN:start..end` query param (e.g. from GeneStructurePlot "Open in JBrowse" button); NC_ accessions are auto-converted to chr IDs using a 35-entry lookup table. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`.
+- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Gene-specific navigation via `?loc=chrN:start..end` query param (e.g. from GeneStructurePlot "Open in JBrowse" button); NC_ accessions are auto-converted to chr IDs using a 35-entry lookup table. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`. BigWig tracks in `jbrowseConfig.ts` use `QuantitativeTrack` + `BigWigAdapter` referencing `/bwdata/*.bw` (29 files, stage × sex × replicate naming, e.g. `E0_Female1.bw`). **NOTE: BigWig files have non-standard header byte order — mixed BE/LE in 8-byte offset fields. UCSC `bedGraphToBigWig` re-generation required for full JBrowse2 compatibility.**
 - **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
 - **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state. `<Text>` defaults to `<p>` — never nest block elements (`<div>`, `<Badge>`, `<Card>`) inside `<Text>`; use `component="span"` if Badge is needed inline.
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
