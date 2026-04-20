@@ -17,7 +17,7 @@ npm run build    # TypeScript check + production build
 npm run lint     # ESLint
 
 # Backend — ONLY supported way to start (from C root):
-D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
 
 # Legacy ways (DEPRECATED — do not use):
 # python backend/main.py               ← wrong: uses old import style
@@ -504,7 +504,7 @@ git push origin <branch>
 npm run dev
 
 # Backend (ONLY way — from C root)
-D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
 
 # Restart PostgreSQL Docker
 cd /d/jbrowsedata/projectdata && docker-compose stop postgres && docker-compose rm -f postgres && docker-compose up -d
