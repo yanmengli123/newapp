@@ -13,7 +13,6 @@ import {
   Accordion,
   Tooltip,
   Tabs,
-  ActionIcon,
   Alert,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
@@ -68,7 +67,6 @@ interface ProteinStructureAccessPanelProps {
   proteinSequence: string;
   geneSymbol: string;
   transcriptAcc: string | null;
-  proteinLength: number | null;
 }
 
 /** Build FASTA text for a protein */
@@ -89,13 +87,12 @@ function isRefSeqAccession(proteinId: string): boolean {
   return /^(NP_|XP_|YP_|WP_|AP_)\d+/i.test(proteinId.trim());
 }
 
-/** ProteinStructureAccessPanel — AlphaFold引导 + 条件NCBI按钮 */
+/** ProteinStructureAccessPanel — AlphaFold引导 + RCSB PDB教程 + 条件NCBI按钮 */
 function ProteinStructureAccessPanel({
   proteinId,
   proteinSequence,
   geneSymbol,
   transcriptAcc,
-  proteinLength,
 }: ProteinStructureAccessPanelProps) {
   if (!proteinSequence || proteinSequence.replace(/\s+/g, "").trim().length === 0) {
     return null;
@@ -147,10 +144,21 @@ function ProteinStructureAccessPanel({
             color="blue"
             variant="filled"
             leftSection={<IconExternalLink size={13} />}
-            // TODO: replace with actual analytics call
-            // onClick={() => analytics.track("open_alphafold_server", { protein_id: proteinId })}
           >
             AlphaFold Server
+          </Button>
+
+          <Button
+            component="a"
+            href="https://www.rcsb.org/search?search_type=sequence"
+            target="_blank"
+            rel="noopener noreferrer"
+            size="xs"
+            color="orange"
+            variant="light"
+            leftSection={<IconExternalLink size={13} />}
+          >
+            RCSB PDB
           </Button>
 
           {canShowNcbi && (
@@ -163,40 +171,80 @@ function ProteinStructureAccessPanel({
               variant="light"
               color="green"
               leftSection={<IconExternalLink size={13} />}
-              // TODO: replace with actual analytics call
-              // onClick={() => analytics.track("open_ncbi_protein", { protein_id: proteinId })}
             >
               NCBI Protein
             </Button>
           )}
         </Group>
 
-        {/* Copy sequence shortcut */}
-        <Group gap="xs" align="center">
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            onClick={() => {
-              navigator.clipboard.writeText(cleanSeq).catch(() => {});
-            }}
-            title="Copy pure sequence"
+        {/* Protein sequence display */}
+        <Alert
+          variant="light"
+          color="teal"
+          title="Protein sequence — copy & paste to RCSB PDB"
+          icon={<IconClipboardCopy size={14} />}
+          py="xs"
+        >
+          <Text
+            component="pre"
+            size="xs"
+            ff="monospace"
+            style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", margin: 0, background: "transparent" }}
           >
-            <IconClipboardCopy size={14} />
-          </ActionIcon>
-          <ActionIcon
-            size="sm"
-            variant="subtle"
-            onClick={() => {
-              navigator.clipboard.writeText(fastaText).catch(() => {});
-            }}
-            title="Copy as FASTA"
-          >
-            <IconClipboardCopy size={14} />
-          </ActionIcon>
-          <Text size="xs" c="dimmed">
-            {cleanSeq.length} aa · {proteinLength != null ? `${proteinLength} aa recorded` : "length from DB"}
+            {cleanSeq}
           </Text>
-        </Group>
+          <Group gap="xs" mt="xs">
+            <Button
+              size="xs"
+              variant="light"
+              color="teal"
+              leftSection={<IconClipboardCopy size={12} />}
+              onClick={() => navigator.clipboard.writeText(cleanSeq).catch(() => {})}
+            >
+              Copy Sequence
+            </Button>
+            <Button
+              size="xs"
+              variant="light"
+              color="gray"
+              leftSection={<IconClipboardCopy size={12} />}
+              onClick={() => navigator.clipboard.writeText(fastaText).catch(() => {})}
+            >
+              Copy FASTA
+            </Button>
+            <Text size="xs" c="dimmed">
+              {cleanSeq.length} aa
+            </Text>
+          </Group>
+        </Alert>
+
+        {/* RCSB PDB tutorial */}
+        <Alert
+          variant="light"
+          color="orange"
+          title="RCSB PDB — How to search by protein sequence"
+          icon={<IconInfoCircle size={14} />}
+          py="xs"
+        >
+          <Text size="xs" mb={4}>
+            <strong>①</strong> 打开 RCSB PDB：<Text component="span" ff="monospace" size="xs">https://www.rcsb.org</Text>
+          </Text>
+          <Text size="xs" mb={4}>
+            <strong>②</strong> 点击上方蓝色导航栏 <Text component="span" ff="monospace" size="xs">Sequence Similarity</Text> 标签（不要用 Attribute Search）
+          </Text>
+          <Text size="xs" mb={4}>
+            <strong>③</strong> 在序列输入框中粘贴上方蛋白序列（仅一字母序列，不要带 <Text component="span" ff="monospace" size="xs">&gt;</Text> 标题行）
+          </Text>
+          <Text size="xs" mb={4}>
+            <strong>④</strong> 勾选 <Text component="span" ff="monospace" size="xs">Include CSM</Text>（可同时搜索实验结构 + AlphaFold/ModelArchive 计算模型）
+          </Text>
+          <Text size="xs" mb={4}>
+            <strong>⑤</strong> 点击 <Text component="span" ff="monospace" size="xs">Search</Text>，从结果列表中找到目标蛋白对应结构，点击查看 3D 结构
+          </Text>
+          <Text size="xs" c="dimmed">
+            提示：RCSB 支持直接以蛋白一字母序列搜索，无需输入 PDB ID；Include CSM 开启后可同时搜到实验结构和 AI 预测模型（AlphaFold / SwissModel）
+          </Text>
+        </Alert>
       </Stack>
     </Box>
   );
@@ -1182,7 +1230,6 @@ export default function GenePage() {
                                     proteinSequence={protein.protein_sequence}
                                     geneSymbol={data.gene.gene_symbol || data.gene.gene_id}
                                     transcriptAcc={tx.transcript_acc}
-                                    proteinLength={protein.protein_length}
                                   />
                                 </>
                               )}
