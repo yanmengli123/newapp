@@ -1,5 +1,5 @@
 import { Box, Button, Container, Group, Text, ThemeIcon, Menu } from "@mantine/core";
-import { IconDna, IconTool, IconBox, IconChartBar, IconDownload } from "@tabler/icons-react";
+import { IconDna, IconTool, IconBox, IconChartBar, IconDownload, IconPhoto } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 
 function HeaderNav() {
@@ -75,6 +75,9 @@ function HeaderNav() {
       </Menu>
       <Button variant="subtle" component={Link} to="/viz">
         Visualizations
+      </Button>
+      <Button variant="subtle" component={Link} to="/picture-maker" leftSection={<IconPhoto size={16} />}>
+        Picture Maker
       </Button>
       <Button variant="subtle" component={Link} to="/data">
         Datasets
