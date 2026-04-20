@@ -150,7 +150,7 @@ function ProteinStructureAccessPanel({
 
           <Button
             component="a"
-            href="https://www.rcsb.org/search?search_type=sequence"
+            href="https://www.rcsb.org/"
             target="_blank"
             rel="noopener noreferrer"
             size="xs"
