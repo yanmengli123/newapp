@@ -4,6 +4,7 @@ import {
   ActionIcon,
   Box,
   Button,
+  Divider,
   Group,
   Modal,
   SegmentedControl,
@@ -11,6 +12,7 @@ import {
   Stack,
   Text,
   TextInput,
+  Tooltip,
 } from "@mantine/core";
 import { IconDownload, IconX } from "@tabler/icons-react";
 import * as PlotlyModule from "plotly.js-dist-min";
@@ -41,12 +43,13 @@ interface ChartFullscreenModalProps {
   resolveStyle: (chartType: string) => ResolvedChartStyle | undefined;
 }
 
-type ExportSizePreset = "1200x800" | "1600x1000" | "2000x1200";
+type ExportSizePreset = "1200x800" | "1600x1000" | "2000x1200" | "2400x1600";
 
 const EXPORT_SIZE_OPTIONS = [
   { value: "1200x800", label: "1200×800" },
   { value: "1600x1000", label: "1600×1000" },
   { value: "2000x1200", label: "2000×1200" },
+  { value: "2400x1600", label: "2400×1600" },
 ];
 
 function parsePresetSize(preset: ExportSizePreset) {
@@ -68,7 +71,7 @@ export default function ChartFullscreenModal({
   const graphDivRef = useRef<any>(null);
   const [plotReady, setPlotReady] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [sizePreset, setSizePreset] = useState<ExportSizePreset>("1200x800");
+  const [sizePreset, setSizePreset] = useState<ExportSizePreset>("2000x1200");
   const [background, setBackground] = useState<"white" | "transparent">("white");
   const [filename, setFilename] = useState("");
 
@@ -77,7 +80,7 @@ export default function ChartFullscreenModal({
       graphDivRef.current = null;
       setPlotReady(false);
       setIsDownloading(false);
-      setSizePreset("1200x800");
+      setSizePreset("2000x1200");
       setBackground("white");
       setFilename("");
       return;
@@ -85,7 +88,7 @@ export default function ChartFullscreenModal({
 
     setPlotReady(false);
     setIsDownloading(false);
-    setSizePreset("1200x800");
+    setSizePreset("2000x1200");
     setBackground("white");
     setFilename(`chart-${fullscreenState.chartType}`);
   }, [fullscreenState]);
@@ -94,7 +97,6 @@ export default function ChartFullscreenModal({
 
   const { chartType } = fullscreenState;
   const styleConfig = resolveStyle(chartType);
-  const chartHeight = styleConfig?.chartHeight ?? 560;
   const titleOverride = styleConfig?.title;
   const { width: exportWidth, height: exportHeight } = parsePresetSize(sizePreset);
 
@@ -169,6 +171,9 @@ export default function ChartFullscreenModal({
     }
   };
 
+  // Fullscreen chart height — use nearly all remaining viewport height
+  const chartHeight = "calc(100vh - 220px)";
+
   const commonProps = {
     style: { width: "100%", height: chartHeight } as const,
     useResizeHandler: true as const,
@@ -210,8 +215,9 @@ export default function ChartFullscreenModal({
       fullScreen
       withCloseButton={false}
       styles={{
-        header: { paddingBottom: 8 },
-        body: { padding: "8px 16px 16px" },
+        header: { padding: "12px 20px 8px", borderBottom: "1px solid #e9ecef" },
+        body: { padding: 0, display: "flex", flexDirection: "column", height: "100vh" },
+        content: { display: "flex", flexDirection: "column" },
       }}
       title={
         <Group gap="xs">
@@ -224,76 +230,87 @@ export default function ChartFullscreenModal({
         </Group>
       }
     >
-      <Stack gap="sm">
-        <Group justify="space-between" align="center">
-          <Text size="xs" c="dimmed">
-            {plotReady ? "Interactive controls ready" : "Loading chart..."}
-          </Text>
-          <Group gap="xs">
-            <Button
-              variant="light"
-              size="xs"
-              leftSection={<IconDownload size={14} />}
-              onClick={handleDownload}
-              disabled={!plotReady || isDownloading}
-              loading={isDownloading}
-            >
-              Download PNG
-            </Button>
-            <ActionIcon variant="subtle" color="gray" onClick={onClose}>
-              <IconX size={16} />
-            </ActionIcon>
+      {/* Toolbar row */}
+      <Box
+        style={{
+          borderBottom: "1px solid #e9ecef",
+          padding: "10px 20px",
+          background: "#fafafa",
+          flexShrink: 0,
+        }}
+      >
+        <Group justify="space-between" wrap="wrap" gap="md">
+          <Group gap="md" wrap="wrap">
+            <Text size="xs" c="dimmed" style={{ alignSelf: "center" }}>
+              {plotReady ? "Interactive: scroll to zoom, drag to pan" : "Loading chart..."}
+            </Text>
           </Group>
-        </Group>
 
-        <Box style={{ width: "100%", minHeight: chartHeight }}>
-          {renderPlotContent()}
-        </Box>
-
-        <Group justify="space-between" align="end" wrap="wrap">
-          <Group gap="sm" align="end" wrap="wrap">
-            <Select
-              label="Export Size"
+          <Group gap="sm">
+            {/* Background toggle */}
+            <SegmentedControl
               size="xs"
-              w={140}
+              value={background}
+              onChange={(value) => setBackground(value as "white" | "transparent")}
+              data={[
+                { value: "white", label: "White BG" },
+                { value: "transparent", label: "Transparent BG" },
+              ]}
+            />
+
+            {/* Export size */}
+            <Select
+              size="xs"
+              w={130}
               data={EXPORT_SIZE_OPTIONS}
               value={sizePreset}
               onChange={(value) => value && setSizePreset(value as ExportSizePreset)}
+              styles={{ input: { fontSize: 12 } }}
             />
+
+            {/* Filename */}
             <TextInput
-              label="Filename"
               size="xs"
-              w={220}
+              w={180}
               value={filename}
               onChange={(event) => setFilename(event.currentTarget.value)}
               placeholder={`chart-${chartType}`}
+              styles={{ input: { fontSize: 12 } }}
             />
-            <Box>
-              <Text size="xs" mb={6}>
-                Background
-              </Text>
-              <SegmentedControl
-                size="xs"
-                value={background}
-                onChange={(value) => setBackground(value as "white" | "transparent")}
-                data={[
-                  { value: "white", label: "White" },
-                  { value: "transparent", label: "Transparent" },
-                ]}
-              />
-            </Box>
-          </Group>
 
-          <Button
-            leftSection={<IconDownload size={14} />}
-            onClick={handleDownload}
-            disabled={!plotReady || isDownloading}
-            loading={isDownloading}
-          >
-            Download
-          </Button>
+            {/* Download */}
+            <Tooltip label={!plotReady ? "Chart loading..." : ""}>
+              <Button
+                size="sm"
+                leftSection={<IconDownload size={15} />}
+                onClick={handleDownload}
+                disabled={!plotReady || isDownloading}
+                loading={isDownloading}
+              >
+                Export PNG
+              </Button>
+            </Tooltip>
+
+            {/* Close */}
+            <ActionIcon variant="subtle" color="gray" size="lg" onClick={onClose}>
+              <IconX size={18} />
+            </ActionIcon>
+          </Group>
         </Group>
-      </Stack>
+      </Box>
+
+      {/* Chart area — fills all remaining space */}
+      <Box
+        style={{
+          flex: 1,
+          minHeight: 0,
+          padding: "12px 16px",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {renderPlotContent()}
+      </Box>
     </Modal>
   );
 }
@@ -397,7 +414,7 @@ const PAPER_STYLE_FULLSCREEN = {
 // Stage Chart
 function StageChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const { stages, maleValues, femaleValues, meanValues } = resolveStageMeans(summary?.stage_means ?? null);
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showMeanLine = styleConfig?.chartSpecific?.showMeanLine ?? true;
   const showValueLabel = styleConfig?.chartSpecific?.showValueLabel ?? false;
   const maleColor = styleConfig?.colors?.male ?? "#228BE6";
@@ -411,13 +428,13 @@ function StageChart({ summary, dataset, metric, styleConfig, ...plotProps }: { s
     { x: stages, y: femaleValues, name: "Female", type: "bar", marker: { color: femaleColor, opacity: 0.85 }, text: showValueLabel ? femaleValues.map((v: number) => (isValidNumber(v) ? v : 0).toFixed(2)) : undefined, textposition: showValueLabel ? "outside" : "none" },
     ...(showMeanLine ? [{ x: stages, y: meanValues, name: "Total Mean", type: "scatter" as const, mode: "lines+markers" as const, line: { color: "#7950F2", width: 2, dash: "dot" }, marker: { color: "#7950F2", size: 7 }, yaxis: "y2" }] : []),
   ];
-  const layout: any = { barmode: "group", margin: { t: 8, b: 56, l: 64, r: 32 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: "#f0f0f0", tickfont: { size: fontSize - 1 }, domain: [0, 0.72] }, yaxis2: { title: { text: "Mean (dot)", font: { size: fontSize, color: "#7950F2" } }, gridcolor: "#f0f0f0", tickfont: { size: fontSize - 1, color: "#7950F2" }, anchor: "free", side: "right", overlaying: "y", position: 0.98, domain: [0, 1] }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "x unified", ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { barmode: "group", margin: { t: 16, b: 72, l: 72, r: 48 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: "#f0f0f0", tickfont: { size: fontSize - 1 }, domain: [0, 0.72] }, yaxis2: { title: { text: "Mean (dot)", font: { size: fontSize, color: "#7950F2" } }, gridcolor: "#f0f0f0", tickfont: { size: fontSize - 1, color: "#7950F2" }, anchor: "free", side: "right", overlaying: "y", position: 0.98, domain: [0, 1] }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.16, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "x unified", ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // Line Chart
 function LineChart({ samples, dataset, metric, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showReplicates = styleConfig?.chartSpecific?.showReplicates ?? true;
   const lineWidth = styleConfig?.chartSpecific?.lineWidth ?? 2.5;
@@ -448,13 +465,13 @@ function LineChart({ samples, dataset, metric, styleConfig, ...plotProps }: { sa
     traces.push({ type: "scatter", mode: "lines+markers", x: maleIdx.map((i: number) => xLabels[i]), y: maleIdx.map((i: number) => values[i]), name: "Male", line: { color: maleColor, width: lineWidth }, marker: { color: maleColor, size: markerSize } });
     traces.push({ type: "scatter", mode: "lines+markers", x: femaleIdx.map((i: number) => xLabels[i]), y: femaleIdx.map((i: number) => values[i]), name: "Female", line: { color: femaleColor, width: lineWidth }, marker: { color: femaleColor, size: markerSize } });
   }
-  const layout: any = { margin: { t: 8, b: 56, l: 64, r: 16 }, xaxis: { tickangle: -40, tickfont: { size: fontSize - 1 }, gridcolor: showGrid ? "#f0f0f0" : "transparent", showgrid: showGrid, dtick: 1 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: showGrid ? "#f0f0f0" : "transparent", tickfont: { size: fontSize - 1 }, zeroline: false }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.24, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "closest" as const, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 72, l: 72, r: 24 }, xaxis: { tickangle: -40, tickfont: { size: fontSize - 1 }, gridcolor: showGrid ? "#f0f0f0" : "transparent", showgrid: showGrid, dtick: 1 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: showGrid ? "#f0f0f0" : "transparent", tickfont: { size: fontSize - 1 }, zeroline: false }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.18, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "closest" as const, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // Violin Chart
 function ViolinChart({ samples, dataset, metric, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showPoints = styleConfig?.chartSpecific?.showPoints ?? true;
   const opacity = styleConfig?.chartSpecific?.opacity ?? 0.7;
@@ -476,13 +493,13 @@ function ViolinChart({ samples, dataset, metric, styleConfig, ...plotProps }: { 
     if (maleVals.length > 0) traces.push({ type: "violin", y: maleVals, x: Array(maleVals.length).fill(stage), name: `${stage} Male`, box: { visible: true }, meanline: { visible: true }, points: showPoints ? "all" : false, jitter: 0.25, marker: { color: maleColor, size: 4, opacity }, span: [Math.min(...maleVals) * 0.9, Math.max(...maleVals) * 1.1] });
     if (femaleVals.length > 0) traces.push({ type: "violin", y: femaleVals, x: Array(femaleVals.length).fill(stage), name: `${stage} Female`, box: { visible: true }, meanline: { visible: true }, points: showPoints ? "all" : false, jitter: 0.25, marker: { color: femaleColor, size: 4, opacity }, span: [Math.min(...femaleVals) * 0.9, Math.max(...femaleVals) * 1.1] });
   }
-  const layout: any = { violinmode: "group", margin: { t: 8, b: 56, l: 64, r: 16 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 } }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, showlegend: true, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.26, font: { size: fontSize - 1 } }, boxpoints: showPoints ? "all" : false, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { violinmode: "group", margin: { t: 16, b: 72, l: 72, r: 24 }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 } }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, showlegend: true, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.18, font: { size: fontSize - 1 } }, boxpoints: showPoints ? "all" : false, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // Area Chart
 function AreaChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showMeanLine = styleConfig?.chartSpecific?.showMeanLine ?? true;
   const areaOpacity = styleConfig?.chartSpecific?.opacity ?? 0.35;
@@ -497,13 +514,13 @@ function AreaChart({ summary, dataset, metric, styleConfig, ...plotProps }: { su
     { type: "scatter", mode: "lines", x: stages, y: maleValues, name: "Male", fill: "tonexty", fillcolor: hexToRgba(maleColor, areaOpacity), line: { color: maleColor, width: 1.5 }, hoverinfo: "x+y+name" },
     ...(showMeanLine ? [{ type: "scatter" as const, mode: "lines+markers" as const, x: stages, y: meanValues, name: "Total Mean", line: { color: "#7950F2", width: 2, dash: "dot" }, marker: { color: "#7950F2", size: 6 }, yaxis: "y2" }] : []),
   ];
-  const layout: any = { margin: { t: 8, b: 48, l: 64, r: 32 }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, domain: [0, 0.85] }, yaxis2: { title: { text: "Mean (dot)", font: { size: fontSize, color: "#7950F2" } }, anchor: "free", side: "right", overlaying: "y", position: 0.98, domain: [0, 1], tickfont: { size: fontSize - 1, color: "#7950F2" }, gridcolor: showGrid ? gridColor : "transparent" }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: fontSize - 1 } }, hovermode: "x unified", showlegend: true, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 56, l: 72, r: 48 }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, yaxis: { title: { text: getMetricLabel(metric), font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, domain: [0, 0.85] }, yaxis2: { title: { text: "Mean (dot)", font: { size: fontSize, color: "#7950F2" } }, anchor: "free", side: "right", overlaying: "y", position: 0.98, domain: [0, 1], tickfont: { size: fontSize - 1, color: "#7950F2" }, gridcolor: showGrid ? gridColor : "transparent" }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.14, font: { size: fontSize - 1 } }, hovermode: "x unified", showlegend: true, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // Radar Chart
 function RadarChart({ summary, dataset, styleConfig, ...plotProps }: { summary: any; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showLegend = styleConfig?.showLegend ?? true;
   const fillOpacity = styleConfig?.chartSpecific?.fillOpacity ?? 0.25;
   const maleColor = styleConfig?.colors?.male ?? "#228BE6";
@@ -516,18 +533,18 @@ function RadarChart({ summary, dataset, styleConfig, ...plotProps }: { summary: 
   const rMale = maleValues.map((v: number) => (maxVal > 0 ? v / maxVal : 0));
   const rFemale = femaleValues.map((v: number) => (maxVal > 0 ? v / maxVal : 0));
   const traces: any[] = [
-    { type: "scatterpolar", r: rMale, theta: stages, name: "Male", fill: "toself", fillcolor: hexToRgba(maleColor, fillOpacity), line: { color: maleColor, width: 2 }, marker: { size: 5 }, text: maleValues.map((v: number) => v.toFixed(2)), hovertemplate: "%{theta}: %{r:.2f} (raw: %{text})<extra>Male</extra>" },
-    { type: "scatterpolar", r: rFemale, theta: stages, name: "Female", fill: "toself", fillcolor: hexToRgba(femaleColor, fillOpacity), line: { color: femaleColor, width: 2 }, marker: { size: 5 }, text: femaleValues.map((v: number) => v.toFixed(2)), hovertemplate: "%{theta}: %{r:.2f} (raw: %{text})<extra>Female</extra>" },
+    { type: "scatterpolar", r: rMale, theta: stages, name: "Male", fill: "toself", fillcolor: hexToRgba(maleColor, fillOpacity), line: { color: maleColor, width: 2 }, marker: { size: 6 }, text: maleValues.map((v: number) => v.toFixed(2)), hovertemplate: "%{theta}: %{r:.2f} (raw: %{text})<extra>Male</extra>" },
+    { type: "scatterpolar", r: rFemale, theta: stages, name: "Female", fill: "toself", fillcolor: hexToRgba(femaleColor, fillOpacity), line: { color: femaleColor, width: 2 }, marker: { size: 6 }, text: femaleValues.map((v: number) => v.toFixed(2)), hovertemplate: "%{theta}: %{r:.2f} (raw: %{text})<extra>Female</extra>" },
   ];
-  const layout: any = { polar: { radialaxis: { visible: true, range: [0, 1], tickfont: { size: fontSize - 1 }, gridcolor: "#f0f0f0", title: { text: "Relative Expression", font: { size: fontSize } } }, angularaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "#f8f8f8" }, bgcolor: "white" }, showlegend: showLegend, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.08, font: { size: fontSize - 1 } }, margin: { t: 8, b: 8, l: 8, r: 8 }, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { polar: { radialaxis: { visible: true, range: [0, 1], tickfont: { size: fontSize - 1 }, gridcolor: "#f0f0f0", title: { text: "Relative Expression", font: { size: fontSize } } }, angularaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "#f8f8f8" }, bgcolor: "white" }, showlegend: showLegend, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.06, font: { size: fontSize - 1 } }, margin: { t: 16, b: 16, l: 16, r: 16 }, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // Heatmap Chart
 function HeatmapChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showValues = styleConfig?.chartSpecific?.showValues ?? true;
-  const labelFontSize = styleConfig?.chartSpecific?.labelFontSize ?? 10;
+  const labelFontSize = styleConfig?.chartSpecific?.labelFontSize ?? 11;
   const { stages, maleValues, femaleValues } = resolveStageMeans(summary?.stage_means ?? null);
   const hasData = stages.length > 0 && (maleValues.some(v => v > 0) || femaleValues.some(v => v > 0));
   if (!hasData) return <Text>No data</Text>;
@@ -536,7 +553,7 @@ function HeatmapChart({ summary, dataset, metric, styleConfig, ...plotProps }: {
   const minVal = allVals.length > 0 ? Math.min(...allVals) : 0;
   const maxVal = allVals.length > 0 ? Math.max(...allVals) : 1;
   const zNormalized = z.map((row: number[]) => row.map((v: number) => (v > 0 ? (maxVal > minVal ? (v - minVal) / (maxVal - minVal) : 0) : 0)));
-  const traces: any[] = [{ type: "heatmap", z: zNormalized, x: stages, y: ["Male", "Female"], colorscale: [[0, "#f8f8f8"], [0.25, "#b39ddb"], [0.5, "#7e57c2"], [0.75, "#5e35b1"], [1, "#311b92"]], showscale: true, colorbar: { title: { text: getMetricLabel(metric), side: "right", font: { size: 10 } }, tickfont: { size: 9 }, len: 0.7 }, text: z.map((row: number[]) => row.map((v: number) => (v > 0 ? v.toFixed(2) : "0"))), hoverongaps: false, hovertemplate: "%{y} %{x}: %{text}<extra></extra>" }];
+  const traces: any[] = [{ type: "heatmap", z: zNormalized, x: stages, y: ["Male", "Female"], colorscale: [[0, "#f8f8f8"], [0.25, "#b39ddb"], [0.5, "#7e57c2"], [0.75, "#5e35b1"], [1, "#311b92"]], showscale: true, colorbar: { title: { text: getMetricLabel(metric), side: "right", font: { size: 11 } }, tickfont: { size: 10 }, len: 0.7 }, text: z.map((row: number[]) => row.map((v: number) => (v > 0 ? v.toFixed(2) : "0"))), hoverongaps: false, hovertemplate: "%{y} %{x}: %{text}<extra></extra>" }];
   const annotations: any[] = [];
   if (showValues) {
     for (let i = 0; i < 2; i++) {
@@ -548,13 +565,13 @@ function HeatmapChart({ summary, dataset, metric, styleConfig, ...plotProps }: {
       }
     }
   }
-  const layout: any = { margin: { t: 8, b: 48, l: 80, r: 16 }, xaxis: { tickfont: { size: labelFontSize }, title: { text: "Stage", font: { size: fontSize } }, gridcolor: "#f8f8f8" }, yaxis: { tickfont: { size: labelFontSize }, title: { text: "", font: { size: fontSize } } }, annotations, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 56, l: 80, r: 24 }, xaxis: { tickfont: { size: labelFontSize }, title: { text: "Stage", font: { size: fontSize } }, gridcolor: "#f8f8f8" }, yaxis: { tickfont: { size: labelFontSize }, title: { text: "", font: { size: fontSize } } }, annotations, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // ZScore Chart
 function ZScoreChart({ samples, dataset, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const lineWidth = styleConfig?.chartSpecific?.lineWidth ?? 2;
   const markerSize = styleConfig?.chartSpecific?.markerSize ?? 6;
@@ -570,13 +587,13 @@ function ZScoreChart({ samples, dataset, styleConfig, ...plotProps }: { samples:
   validSamples.forEach((s: ExpressionSample, i: number) => { if (normalizeSex(s.sex) === "Male") maleIdx.push(i); else if (normalizeSex(s.sex) === "Female") femaleIdx.push(i); });
   const traces: any[] = [{ type: "scatter", mode: "lines+markers", x: labels, y: zScores, name: "All", line: { color: neutralColor, width: 0.8, dash: "dot" }, marker: { color: neutralColor, size: 4, opacity: 0.4 } }];
   if (maleIdx.length > 0 && femaleIdx.length > 0) { traces.push({ type: "scatter", mode: "lines+markers", x: maleIdx.map((i: number) => labels[i]), y: maleIdx.map((i: number) => zScores[i]), name: "Male", line: { color: maleColor, width: lineWidth }, marker: { color: maleColor, size: markerSize } }); traces.push({ type: "scatter", mode: "lines+markers", x: femaleIdx.map((i: number) => labels[i]), y: femaleIdx.map((i: number) => zScores[i]), name: "Female", line: { color: femaleColor, width: lineWidth }, marker: { color: femaleColor, size: markerSize } }); }
-  const layout: any = { margin: { t: 8, b: 56, l: 64, r: 16 }, xaxis: { tickangle: -40, tickfont: { size: fontSize - 2 }, gridcolor: "transparent", dtick: 1 }, yaxis: { title: { text: "Z-Score", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, zeroline: true, zerolinecolor: "#ccc", zerolinewidth: 1 }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.28, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "closest" as const, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 72, l: 72, r: 24 }, xaxis: { tickangle: -40, tickfont: { size: fontSize - 2 }, gridcolor: "transparent", dtick: 1 }, yaxis: { title: { text: "Z-Score", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, zeroline: true, zerolinecolor: "#ccc", zerolinewidth: 1 }, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, showlegend: true, hovermode: "closest" as const, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // FCBar Chart
 function FCBarChart({ summary, styleConfig, ...plotProps }: { summary: any; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showValueLabel = styleConfig?.chartSpecific?.showValueLabel ?? true;
   const barWidth = styleConfig?.chartSpecific?.barWidth ?? 0.6;
@@ -592,13 +609,13 @@ function FCBarChart({ summary, styleConfig, ...plotProps }: { summary: any; styl
   if (isValidNumber(foldTop) && foldTop! > 0) foldData.push({ label: topStage && topStage !== "—" ? `Top (${topStage})` : "Top Stage", raw: foldTop!, log2: Math.log2(foldTop!), direction: "up" });
   if (isValidNumber(foldBottom) && foldBottom! > 0) foldData.push({ label: "Bottom Stage", raw: foldBottom!, log2: -Math.log2(foldBottom!), direction: "down" });
   const traces: any[] = [{ type: "bar", x: foldData.map(d => d.label), y: foldData.map(d => d.log2), text: showValueLabel ? foldData.map(d => `${d.raw.toFixed(2)}x`) : undefined, textposition: showValueLabel ? "outside" : "none", textfont: { size: fontSize - 1, color: foldData.map(d => d.direction === "up" ? upColor : downColor) }, marker: { color: foldData.map(d => d.direction === "up" ? upColor : downColor), opacity: 0.85, width: barWidth }, hovertemplate: "%{x}: %{text} (log2: %{y:.2f})<extra></extra>", orientation: "v" as const }];
-  const layout: any = { margin: { t: 8, b: 52, l: 80, r: 16 }, yaxis: { title: { text: "log2(Fold Change)", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", zeroline: true, zerolinecolor: "#ccc", tickfont: { size: fontSize - 1 } }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, showlegend: false, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 64, l: 96, r: 24 }, yaxis: { title: { text: "log2(Fold Change)", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", zeroline: true, zerolinecolor: "#ccc", tickfont: { size: fontSize - 1 } }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, showlegend: false, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // FCTrajectory Chart
 function FCTrajectoryChart({ samples, dataset, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showLegend = styleConfig?.showLegend ?? true;
   const showGrid = styleConfig?.showGrid ?? true;
   const showValueLabel = styleConfig?.chartSpecific?.showValueLabel ?? true;
@@ -618,16 +635,16 @@ function FCTrajectoryChart({ samples, dataset, styleConfig, ...plotProps }: { sa
   const traces: any[] = [];
   if (validMale.length > 0) traces.push({ type: "bar", x: labels, y: maleFc, name: "Male", marker: { color: maleFc.map(v => v != null ? (v > 0 ? maleColor : maleColor + "99") : "#ccc"), width: barWidth }, text: showValueLabel ? maleFc.map(v => v != null ? `log2FC: ${v.toFixed(3)}` : "N/A") : undefined, hovertemplate: "%{text}<extra>Male</extra>", showlegend: true });
   if (validFemale.length > 0) traces.push({ type: "bar", x: labels, y: femaleFc, name: "Female", marker: { color: femaleFc.map(v => v != null ? (v > 0 ? femaleColor : femaleColor + "99") : "#ccc"), width: barWidth }, text: showValueLabel ? femaleFc.map(v => v != null ? `log2FC: ${v.toFixed(3)}` : "N/A") : undefined, hovertemplate: "%{text}<extra>Female</extra>", showlegend: true });
-  const layout: any = { margin: { t: 8, b: 56, l: 64, r: 16 }, xaxis: { tickangle: -30, tickfont: { size: fontSize - 2 }, gridcolor: "transparent" }, yaxis: { title: { text: "log₂ Fold Change", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, zeroline: true, zerolinecolor: "#ccc", zerolinewidth: 1 }, legend: { orientation: "h" as const, x: 0.5, xanchor: "center" as const, y: -0.26, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, barmode: "group", hovermode: "closest" as const, showlegend: showLegend, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 72, l: 72, r: 24 }, xaxis: { tickangle: -30, tickfont: { size: fontSize - 2 }, gridcolor: "transparent" }, yaxis: { title: { text: "log₂ Fold Change", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, zeroline: true, zerolinecolor: "#ccc", zerolinewidth: 1 }, legend: { orientation: "h" as const, x: 0.5, xanchor: "center" as const, y: -0.18, font: { size: fontSize - 1 } }, font: { family: "sans-serif", size: fontSize }, barmode: "group", hovermode: "closest" as const, showlegend: showLegend, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
 
 // Dendrogram Chart
 function DendrogramChart({ samples, dataset, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
-  const fontSize = styleConfig?.fontSize ?? 12;
+  const fontSize = styleConfig?.fontSize ?? 13;
   const showLegend = styleConfig?.showLegend ?? true;
   const showGrid = styleConfig?.showGrid ?? true;
-  const pointSize = styleConfig?.chartSpecific?.pointSize ?? 8;
+  const pointSize = styleConfig?.chartSpecific?.pointSize ?? 9;
   const showLabels = styleConfig?.chartSpecific?.showLabels ?? true;
   const maleColor = styleConfig?.colors?.male ?? "#228BE6";
   const femaleColor = styleConfig?.colors?.female ?? "#E64980";
@@ -646,6 +663,6 @@ function DendrogramChart({ samples, dataset, styleConfig, ...plotProps }: { samp
     { type: "scatter", mode: showLabels ? "lines+markers" : "lines", x: maleData.map(d => STAGE_X[d.stage]), y: maleData.map(d => d.mean), line: { color: maleColor, width: 1.5, dash: "solid" }, marker: { color: maleColor, size: pointSize, symbol: "circle" }, text: hoverMale, hovertemplate: "%{text}<extra>Male</extra>", name: "Male" },
     { type: "scatter", mode: showLabels ? "lines+markers" : "lines", x: femaleData.map(d => STAGE_X[d.stage]), y: femaleData.map(d => d.mean), line: { color: femaleColor, width: 1.5, dash: "solid" }, marker: { color: femaleColor, size: pointSize, symbol: "circle" }, text: hoverFemale, hovertemplate: "%{text}<extra>Female</extra>", name: "Female" },
   ];
-  const layout: any = { margin: { t: 8, b: 52, l: 64, r: 16 }, xaxis: { tickmode: "array", tickvals: stages.map((_: string, i: number) => i), ticktext: stages, tickfont: { size: fontSize - 1 }, title: { text: "Stage", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", showgrid: showGrid, dtick: 1 }, yaxis: { title: { text: "Mean Expression", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, zeroline: false }, showlegend: showLegend, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.2, font: { size: fontSize - 1 } }, hovermode: "closest" as const, ...PAPER_STYLE_FULLSCREEN };
+  const layout: any = { margin: { t: 16, b: 60, l: 72, r: 24 }, xaxis: { tickmode: "array", tickvals: stages.map((_: string, i: number) => i), ticktext: stages, tickfont: { size: fontSize - 1 }, title: { text: "Stage", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", showgrid: showGrid, dtick: 1 }, yaxis: { title: { text: "Mean Expression", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", tickfont: { size: fontSize - 1 }, zeroline: false }, showlegend: showLegend, legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.14, font: { size: fontSize - 1 } }, hovermode: "closest" as const, ...PAPER_STYLE_FULLSCREEN };
   return <Plot data={traces} layout={layout} {...plotProps} />;
 }
