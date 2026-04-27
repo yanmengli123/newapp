@@ -36,11 +36,17 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
 │   │   ├── expression/            # 14 Plotly expression chart components
 │   │   ├── kegg/                # KEGG pathway viewer
 │   │   ├── go/                   # GO term cards
+│   │   ├── go_enrichment/       # GO Enrichment SEA components
+│   │   │   ├── GOEnrichmentBarChart.tsx
+│   │   │   ├── GOEnrichmentBarChartFullscreen.tsx
+│   │   │   ├── GOEnrichmentTable.tsx
+│   │   │   └── GOEnrichmentTermDrawer.tsx
 │   │   ├── gene/                 # Gene structure & transcript components
 │   │   └── chat/                 # ChatWidget
 │   └── lib/                      # API clients
 │       ├── apiClient.ts           # Mandatory centralized fetch wrapper
 │       ├── geneApi.ts            # Gene/GO/KEGG API
+│       ├── goEnrichmentApi.ts    # GO Enrichment SEA API
 │       ├── genomeApi.ts           # Genome analysis API (ALL /genome-api/*)
 │       └── overviewApi.ts         # ESC Atlas overview API
 │
@@ -102,11 +108,12 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `PictureMakerPage` — Single-chart generator: Gene Search + Chart Type/Dataset/Metric dropdowns + Run button → renders one of 10 expression charts. Reuses all Expression* components; includes ChartCustomizerDrawer and ChartFullscreenModal. Route: `/picture-maker`
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
+- **`GOEnrichmentPage.tsx`** — GO Enrichment Analysis (SEA) page: gene list input, example gene sets (daily-stable), parameters (ontology/correction/evidence/fdr/min_overlap), bar chart with ontology filter, results table with FDR sorting + pagination, term detail drawer with AmiGO/QuickGO links. Toggle "Show all tested terms" to reveal non-significant results.
 - **`EscOverviewSection.tsx`** — ESC Gene Expression Atlas homepage section: 8 clickable chart cards (Sample Composition / Sex-Biased Genes / Female vs Male Scatter / Stage DEG Count / Expression Distribution / PCA / Top50 Heatmap / Trajectory Clusters). Each card opens in a `Drawer` fullscreen view via `useDisclosure` + `useHotkeys`. Heatmap uses agglomerative hierarchical clustering (pure TypeScript, single linkage) for gene ordering.
 - **`DownloadsPage.tsx`** — CSV download cards for all 8 overview charts. Download via `fetch` + `Blob` + `createObjectURL` pattern hitting `/overview/<id>/csv` endpoints.
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis — **all paths use `/genome-api/` prefix**), `src/lib/chatApi.ts` (chat)
-  - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `http://localhost:8000`; **dev proxy routes most paths to port 8001**). Never hardcode URLs in components.
-- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.**
+  - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `''` — dev proxy handles routing). Never hardcode URLs in components.
+- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/go-enrichment`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.**
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (区域容器), `KeggPathwayCard` (View/Interactive/Download/KEGG 4按钮), `KeggInteractiveViewer` (PNG+SVG等比叠加交互查看器). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (单个GO条目卡片，含ID/名称/证据码/来源/定义)
@@ -145,6 +152,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - **config.py** — Centralized path configuration. All paths resolve to `D:\jbrowsedata\projectdata\` unless overridden by env vars. All modules import from here; no hardcoded paths.
 - **main.py** — **The only supported entry point**. Must be started as `uvicorn backend.main:app`. Responsibilities: app creation, lifespan (DB pools + gffutils + in-memory indexes), middleware, exception handlers, router registration. **No business logic** lives here.
 - **api/** — Route modules (all importable as `from backend.api.xxx`):
+  - `go_enrichment_routes.py` — GO Enrichment SEA (prefix `/go-enrichment`)
   - `go_kegg_routes.py` — Gene/GO/KEGG endpoints (prefix `/annotations`)
   - `overview_routes.py` — ESC Atlas overview charts (prefix `/overview`)
   - `genome_analysis_routes.py` — Genome analysis (prefix `/genome-api`) — **NOTE: prefix was changed from `/genome`**
@@ -152,6 +160,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `tool_routes.py` — Primer3, Domain Search (prefix `/tools`)
   - `chat_router.py` — Chat (prefix `/api`)
 - **expression_service.py** — Expression data service (ESC star schema queries, `stage_means` aggregation, cross-dataset comparison). Depends on `mv_dataset_metric` materialized view.
+- **go_enrichment_service.py** — GO Enrichment SEA (Singular Enrichment Analysis): hypergeometric test + per-ontology FDR correction (BH/BY/Bonferroni/none). Supports `evidence_filter` (all / non_iea / experimental). Uses `_evidence_filter_sql()` to build consistent K/N across background, hits, and mapping queries.
 - **overview_service.py** — Overview aggregation (8 chart services). Reads from `gene_expression_summary` JSONB `stage_means`; `jsonb_object_keys()` returns `text`, use `stage_key::text` cast in `->>` chains.
 - **genome_analysis/** — Analysis engine (imported at runtime, not at startup):
   - `analyzer.py`, `task_manager.py`, `output_config.py`, `carousel_service.py`, `file_discovery.py`, `chart_exporter.py`, `chart_styles.py`, `settings.py`
@@ -189,6 +198,11 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - `GET /annotations/kegg/kgml-cache/status` — KGML 缓存状态
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
 - `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
+
+### GO Enrichment — SEA (3, prefix `/go-enrichment`)
+- `POST /go-enrichment/analyze` — Singular Enrichment Analysis for Gallus gallus GRCg6a genes. Params: `gene_list`, `correction` (bh/by/bonferroni/none), `fdr_cutoff` (0–1), `min_overlap` (≥1), `namespace` (all/biological_process/cellular_component/molecular_function), `annotation_mode` (direct/propagated), `evidence_filter` (all/non_iea/experimental). FDR correction applied per ontology (BP/CC/MF corrected separately within each namespace). Returns `results[]` (enriched GO terms with hit genes/symbols/ncbi_ids), `bar_chart_data`, `mapping[]`, `ontology_stats`.
+- `GET /go-enrichment/example-sets` — Dynamically generated example gene sets (stable within same day via PostgreSQL `setseed`). Returns 4 sets × 20 genes each, drawn from real shared GO terms in the database.
+- `GET /go-enrichment/term/{go_id}` — GO term detail: name, namespace, definition, total_genes, genes[] (gene_id/ncbi_id/symbol).
 
 ### KEGG Images (2, prefix `/kegg-images`)
 - `GET /kegg-images/{pathway_id}.png` — KEGG 通路图片
@@ -385,13 +399,14 @@ interface GeneExpressionExpandResponse {
 | 路由文件 | 前缀 | 接口数 |
 |---|---|---|
 | main.py (inline) | `/` | 11 |
+| go_enrichment_routes.py | `/go-enrichment` | 3 |
 | go_kegg_routes.py | `/annotations` | 11 |
 | kegg_image_router.py | `/kegg-images` | 2 |
 | tool_routes.py | `/tools` | 2 |
 | genome_analysis_routes.py | `/genome-api` | 21 |
 | chat_router.py | `/api` | 1 |
 | overview_routes.py | `/overview` | 17 |
-| **总计** | | **65** |
+| **总计** | | **69** |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
