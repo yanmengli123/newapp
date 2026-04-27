@@ -47,7 +47,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
             <Table.Th>Description</Table.Th>
             <Table.Th
               style={{ cursor: "pointer" }}
-              onClick={() => setSortField("query_count")}
+              onClick={(e) => { e.stopPropagation(); setSortField("query_count"); }}
             >
               Gene Ratio
             </Table.Th>

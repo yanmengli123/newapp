@@ -347,8 +347,12 @@ class GOEnrichmentAnalyzer:
 
             # FDR 校正
             p_values = [r["p_value"] for r in results]
-            method = self.CORRECTION_MAP.get(params.correction, "fdr_bh")
-            rejected, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
+            if params.correction == "none":
+                # 不做校正，直接使用原始 p 值
+                fdr_values = p_values
+            else:
+                method = self.CORRECTION_MAP.get(params.correction, "fdr_bh")
+                _, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
 
             for r, fdr in zip(results, fdr_values):
                 r["fdr"] = fdr

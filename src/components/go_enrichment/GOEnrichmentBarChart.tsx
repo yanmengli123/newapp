@@ -80,7 +80,7 @@ export default function GOEnrichmentBarChart({ data, filtered }: Props) {
   }
 
   return (
-    <Box style={{ width: "100%", height: Math.min(500, totalEntries * 28 + 80) }}>
+    <Box style={{ width: "100%", height: Math.min(500, totalEntries * 28 + 80) }} onClick={(e) => e.stopPropagation()}>
       <Plot
         data={traces}
         layout={{

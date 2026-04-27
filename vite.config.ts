@@ -1,13 +1,14 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import type { ViteDevServer } from 'vite'
+import type { Plugin } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     {
-      configureServer(server: ViteDevServer) {
+      name: 'spa-fallback',
+      configureServer(server) {
         server.middlewares.use((req, _res, next) => {
           if (req.url === '/go-enrichment' || req.url === '/go-enrichment/') {
             req.url = '/';
@@ -15,7 +16,7 @@ export default defineConfig({
           next();
         });
       },
-    },
+    } satisfies Plugin,
   ],
   server: {
     proxy: {
