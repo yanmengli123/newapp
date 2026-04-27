@@ -50,7 +50,7 @@ export interface EnrichmentResponse {
   query_count: number;
   mapped_count: number;
   annotated_count: number;
-  background_count: number;
+  background_count: number | null;
   tested_term_count: number;
   significant_count: number;
   annotation_source: string;

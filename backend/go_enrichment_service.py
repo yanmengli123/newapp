@@ -53,7 +53,7 @@ class EnrichmentResponse:
     query_count: int
     mapped_count: int
     annotated_count: int
-    background_count: int
+    background_count: Optional[int]  # None when namespace="all" (per-ontology)
     tested_term_count: int
     significant_count: int
     annotation_source: str
@@ -466,9 +466,9 @@ class GOEnrichmentAnalyzer:
             for r in all_results
         ]
 
-        # 背景基因总数 — "all" 模式取三个 namespace 的并集
-        if params.namespace == "all" and ontology_stats:
-            total_bg = max(s["background_count"] for s in ontology_stats.values())
+        # 背景基因总数 — "all" 模式返回 None，前端已展示为 "See below"
+        if params.namespace == "all":
+            total_bg = None
         else:
             total_bg = max(s["background_count"] for s in ontology_stats.values()) if ontology_stats else 0
 

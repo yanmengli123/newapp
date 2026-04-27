@@ -312,7 +312,7 @@ export default function GOEnrichmentPage() {
               <Text size="xs" c="dimmed">Annotated</Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
-              <Text fw={700} fz={24}>{namespace === "all" ? "See below" : result.background_count.toLocaleString()}</Text>
+              <Text fw={700} fz={24}>{namespace === "all" ? "See below" : (result.background_count ?? 0).toLocaleString()}</Text>
               <Text size="xs" c="dimmed">
                 {namespace === "all" ? "Background (per ontology)" : "Background"}
               </Text>
