@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   Divider,
   Group,
   Paper,
@@ -37,6 +36,14 @@ import ExpressionZScoreChart from "../components/expression/ExpressionZScoreChar
 import ExpressionFoldChangeBar from "../components/expression/ExpressionFoldChangeBar";
 import ExpressionFoldChangeTrajectory from "../components/expression/ExpressionFoldChangeTrajectory";
 import ExpressionDendrogram from "../components/expression/ExpressionDendrogram";
+
+const EXAMPLE_GENES = [
+  "gene-A4GALT",
+  "gene-LOC112532827",
+  "gene-OLAH",
+  "gene-STOX2",
+  "gene-CD44",
+];
 
 const CHART_TYPE_OPTIONS = Object.entries(CHART_TYPE_LABELS).map(([value, label]) => ({
   value,
@@ -89,8 +96,9 @@ export default function PictureMakerPage() {
     [availableDatasets]
   );
 
-  const handleRun = useCallback(async () => {
-    if (!geneQuery.trim()) {
+  const handleRun = useCallback(async (gene?: string) => {
+    const targetGene = (gene ?? geneQuery).trim();
+    if (!targetGene) {
       setErrorMsg("Please enter a gene ID or symbol.");
       setPageState("error");
       return;
@@ -106,7 +114,7 @@ export default function PictureMakerPage() {
     setExpressionData(null);
 
     try {
-      const result = await getGeneExpression(geneQuery.trim(), {
+      const result = await getGeneExpression(targetGene, {
         dataset: selectedDataset,
         metric: selectedMetric,
       });
@@ -122,7 +130,7 @@ export default function PictureMakerPage() {
           setPageState("error");
         } else {
           setExpressionData(result as GeneExpressionResponse);
-          setSubmittedGene(geneQuery.trim());
+          setSubmittedGene(targetGene);
           setPageState("success");
         }
       }
@@ -130,7 +138,7 @@ export default function PictureMakerPage() {
       setErrorMsg("Gene not found or expression data unavailable for the selected dataset.");
       setPageState("error");
     }
-  }, [geneQuery, selectedDataset, selectedMetric]);
+  }, [geneQuery, selectedDataset, selectedMetric, availableDatasets]);
 
   const metricOptions = (() => {
     const ds = availableDatasets.find((d) => d.dataset_code === selectedDataset);
@@ -281,17 +289,38 @@ export default function PictureMakerPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleRun();
               }}
-              description="Supports gene ID, symbol, or NCBI gene ID"
+description="Supports gene ID, symbol, or NCBI gene ID"
               styles={{ input: { fontFamily: "monospace" } }}
             />
             <Button
               leftSection={<IconPlayerPlay size={16} />}
-              onClick={handleRun}
+              onClick={() => { void handleRun(); }}
               loading={pageState === "loading"}
               size="md"
             >
               Run
             </Button>
+          </Group>
+
+          {/* Example genes */}
+          <Group gap="xs" align="center">
+            <Text size="xs" c="dimmed">
+              Try an example:
+            </Text>
+            <Group gap={6}>
+              {EXAMPLE_GENES.map((gene) => (
+                <Badge
+                  key={gene}
+                  size="sm"
+                  variant="light"
+                  color="blue"
+                  style={{ cursor: "pointer" }}
+                  onClick={() => { setGeneQuery(gene); void handleRun(gene); }}
+                >
+                  {gene}
+                </Badge>
+              ))}
+            </Group>
           </Group>
 
           {/* Row 2: Chart Type + Dataset + Metric */}
