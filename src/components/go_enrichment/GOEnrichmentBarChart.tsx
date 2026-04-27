@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import Plotly from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
-import { Box, Text } from "@mantine/core";
+import { Box, Text, Group, ActionIcon, Tooltip } from "@mantine/core";
+import { IconMaximize } from "@tabler/icons-react";
 import { useRef, useEffect } from "react";
 import type { BarChartEntry } from "../../lib/goEnrichmentApi";
 
@@ -10,6 +11,7 @@ const Plot = createPlotlyComponent(Plotly);
 interface Props {
   data: { P: BarChartEntry[]; C: BarChartEntry[]; F: BarChartEntry[] };
   filtered: { P: boolean; C: boolean; F: boolean };
+  onExpand: () => void;
 }
 
 const COLORS = {
@@ -18,7 +20,7 @@ const COLORS = {
   F: "#33CC66",
 };
 
-export default function GOEnrichmentBarChart({ data, filtered }: Props) {
+export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const traces: any[] = [];
@@ -74,8 +76,8 @@ export default function GOEnrichmentBarChart({ data, filtered }: Props) {
   const allEntries = [...(filtered.P ? data.P : []), ...(filtered.C ? data.C : []), ...(filtered.F ? data.F : [])];
   const totalEntries = allEntries.filter((e, i, arr) => arr.findIndex(a => a.go_id === e.go_id) === i).length;
 
-  // Block native DOM events from the Plotly SVG modebar so they don't
-  // bubble into React's onClick chain and collapse the parent Paper.
+  // Block native DOM events from Plotly SVG so they don't bubble and
+  // trigger parent Paper collapse.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -93,34 +95,45 @@ export default function GOEnrichmentBarChart({ data, filtered }: Props) {
   }
 
   return (
-    <Box ref={containerRef} style={{ width: "100%", height: Math.min(500, totalEntries * 28 + 80) }}>
-      <Plot
-        data={traces}
-        layout={{
-          barmode: "group",
-          margin: { l: 350, r: 50, t: 20, b: 60 },
-          xaxis: { title: "-log10(FDR)", tickangle: -30 },
-          yaxis: { title: "", automargin: true, tickangle: -30, tickfont: { size: 11 } },
-          font: { size: 11 },
-          showlegend: true,
-          legend: { orientation: "h", x: 0, y: -0.15 },
-          paper_bgcolor: "white",
-          plot_bgcolor: "white",
-          bargap: 0.2,
-          bargroupgap: 0.1,
-        }}
-        config={{
-          responsive: true,
-          displayModeBar: false,
-          modeBarButtonsToRemove: [
-            "lasso2d", "select2d", "autoScale2d", "resetScale2d",
-            "zoomIn2d", "zoomOut2d", "pan2d", "toggleSpikelines",
-            "hoverClosestCartesian", "hoverCompareCartesian",
-          ],
-        }}
-        style={{ width: "100%", height: "100%" }}
-        useResizeHandler
-      />
+    <Box>
+      {/* Header row: title + expand button */}
+      <Group justify="flex-end" mb="xs">
+        <Tooltip label="Expand to fullscreen">
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            size="md"
+            onClick={(e) => { e.stopPropagation(); onExpand(); }}
+          >
+            <IconMaximize size={16} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+
+      <Box ref={containerRef} style={{ width: "100%", height: Math.min(420, totalEntries * 28 + 80) }}>
+        <Plot
+          data={traces}
+          layout={{
+            barmode: "group",
+            margin: { l: 350, r: 50, t: 20, b: 60 },
+            xaxis: { title: "-log10(FDR)", tickangle: -30 },
+            yaxis: { title: "", automargin: true, tickangle: -30, tickfont: { size: 11 } },
+            font: { size: 11 },
+            showlegend: true,
+            legend: { orientation: "h", x: 0, y: -0.15 },
+            paper_bgcolor: "white",
+            plot_bgcolor: "white",
+            bargap: 0.2,
+            bargroupgap: 0.1,
+          }}
+          config={{
+            responsive: true,
+            displayModeBar: false,
+          }}
+          style={{ width: "100%", height: "100%" }}
+          useResizeHandler
+        />
+      </Box>
     </Box>
   );
 }

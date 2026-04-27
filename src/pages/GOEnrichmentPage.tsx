@@ -34,6 +34,7 @@ import {
   type ExampleGeneSet,
 } from "../lib/goEnrichmentApi";
 import GOEnrichmentBarChart from "../components/go_enrichment/GOEnrichmentBarChart";
+import GOEnrichmentBarChartFullscreen from "../components/go_enrichment/GOEnrichmentBarChartFullscreen";
 import GOEnrichmentTable from "../components/go_enrichment/GOEnrichmentTable";
 import GOEnrichmentTermDrawer from "../components/go_enrichment/GOEnrichmentTermDrawer";
 import { BarChartFilters, TableFilters } from "../components/go_enrichment/GOEnrichmentPageFilters";
@@ -68,6 +69,7 @@ export default function GOEnrichmentPage() {
 
   const [ontologyFilter, setOntologyFilter] = useState({ P: true, C: true, F: true });
   const [selectedTerm, setSelectedTerm] = useState<GOEnrichmentResult | null>(null);
+  const [fullscreenChartOpened, setFullscreenChartOpened] = useState(false);
 
   // Load example sets on mount
   useEffect(() => {
@@ -376,7 +378,7 @@ export default function GOEnrichmentPage() {
                 <Title order={4}>GO Enrichment Bar Chart</Title>
                 <BarChartFilters filter={ontologyFilter} onChange={setOntologyFilter} />
               </Group>
-              <GOEnrichmentBarChart data={result.bar_chart_data} filtered={ontologyFilter} />
+              <GOEnrichmentBarChart data={result.bar_chart_data} filtered={ontologyFilter} onExpand={() => setFullscreenChartOpened(true)} />
             </Stack>
           </Paper>
 
@@ -408,6 +410,15 @@ export default function GOEnrichmentPage() {
 
       {/* Term Drawer */}
       <GOEnrichmentTermDrawer term={selectedTerm} onClose={() => setSelectedTerm(null)} />
+
+      {/* Bar Chart Fullscreen Modal */}
+      {fullscreenChartOpened && result && (
+        <GOEnrichmentBarChartFullscreen
+          data={result.bar_chart_data}
+          filtered={ontologyFilter}
+          onClose={() => setFullscreenChartOpened(false)}
+        />
+      )}
     </Stack>
   );
 }
