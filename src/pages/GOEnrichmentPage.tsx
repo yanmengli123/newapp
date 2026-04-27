@@ -123,10 +123,11 @@ export default function GOEnrichmentPage() {
 
   const handleDownloadCSV = () => {
     if (!result) return;
-    const header = ["GO ID", "Ontology", "Description", "Gene Ratio", "BG Ratio", "Query", "BG", "p-value", "FDR", "Hit Genes", "Hit NCBI IDs", "Hit Symbols"];
+    const header = ["GO ID", "Ontology", "Description", "Gene Ratio", "BG Ratio", "Query", "BG", "p-value", "FDR", "Significant", "Hit Genes", "Hit NCBI IDs", "Hit Symbols"];
     const rows = result.results.map((t) => [
       t.go_id, t.ontology, t.term_name, t.gene_ratio, t.background_ratio,
       t.query_count, t.background_count, t.p_value, t.fdr,
+      t.significant ? "yes" : "no",
       t.hit_genes.join(";"), t.hit_ncbi_ids.join(";"), t.hit_symbols.join(";"),
     ]);
     const csv = [header.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n");
@@ -166,7 +167,7 @@ export default function GOEnrichmentPage() {
         </Text>
         <Text c="dimmed" size="xs">
           This analysis uses the local GO annotations mapped to the NCBI GRCg6a gene set,
-          not the full agriGO background.
+          not the full agriGO background. Annotation mode: direct GO terms only (no GO DAG propagation).
         </Text>
       </Box>
 
@@ -310,7 +311,9 @@ export default function GOEnrichmentPage() {
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
               <Text fw={700} fz={24}>{result.background_count.toLocaleString()}</Text>
-              <Text size="xs" c="dimmed">Background</Text>
+              <Text size="xs" c="dimmed">
+                {namespace === "all" ? "Background (per ontology ↓)" : "Background"}
+              </Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
               <Text fw={700} fz={24}>{result.tested_term_count}</Text>
