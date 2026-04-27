@@ -5,3 +5,5 @@ python-multipart
 gffutils
 psycopg2-binary
 requests
+scipy
+statsmodels

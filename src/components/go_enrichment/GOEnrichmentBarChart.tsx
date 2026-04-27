@@ -35,7 +35,7 @@ export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props
         orientation: "h" as const,
         marker: { color: COLORS.P },
         name: "Biological Process (P)",
-        text: entries.map((e) => `GO:${e.go_id} | Hits: ${e.query_count}/${e.background_count}`),
+        text: entries.map((e) => `${e.go_id} | Hits: ${e.query_count}/${e.background_count}`),
         hoverinfo: "text+y",
       });
     }
@@ -51,7 +51,7 @@ export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props
         orientation: "h" as const,
         marker: { color: COLORS.C },
         name: "Cellular Component (C)",
-        text: entries.map((e) => `GO:${e.go_id} | Hits: ${e.query_count}/${e.background_count}`),
+        text: entries.map((e) => `${e.go_id} | Hits: ${e.query_count}/${e.background_count}`),
         hoverinfo: "text+y",
       });
     }
@@ -67,7 +67,7 @@ export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props
         orientation: "h" as const,
         marker: { color: COLORS.F },
         name: "Molecular Function (F)",
-        text: entries.map((e) => `GO:${e.go_id} | Hits: ${e.query_count}/${e.background_count}`),
+        text: entries.map((e) => `${e.go_id} | Hits: ${e.query_count}/${e.background_count}`),
         hoverinfo: "text+y",
       });
     }

@@ -158,18 +158,18 @@ class GOBackgroundBuilder:
     """按 ontology 构建背景基因集"""
 
     @staticmethod
-    def get_background_and_terms(namespace: str, pg_getconn, pg_putconn) -> tuple[list[str], dict[str, int], dict[str, tuple]]:
+    def get_background_and_terms(namespace: str, pg_getconn, pg_putconn) -> tuple[set[str], dict[str, int], dict[str, tuple]]:
         """
         返回:
-        - background_gene_ids: 背景基因 ID 列表
-        - bg_go_counts: {go_id: 在背景中的基因数}
+        - background_gene_ids: 背景基因 ID 集合（有 GO 注释且有 ncbi_gene_id 的基因）
+        - bg_go_counts: {go_id: 在背景中的基因数}  — 与 N 的定义严格一致
         - go_names: {go_id: (term_name, namespace)}
         """
         conn = pg_getconn()
         try:
             cur = conn.cursor()
 
-            # 背景基因：有 GO 注释且有 ncbi_gene_id 的基因
+            # 背景基因 N：有 GO 注释且有 ncbi_gene_id 的基因
             if namespace == "all":
                 cur.execute("""
                     SELECT DISTINCT gg.gene_id
@@ -186,19 +186,24 @@ class GOBackgroundBuilder:
                     WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
                 """, (namespace,))
 
-            background_gene_ids = [r[0] for r in cur.fetchall()]
+            background_gene_ids = {r[0] for r in cur.fetchall()}
 
-            # 每个 GO term 在背景中的基因数
+            # 每个 GO term 在背景中的基因数 K — 必须与 N 的定义严格一致（join gene_xref 限制 ncbi_gene_id）
             if namespace == "all":
-                cur.execute(
-                    "SELECT go_id, COUNT(DISTINCT gene_id) FROM gene_go GROUP BY go_id"
-                )
+                cur.execute("""
+                    SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                    FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    WHERE gx.ncbi_gene_id IS NOT NULL
+                    GROUP BY gg.go_id
+                """)
             else:
                 cur.execute("""
                     SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
                     FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
                     JOIN go_term gt ON gt.go_id = gg.go_id
-                    WHERE gt.go_namespace = %s
+                    WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
                     GROUP BY gg.go_id
                 """, (namespace,))
             bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
@@ -238,13 +243,18 @@ class GOEnrichmentAnalyzer:
         # 1. 解析基因 ID
         mapping = self.resolver.resolve(raw_gene_list, pg_getconn, pg_putconn)
 
-        mapped_gene_ids = [
+        # 去重：用 set 确保每个基因只出现一次，避免 n 被放大
+        mapped_gene_ids_raw = [
             r.resolved_gene_id for r in mapping
             if r.status == "mapped"
         ]
+        mapped_gene_ids_unique = list(dict.fromkeys(mapped_gene_ids_raw))  # 保留顺序去重
 
-        if not mapped_gene_ids:
+        if not mapped_gene_ids_unique:
             raise ValueError("No valid gene IDs found in the input list")
+
+        # query_count = 原始输入数（不去重，显示给用户看原始输入量）
+        query_count_total = len(raw_gene_list)
 
         # 2. 按 namespace 分开处理
         ns_map = {
@@ -262,43 +272,30 @@ class GOEnrichmentAnalyzer:
         for ns in namespaces:
             bg_gene_ids, bg_go_counts, go_names = self.bg_builder.get_background_and_terms(ns, pg_getconn, pg_putconn)
             N = len(bg_gene_ids)
-            bg_gene_ids_set = set(bg_gene_ids)
+            bg_gene_ids_set = bg_gene_ids  # 已经是 set
 
-            if params.namespace == "all":
-                # 只保留有当前 namespace GO 注释的基因
-                conn = pg_getconn()
-                try:
-                    cur = conn.cursor()
-                    cur.execute("""
-                        SELECT DISTINCT gg.gene_id
-                        FROM gene_go gg
-                        JOIN go_term gt ON gt.go_id = gg.go_id
-                        WHERE gt.go_namespace = %s
-                    """, (ns,))
-                    ns_gene_ids = [r[0] for r in cur.fetchall()]
-                    cur.close()
-                finally:
-                    pg_putconn(conn)
-            else:
-                ns_gene_ids = mapped_gene_ids
+            if N == 0:
+                ontology_stats[ns_map[ns]] = {"background_count": 0, "tested_term_count": 0, "significant_count": 0}
+                continue
 
-            annotated_gene_ids = [g for g in mapped_gene_ids if g in bg_gene_ids_set]
-            n = len(annotated_gene_ids)  # 有注释的输入基因数
+            # n = 查询基因中唯一且在当前 namespace 背景中的基因数（去重后）
+            annotated_gene_ids = [g for g in mapped_gene_ids_unique if g in bg_gene_ids_set]
+            n = len(annotated_gene_ids)
 
             if n == 0:
                 ontology_stats[ns_map[ns]] = {"background_count": N, "tested_term_count": 0, "significant_count": 0}
                 continue
 
-            # 命中的 GO terms
+            # 命中的 GO terms（只统计去重后的基因）
             conn = pg_getconn()
             try:
                 cur = conn.cursor()
                 cur.execute(
-                    "SELECT go_id, ARRAY_AGG(gene_id) FROM gene_go "
+                    "SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go "
                     "WHERE gene_id = ANY(%s) GROUP BY go_id",
                     (annotated_gene_ids,)
                 )
-                query_go_hits = {r[0]: r[1] for r in cur.fetchall()}
+                query_go_hits = {r[0]: list(set(r[1])) for r in cur.fetchall()}
 
                 # 基因 ID → (ncbi_id, symbol)
                 cur.execute(
@@ -348,7 +345,6 @@ class GOEnrichmentAnalyzer:
             # FDR 校正
             p_values = [r["p_value"] for r in results]
             if params.correction == "none":
-                # 不做校正，直接使用原始 p 值
                 fdr_values = p_values
             else:
                 method = self.CORRECTION_MAP.get(params.correction, "fdr_bh")
@@ -382,7 +378,7 @@ class GOEnrichmentAnalyzer:
         # 排序
         all_results.sort(key=lambda x: x["fdr"])
 
-        # 3. 计算 annotated_count（跨所有 namespace）
+        # 3. 计算 annotated_count（跨所有 namespace，唯一基因）
         conn = pg_getconn()
         try:
             cur = conn.cursor()
@@ -390,27 +386,36 @@ class GOEnrichmentAnalyzer:
                 cur.execute("""
                     SELECT COUNT(DISTINCT gene_id) FROM gene_go
                     WHERE gene_id = ANY(%s)
-                """, (mapped_gene_ids,))
+                """, (mapped_gene_ids_unique,))
             else:
                 cur.execute("""
                     SELECT COUNT(DISTINCT gg.gene_id) FROM gene_go gg
                     JOIN go_term gt ON gt.go_id = gg.go_id
                     WHERE gg.gene_id = ANY(%s) AND gt.go_namespace = %s
-                """, (mapped_gene_ids, params.namespace))
+                """, (mapped_gene_ids_unique, params.namespace))
             annotated_count = cur.fetchone()[0]
             cur.close()
         finally:
             pg_putconn(conn)
 
-        # 4. mapping report（加上 no_go_annotation）
-        all_annotated = set()
+        # 4. mapping report — no_go_annotation 按当前 namespace 判断
+        if params.namespace == "all":
+            cur_annotated_query = """
+                SELECT DISTINCT gene_id FROM gene_go WHERE gene_id = ANY(%s)
+            """
+            cur_annotated_args = (mapped_gene_ids_unique,)
+        else:
+            cur_annotated_query = """
+                SELECT DISTINCT gg.gene_id FROM gene_go gg
+                JOIN go_term gt ON gt.go_id = gg.go_id
+                WHERE gg.gene_id = ANY(%s) AND gt.go_namespace = %s
+            """
+            cur_annotated_args = (mapped_gene_ids_unique, params.namespace)
+
         conn = pg_getconn()
         try:
             cur = conn.cursor()
-            cur.execute(
-                "SELECT DISTINCT gene_id FROM gene_go WHERE gene_id = ANY(%s)",
-                (mapped_gene_ids,)
-            )
+            cur.execute(cur_annotated_query, cur_annotated_args)
             all_annotated = {r[0] for r in cur.fetchall()}
             cur.close()
         finally:
@@ -418,14 +423,17 @@ class GOEnrichmentAnalyzer:
 
         final_mapping = []
         for r in mapping:
-            if r.status == "mapped" and r.resolved_gene_id not in all_annotated:
-                final_mapping.append(MappingRecord(
-                    input_id=r.input_id,
-                    resolved_gene_id=r.resolved_gene_id,
-                    ncbi_gene_id=r.ncbi_gene_id,
-                    gene_symbol=r.gene_symbol,
-                    status="no_go_annotation"
-                ))
+            if r.status == "mapped":
+                if r.resolved_gene_id not in all_annotated:
+                    final_mapping.append(MappingRecord(
+                        input_id=r.input_id,
+                        resolved_gene_id=r.resolved_gene_id,
+                        ncbi_gene_id=r.ncbi_gene_id,
+                        gene_symbol=r.gene_symbol,
+                        status="no_go_annotation"
+                    ))
+                else:
+                    final_mapping.append(r)
             else:
                 final_mapping.append(r)
 
@@ -455,8 +463,8 @@ class GOEnrichmentAnalyzer:
         total_bg = max(s["background_count"] for s in ontology_stats.values()) if ontology_stats else 0
 
         return EnrichmentResponse(
-            query_count=len(raw_gene_list),
-            mapped_count=len(mapped_gene_ids),
+            query_count=query_count_total,
+            mapped_count=len(mapped_gene_ids_unique),
             annotated_count=annotated_count,
             background_count=total_bg,
             tested_term_count=sum(s["tested_term_count"] for s in ontology_stats.values()),

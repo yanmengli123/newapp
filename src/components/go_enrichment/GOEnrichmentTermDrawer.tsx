@@ -1,5 +1,7 @@
-import { Drawer, Badge, Stack, Text, Group, Box, Chip, ActionIcon, Tooltip } from "@mantine/core";
+import { useEffect, useState } from "react";
+import { Drawer, Badge, Stack, Text, Group, Box, Chip, ActionIcon, Tooltip, Skeleton } from "@mantine/core";
 import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
+import { getGOTermDetail } from "../../lib/goEnrichmentApi";
 
 interface Props {
   term: GOEnrichmentResult | null;
@@ -17,7 +19,32 @@ function formatPValue(p: number): string {
   return p.toFixed(6);
 }
 
+interface TermDetail {
+  go_id: string;
+  term_name: string;
+  namespace: string;
+  definition: string;
+  total_genes: number;
+  genes: Array<{ gene_id: string; ncbi_id: string | null; symbol: string | null }>;
+}
+
 export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
+  const [termDetail, setTermDetail] = useState<TermDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+
+  useEffect(() => {
+    if (!term) {
+      setTermDetail(null);
+      return;
+    }
+    setLoadingDetail(true);
+    setTermDetail(null);
+    getGOTermDetail(term.go_id)
+      .then((d) => setTermDetail(d as unknown as TermDetail))
+      .catch(() => setTermDetail(null))
+      .finally(() => setLoadingDetail(false));
+  }, [term?.go_id]);
+
   if (!term) return null;
 
   const ont = ONTOLOGY_COLORS[term.ontology as keyof typeof ONTOLOGY_COLORS];
@@ -45,6 +72,20 @@ export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Ontology</Text>
           <Chip color={ont.color} checked={false} readOnly>{ont.label}</Chip>
         </Box>
+
+        {/* GO Definition */}
+        {(loadingDetail) && (
+          <Box>
+            <Skeleton height={14} width={80} mb={4} />
+            <Skeleton height={48} />
+          </Box>
+        )}
+        {(!loadingDetail && termDetail?.definition) && (
+          <Box>
+            <Text size="xs" c="dimmed" tt="uppercase" fw={600}>Definition</Text>
+            <Text size="sm" style={{ lineHeight: 1.5 }}>{termDetail.definition}</Text>
+          </Box>
+        )}
 
         <Group grow>
           <Box>

@@ -166,10 +166,10 @@ async def get_example_sets(request: Request):
         # 分成 4 组
         chunk_size = len(genes) // 4
         sets = [
-            {"name": "Immune-related genes", "description": "Genes with diverse GO annotations", "genes": genes[:chunk_size]},
-            {"name": "Cell cycle genes", "description": "Genes involved in cellular processes", "genes": genes[chunk_size:2*chunk_size]},
-            {"name": "Metabolic genes", "description": "Genes involved in metabolism", "genes": genes[2*chunk_size:3*chunk_size]},
-            {"name": "Development genes", "description": "Genes involved in development", "genes": genes[3*chunk_size:]},
+            {"name": "Example Set 1", "description": "Random genes with GO annotations (set 1)", "genes": genes[:chunk_size]},
+            {"name": "Example Set 2", "description": "Random genes with GO annotations (set 2)", "genes": genes[chunk_size:2*chunk_size]},
+            {"name": "Example Set 3", "description": "Random genes with GO annotations (set 3)", "genes": genes[2*chunk_size:3*chunk_size]},
+            {"name": "Example Set 4", "description": "Random genes with GO annotations (set 4)", "genes": genes[3*chunk_size:]},
         ]
 
         return {"sets": [s for s in sets if s["genes"]]}

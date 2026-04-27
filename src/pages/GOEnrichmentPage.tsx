@@ -165,7 +165,8 @@ export default function GOEnrichmentPage() {
           Background: GRCg6a genes with NCBI Gene ID and local GO annotations.
         </Text>
         <Text c="dimmed" size="xs">
-          本分析不会直接使用 agriGO 原始全量背景，而是使用已映射到 NCBI GRCg6a 基因体系的本地 GO 注释。
+          This analysis uses the local GO annotations mapped to the NCBI GRCg6a gene set,
+          not the full agriGO background.
         </Text>
       </Box>
 
