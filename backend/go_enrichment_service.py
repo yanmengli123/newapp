@@ -42,6 +42,7 @@ class GOEnrichmentResult:
     background_ratio: str
     p_value: float
     fdr: float
+    significant: bool
     hit_genes: list[str] = field(default_factory=list)
     hit_ncbi_ids: list[str] = field(default_factory=list)
     hit_symbols: list[str] = field(default_factory=list)
@@ -308,13 +309,10 @@ class GOEnrichmentAnalyzer:
             finally:
                 pg_putconn(conn)
 
-            # 超几何检验
-            results = []
+            # 超几何检验 — 先对所有命中 term 计算 p-value（不过滤）
+            raw_results = []
             for go_id, hit_gene_ids in query_go_hits.items():
                 k = len(hit_gene_ids)
-                if k < params.min_overlap:
-                    continue
-
                 K = bg_go_counts.get(go_id, 0)
                 if K == 0:
                     continue
@@ -326,7 +324,7 @@ class GOEnrichmentAnalyzer:
                     hit_ncbi = [gene_info[g][0] for g in hit_gene_ids if g in gene_info and gene_info[g][0]]
                     hit_syms = [gene_info[g][1] for g in hit_gene_ids if g in gene_info and gene_info[g][1]]
 
-                    results.append({
+                    raw_results.append({
                         "go_id": go_id,
                         "term_name": term_name,
                         "namespace": ns,
@@ -342,31 +340,39 @@ class GOEnrichmentAnalyzer:
                         "hit_symbols": hit_syms,
                     })
 
-            # FDR 校正
-            p_values = [r["p_value"] for r in results]
+            # FDR 校正 — 对全部命中的 term 一起做
+            p_values = [r["p_value"] for r in raw_results]
             if params.correction == "none":
                 fdr_values = p_values
             else:
                 method = self.CORRECTION_MAP.get(params.correction, "fdr_bh")
                 _, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
 
-            for r, fdr in zip(results, fdr_values):
+            for r, fdr in zip(raw_results, fdr_values):
                 r["fdr"] = fdr
 
-            significant = [r for r in results if r["fdr"] < params.fdr_cutoff]
-            significant.sort(key=lambda x: x["fdr"])
+            # min_overlap 和 fdr_cutoff 过滤 — 过滤后才算作 significant
+            tested_results = [
+                r for r in raw_results
+                if r["query_count"] >= params.min_overlap
+            ]
+            significant_results = [r for r in tested_results if r["fdr"] < params.fdr_cutoff]
+            significant_results.sort(key=lambda x: x["fdr"])
 
             ontology_stats[ns_map[ns]] = {
                 "background_count": N,
-                "tested_term_count": len(results),
-                "significant_count": len(significant),
+                "tested_term_count": len(tested_results),
+                "significant_count": len(significant_results),
             }
 
-            all_results.extend(significant)
+            # 返回全部 tested terms，标记 significant
+            for r in tested_results:
+                r["significant"] = r["fdr"] < params.fdr_cutoff
+            all_results.extend(tested_results)
 
-            # bar chart data
+            # bar chart data — 只用 significant
             code = ns_map[ns]
-            for r in significant[:20]:
+            for r in significant_results[:20]:
                 all_bar_data[code].append({
                     "go_id": r["go_id"],
                     "term_name": r["term_name"][:50] + "..." if len(r["term_name"]) > 50 else r["term_name"],
@@ -452,6 +458,7 @@ class GOEnrichmentAnalyzer:
                 background_ratio=r["background_ratio"],
                 p_value=r["p_value"],
                 fdr=r["fdr"],
+                significant=r["significant"],
                 hit_genes=r["hit_genes"],
                 hit_ncbi_ids=r["hit_ncbi_ids"],
                 hit_symbols=r["hit_symbols"],
@@ -459,8 +466,11 @@ class GOEnrichmentAnalyzer:
             for r in all_results
         ]
 
-        # 背景基因总数（取最大那个）
-        total_bg = max(s["background_count"] for s in ontology_stats.values()) if ontology_stats else 0
+        # 背景基因总数 — "all" 模式取三个 namespace 的并集
+        if params.namespace == "all" and ontology_stats:
+            total_bg = max(s["background_count"] for s in ontology_stats.values())
+        else:
+            total_bg = max(s["background_count"] for s in ontology_stats.values()) if ontology_stats else 0
 
         return EnrichmentResponse(
             query_count=query_count_total,

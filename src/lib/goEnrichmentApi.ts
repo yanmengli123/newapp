@@ -26,6 +26,7 @@ export interface GOEnrichmentResult {
   background_ratio: string;
   p_value: number;
   fdr: number;
+  significant: boolean;
   hit_genes: string[];
   hit_ncbi_ids: string[];
   hit_symbols: string[];

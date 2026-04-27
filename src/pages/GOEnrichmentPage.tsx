@@ -387,7 +387,7 @@ export default function GOEnrichmentPage() {
           <Paper withBorder radius="lg" p="lg">
             <Stack gap="md">
               <Group justify="space-between">
-                <Title order={4}>Detail Information</Title>
+                <Title order={4}>Significant GO Terms ({filteredResults.length})</Title>
                 <Group gap="xs">
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadAnnotated}>
                     Download Annotated IDs

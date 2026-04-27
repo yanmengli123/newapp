@@ -6,20 +6,45 @@ GET  /go-enrichment/term/{go_id}
 """
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator
+from typing import Literal, Optional
 from backend.go_enrichment_service import GOEnrichmentAnalyzer, EnrichmentParams
 
 router = APIRouter(prefix="/go-enrichment", tags=["GO Enrichment"])
 
+VALID_NAMESPACES = {"all", "biological_process", "cellular_component", "molecular_function"}
+VALID_CORRECTIONS = {"bh", "by", "bonferroni", "none"}
+VALID_ANNOTATION_MODES = {"direct"}
+
 
 class AnalyzeRequest(BaseModel):
     gene_list: list[str] = Field(..., description="输入基因列表，支持 NCBI Gene ID / symbol / gene_id")
-    correction: str = Field(default="bh")
+    correction: Literal["bh", "by", "bonferroni", "none"] = Field(default="bh")
     fdr_cutoff: float = Field(default=0.05, ge=0, le=1)
     min_overlap: int = Field(default=2, ge=1)
-    namespace: str = Field(default="all")
-    annotation_mode: str = Field(default="direct")
+    namespace: Literal["all", "biological_process", "cellular_component", "molecular_function"] = Field(default="all")
+    annotation_mode: Literal["direct"] = Field(default="direct")
+
+    @field_validator("correction")
+    @classmethod
+    def validate_correction(cls, v: str) -> str:
+        if v not in VALID_CORRECTIONS:
+            raise ValueError(f"correction must be one of: {', '.join(sorted(VALID_CORRECTIONS))}")
+        return v
+
+    @field_validator("namespace")
+    @classmethod
+    def validate_namespace(cls, v: str) -> str:
+        if v not in VALID_NAMESPACES:
+            raise ValueError(f"namespace must be one of: {', '.join(sorted(VALID_NAMESPACES))}")
+        return v
+
+    @field_validator("annotation_mode")
+    @classmethod
+    def validate_annotation_mode(cls, v: str) -> str:
+        if v not in VALID_ANNOTATION_MODES:
+            raise ValueError(f"annotation_mode must be one of: {', '.join(sorted(VALID_ANNOTATION_MODES))}")
+        return v
 
 
 class MappingRecordOut(BaseModel):
@@ -43,6 +68,7 @@ class ResultOut(BaseModel):
     background_ratio: str
     p_value: float
     fdr: float
+    significant: bool
     hit_genes: list[str]
     hit_ncbi_ids: list[str]
     hit_symbols: list[str]
@@ -126,6 +152,7 @@ async def analyze_enrichment(req: AnalyzeRequest, request: Request):
                 background_ratio=t.background_ratio,
                 p_value=t.p_value,
                 fdr=t.fdr,
+                significant=t.significant,
                 hit_genes=t.hit_genes,
                 hit_ncbi_ids=t.hit_ncbi_ids,
                 hit_symbols=t.hit_symbols,
@@ -146,13 +173,13 @@ async def get_example_sets(request: Request):
     try:
         cur = conn.cursor()
 
-        # 选 GO 注释丰富的基因，分 4 组
+        # 选 GO 注释丰富的基因，分 4 组（限制为有 ncbi_gene_id 的基因，与 SEA 背景一致）
         cur.execute("""
             SELECT gx.gene_id, gx.gene_symbol, COUNT(DISTINCT gt.go_namespace) as ns_count
             FROM gene_xref gx
             JOIN gene_go gg ON gg.gene_id = gx.gene_id
             JOIN go_term gt ON gt.go_id = gg.go_id
-            WHERE gx.gene_symbol IS NOT NULL
+            WHERE gx.gene_symbol IS NOT NULL AND gx.ncbi_gene_id IS NOT NULL
             GROUP BY gx.gene_id, gx.gene_symbol
             HAVING COUNT(DISTINCT gt.go_namespace) >= 2
             ORDER BY RANDOM()

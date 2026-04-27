@@ -121,7 +121,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
       {totalPages > 1 && (
         <Group justify="space-between" mt="md">
           <Text size="sm" c="dimmed">
-            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
+            Showing {(page - 1) * PAGE_SIZE + 1} – {Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
           </Text>
           <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
         </Group>
