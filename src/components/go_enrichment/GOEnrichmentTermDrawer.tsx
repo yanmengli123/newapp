@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Drawer, Badge, Stack, Text, Group, Box, Chip, ActionIcon, Tooltip, Skeleton } from "@mantine/core";
+import { Button, Drawer, Badge, Stack, Text, Group, Box, Chip, Tooltip, Skeleton } from "@mantine/core";
 import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
 import { getGOTermDetail } from "../../lib/goEnrichmentApi";
 
@@ -168,26 +168,28 @@ export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
           <Text size="xs" c="dimmed" tt="uppercase" fw={600}>External Links</Text>
           <Group gap="xs" mt={4}>
             <Tooltip label="View in AmiGO">
-              <ActionIcon
+              <Button
                 component="a"
                 href={`https://amigo.geneontology.org/amigo/term/${term.go_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="light"
+                size="xs"
               >
-                <Text size="xs">AmiGO</Text>
-              </ActionIcon>
+                AmiGO
+              </Button>
             </Tooltip>
             <Tooltip label="View in QuickGO">
-              <ActionIcon
+              <Button
                 component="a"
                 href={`https://www.ebi.ac.uk/QuickGO/term/${term.go_id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="light"
+                size="xs"
               >
-                <Text size="xs">QuickGO</Text>
-              </ActionIcon>
+                QuickGO
+              </Button>
             </Tooltip>
           </Group>
         </Box>
