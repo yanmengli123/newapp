@@ -159,54 +159,93 @@ class GOBackgroundBuilder:
     """按 ontology 构建背景基因集"""
 
     @staticmethod
-    def get_background_and_terms(namespace: str, pg_getconn, pg_putconn) -> tuple[set[str], dict[str, int], dict[str, tuple]]:
+    def get_background_and_terms(namespace: str, annotation_mode: str, pg_getconn, pg_putconn) -> tuple[set[str], dict[str, int], dict[str, tuple]]:
         """
         返回:
         - background_gene_ids: 背景基因 ID 集合（有 GO 注释且有 ncbi_gene_id 的基因）
         - bg_go_counts: {go_id: 在背景中的基因数}  — 与 N 的定义严格一致
         - go_names: {go_id: (term_name, namespace)}
+        annotation_mode: "direct" 时排除 IEA 电子注释
         """
         conn = pg_getconn()
         try:
             cur = conn.cursor()
 
             # 背景基因 N：有 GO 注释且有 ncbi_gene_id 的基因
+            # annotation_mode=direct 时排除 IEA 电子注释
             if namespace == "all":
-                cur.execute("""
-                    SELECT DISTINCT gg.gene_id
-                    FROM gene_go gg
-                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    WHERE gx.ncbi_gene_id IS NOT NULL
-                """)
+                if annotation_mode == "direct":
+                    cur.execute("""
+                        SELECT DISTINCT gg.gene_id
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gg.evidence_code != 'IEA'
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT DISTINCT gg.gene_id
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL
+                    """)
             else:
-                cur.execute("""
-                    SELECT DISTINCT gg.gene_id
-                    FROM gene_go gg
-                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    JOIN go_term gt ON gt.go_id = gg.go_id
-                    WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
-                """, (namespace,))
+                if annotation_mode == "direct":
+                    cur.execute("""
+                        SELECT DISTINCT gg.gene_id
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s AND gg.evidence_code != 'IEA'
+                    """, (namespace,))
+                else:
+                    cur.execute("""
+                        SELECT DISTINCT gg.gene_id
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
+                    """, (namespace,))
 
             background_gene_ids = {r[0] for r in cur.fetchall()}
 
             # 每个 GO term 在背景中的基因数 K — 必须与 N 的定义严格一致（join gene_xref 限制 ncbi_gene_id）
+            # annotation_mode=direct 时排除 IEA
             if namespace == "all":
-                cur.execute("""
-                    SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
-                    FROM gene_go gg
-                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    WHERE gx.ncbi_gene_id IS NOT NULL
-                    GROUP BY gg.go_id
-                """)
+                if annotation_mode == "direct":
+                    cur.execute("""
+                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gg.evidence_code != 'IEA'
+                        GROUP BY gg.go_id
+                    """)
+                else:
+                    cur.execute("""
+                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL
+                        GROUP BY gg.go_id
+                    """)
             else:
-                cur.execute("""
-                    SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
-                    FROM gene_go gg
-                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    JOIN go_term gt ON gt.go_id = gg.go_id
-                    WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
-                    GROUP BY gg.go_id
-                """, (namespace,))
+                if annotation_mode == "direct":
+                    cur.execute("""
+                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s AND gg.evidence_code != 'IEA'
+                        GROUP BY gg.go_id
+                    """, (namespace,))
+                else:
+                    cur.execute("""
+                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
+                        GROUP BY gg.go_id
+                    """, (namespace,))
             bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
 
             # GO term 名称
@@ -271,7 +310,7 @@ class GOEnrichmentAnalyzer:
         namespaces = ["biological_process", "cellular_component", "molecular_function"] if params.namespace == "all" else [params.namespace]
 
         for ns in namespaces:
-            bg_gene_ids, bg_go_counts, go_names = self.bg_builder.get_background_and_terms(ns, pg_getconn, pg_putconn)
+            bg_gene_ids, bg_go_counts, go_names = self.bg_builder.get_background_and_terms(ns, params.annotation_mode, pg_getconn, pg_putconn)
             N = len(bg_gene_ids)
             bg_gene_ids_set = bg_gene_ids  # 已经是 set
 
@@ -288,14 +327,22 @@ class GOEnrichmentAnalyzer:
                 continue
 
             # 命中的 GO terms（只统计去重后的基因）
+            # annotation_mode=direct 时，排除 IEA（电子注释）
             conn = pg_getconn()
             try:
                 cur = conn.cursor()
-                cur.execute(
-                    "SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go "
-                    "WHERE gene_id = ANY(%s) GROUP BY go_id",
-                    (annotated_gene_ids,)
-                )
+                if params.annotation_mode == "direct":
+                    cur.execute(
+                        "SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go "
+                        "WHERE gene_id = ANY(%s) AND evidence_code != 'IEA' GROUP BY go_id",
+                        (annotated_gene_ids,)
+                    )
+                else:
+                    cur.execute(
+                        "SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go "
+                        "WHERE gene_id = ANY(%s) GROUP BY go_id",
+                        (annotated_gene_ids,)
+                    )
                 query_go_hits = {r[0]: list(set(r[1])) for r in cur.fetchall()}
 
                 # 基因 ID → (ncbi_id, symbol)
@@ -384,39 +431,87 @@ class GOEnrichmentAnalyzer:
         # 排序
         all_results.sort(key=lambda x: x["fdr"])
 
-        # 3. 计算 annotated_count（跨所有 namespace，唯一基因）
+        # 3. 计算 annotated_count（跨所有 namespace，唯一基因，与背景口径一致）
+        # 必须：join gene_xref（ncbi_gene_id）+ evidence_code 过滤（direct 模式）
         conn = pg_getconn()
         try:
             cur = conn.cursor()
-            if params.namespace == "all":
-                cur.execute("""
-                    SELECT COUNT(DISTINCT gene_id) FROM gene_go
-                    WHERE gene_id = ANY(%s)
-                """, (mapped_gene_ids_unique,))
+            if params.annotation_mode == "direct":
+                if params.namespace == "all":
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL AND gg.evidence_code != 'IEA'
+                    """, (mapped_gene_ids_unique,))
+                else:
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL
+                          AND gt.go_namespace = %s AND gg.evidence_code != 'IEA'
+                    """, (mapped_gene_ids_unique, params.namespace))
             else:
-                cur.execute("""
-                    SELECT COUNT(DISTINCT gg.gene_id) FROM gene_go gg
-                    JOIN go_term gt ON gt.go_id = gg.go_id
-                    WHERE gg.gene_id = ANY(%s) AND gt.go_namespace = %s
-                """, (mapped_gene_ids_unique, params.namespace))
+                if params.namespace == "all":
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL
+                    """, (mapped_gene_ids_unique,))
+                else:
+                    cur.execute("""
+                        SELECT COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
+                    """, (mapped_gene_ids_unique, params.namespace))
             annotated_count = cur.fetchone()[0]
             cur.close()
         finally:
             pg_putconn(conn)
 
-        # 4. mapping report — no_go_annotation 按当前 namespace 判断
-        if params.namespace == "all":
-            cur_annotated_query = """
-                SELECT DISTINCT gene_id FROM gene_go WHERE gene_id = ANY(%s)
-            """
-            cur_annotated_args = (mapped_gene_ids_unique,)
+        # 4. mapping report — no_go_annotation 判断，与背景口径一致（ncbi + IEA 过滤）
+        if params.annotation_mode == "direct":
+            if params.namespace == "all":
+                cur_annotated_query = """
+                    SELECT DISTINCT gg.gene_id
+                    FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL AND gg.evidence_code != 'IEA'
+                """
+                cur_annotated_args = (mapped_gene_ids_unique,)
+            else:
+                cur_annotated_query = """
+                    SELECT DISTINCT gg.gene_id
+                    FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    JOIN go_term gt ON gt.go_id = gg.go_id
+                    WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL
+                      AND gt.go_namespace = %s AND gg.evidence_code != 'IEA'
+                """
+                cur_annotated_args = (mapped_gene_ids_unique, params.namespace)
         else:
-            cur_annotated_query = """
-                SELECT DISTINCT gg.gene_id FROM gene_go gg
-                JOIN go_term gt ON gt.go_id = gg.go_id
-                WHERE gg.gene_id = ANY(%s) AND gt.go_namespace = %s
-            """
-            cur_annotated_args = (mapped_gene_ids_unique, params.namespace)
+            if params.namespace == "all":
+                cur_annotated_query = """
+                    SELECT DISTINCT gg.gene_id
+                    FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL
+                """
+                cur_annotated_args = (mapped_gene_ids_unique,)
+            else:
+                cur_annotated_query = """
+                    SELECT DISTINCT gg.gene_id
+                    FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    JOIN go_term gt ON gt.go_id = gg.go_id
+                    WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s
+                """
+                cur_annotated_args = (mapped_gene_ids_unique, params.namespace)
 
         conn = pg_getconn()
         try:
@@ -487,7 +582,6 @@ class GOEnrichmentAnalyzer:
                 "fdr_cutoff": params.fdr_cutoff,
                 "min_overlap": params.min_overlap,
                 "namespace": params.namespace,
-                "annotation_mode": params.annotation_mode,
             },
             ontology_stats=ontology_stats,
             mapping=final_mapping,

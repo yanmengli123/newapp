@@ -1,5 +1,5 @@
 import { Box, Pagination, Table, Text, Badge, Group, Tooltip } from "@mantine/core";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
 
 interface Props {
@@ -28,6 +28,9 @@ function formatFDR(f: number): string {
 export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   const [page, setPage] = useState(1);
   const [sortField, setSortField] = useState<"fdr" | "query_count">("fdr");
+
+  // Reset to page 1 whenever the terms prop changes (e.g. filter toggle)
+  useEffect(() => { setPage(1); }, [terms]);
 
   const sorted = [...terms].sort((a, b) => {
     if (sortField === "query_count") return b.query_count - a.query_count;
@@ -75,7 +78,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
             const ont = ONTOLOGY_COLORS[term.ontology as keyof typeof ONTOLOGY_COLORS];
             return (
               <Table.Tr
-                key={term.go_id}
+                key={`${term.go_id}-${term.namespace}`}
                 style={{ cursor: "pointer" }}
                 onClick={() => onRowClick(term)}
               >

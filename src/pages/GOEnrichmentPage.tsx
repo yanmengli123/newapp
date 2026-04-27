@@ -110,6 +110,7 @@ export default function GOEnrichmentPage() {
     setGeneInput("");
     setResult(null);
     setPageState("idle");
+    setOntologyFilter({ P: true, C: true, F: true });
   };
 
   const handleFillExample = (genes: string[]) => {
@@ -136,7 +137,7 @@ export default function GOEnrichmentPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `go_enrichment_${Date.now()}.tsv`;
+    a.download = `significant_go_terms_${Date.now()}.tsv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -149,7 +150,7 @@ export default function GOEnrichmentPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `annotated_genes_${Date.now()}.txt`;
+    a.download = `hit_genes_${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -319,7 +320,9 @@ export default function GOEnrichmentPage() {
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
               <Text fw={700} fz={24}>{result.tested_term_count}</Text>
-              <Text size="xs" c="dimmed">Tested Terms</Text>
+              <Text size="xs" c="dimmed">
+                {namespace === "all" ? "Tested Terms (all)" : "Tested Terms"}
+              </Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
               <Text fw={700} fz={24} c="red">{result.significant_count}</Text>
