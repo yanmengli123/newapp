@@ -70,6 +70,7 @@ export interface GOEnrichmentParams {
   min_overlap?: number;
   namespace?: string;
   annotation_mode?: string;
+  evidence_filter?: string;
 }
 
 export interface ExampleGeneSet {

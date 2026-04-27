@@ -14,6 +14,7 @@ import {
   SimpleGrid,
   Skeleton,
   Stack,
+  Switch,
   Table,
   Text,
   Textarea,
@@ -61,6 +62,7 @@ export default function GOEnrichmentPage() {
   const [fdrCutoff, setFdrCutoff] = useState<number>(0.05);
   const [minOverlap, setMinOverlap] = useState<number>(2);
   const [namespace, setNamespace] = useState("all");
+  const [evidenceFilter, setEvidenceFilter] = useState("non_iea");
 
   const [pageState, setPageState] = useState<PageState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -70,6 +72,7 @@ export default function GOEnrichmentPage() {
   const [ontologyFilter, setOntologyFilter] = useState({ P: true, C: true, F: true });
   const [selectedTerm, setSelectedTerm] = useState<GOEnrichmentResult | null>(null);
   const [fullscreenChartOpened, setFullscreenChartOpened] = useState(false);
+  const [showAllTerms, setShowAllTerms] = useState(false);
 
   // Load example sets on mount
   useEffect(() => {
@@ -97,6 +100,7 @@ export default function GOEnrichmentPage() {
         min_overlap: minOverlap,
         namespace,
         annotation_mode: "direct",
+        evidence_filter: evidenceFilter,
       });
       setResult(res);
       setPageState("success");
@@ -104,7 +108,7 @@ export default function GOEnrichmentPage() {
       setErrorMsg(err.message ?? "Analysis failed. Please try again.");
       setPageState("error");
     }
-  }, [geneInput, correction, fdrCutoff, minOverlap, namespace]);
+  }, [geneInput, correction, fdrCutoff, minOverlap, namespace, evidenceFilter]);
 
   const handleClear = () => {
     setGeneInput("");
@@ -118,7 +122,7 @@ export default function GOEnrichmentPage() {
   };
 
   const filteredResults = result?.results.filter((term) => {
-    if (!term.significant) return false;
+    if (!showAllTerms && !term.significant) return false;
     const code = term.ontology;
     return ontologyFilter[code as "P" | "C" | "F"];
   }) ?? [];
@@ -170,7 +174,8 @@ export default function GOEnrichmentPage() {
         <Text c="dimmed" size="xs">
           This analysis uses the local GO annotations mapped to the NCBI GRCg6a gene set,
           not the full agriGO background. Annotation mode: direct GO terms only (no GO DAG propagation).
-          FDR correction is applied across all terms hit by query genes (min_overlap filter applied after).
+          FDR correction (BH) is applied within each ontology (BP/CC/MF corrected separately).
+          Evidence filter excludes electronic IEA annotations by default.
         </Text>
       </Box>
 
@@ -209,7 +214,7 @@ export default function GOEnrichmentPage() {
           </Group>
 
           {/* Parameters */}
-          <SimpleGrid cols={{ base: 2, xs: 3, sm: 6 }} spacing="xs">
+          <SimpleGrid cols={{ base: 2, xs: 3, sm: 7 }} spacing="xs">
             <Select
               label="Ontology"
               data={NAMESPACE_OPTIONS}
@@ -222,6 +227,17 @@ export default function GOEnrichmentPage() {
               data={CORRECTION_OPTIONS}
               value={correction}
               onChange={(v) => v && setCorrection(v)}
+              size="sm"
+            />
+            <Select
+              label="Evidence"
+              data={[
+                { value: "all", label: "All evidence" },
+                { value: "non_iea", label: "Exclude IEA (non-electronic)" },
+                { value: "experimental", label: "Experimental only" },
+              ]}
+              value={evidenceFilter}
+              onChange={(v) => v && setEvidenceFilter(v)}
               size="sm"
             />
             <NumberInput
@@ -395,13 +411,21 @@ export default function GOEnrichmentPage() {
           <Paper withBorder radius="lg" p="lg">
             <Stack gap="md">
               <Group justify="space-between">
-                <Title order={4}>Significant GO Terms ({filteredResults.length})</Title>
+                <Group gap="xs">
+                  <Title order={4}>{showAllTerms ? "All Tested GO Terms" : "Significant GO Terms"} ({filteredResults.length})</Title>
+                  <Switch
+                    size="xs"
+                    label="Show all tested"
+                    checked={showAllTerms}
+                    onChange={(e) => setShowAllTerms(e.currentTarget.checked)}
+                  />
+                </Group>
                 <Group gap="xs">
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadAnnotated}>
                     Download Hit Genes
                   </Button>
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadCSV}>
-                    Download Significant Terms CSV
+                    {showAllTerms ? "Download All Terms CSV" : "Download Significant CSV"}
                   </Button>
                 </Group>
               </Group>

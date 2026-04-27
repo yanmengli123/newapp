@@ -43,7 +43,8 @@ export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
       .then((d) => setTermDetail(d as unknown as TermDetail))
       .catch(() => setTermDetail(null))
       .finally(() => setLoadingDetail(false));
-  }, [term?.go_id]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [term]);
 
   if (!term) return null;
 

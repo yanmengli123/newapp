@@ -5,6 +5,7 @@ GET  /go-enrichment/example-sets
 GET  /go-enrichment/term/{go_id}
 """
 
+import random
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
@@ -14,7 +15,8 @@ router = APIRouter(prefix="/go-enrichment", tags=["GO Enrichment"])
 
 VALID_NAMESPACES = {"all", "biological_process", "cellular_component", "molecular_function"}
 VALID_CORRECTIONS = {"bh", "by", "bonferroni", "none"}
-VALID_ANNOTATION_MODES = {"direct"}
+VALID_ANNOTATION_MODES = {"direct", "propagated"}
+VALID_EVIDENCE_FILTERS = {"all", "non_iea", "experimental"}
 
 
 class AnalyzeRequest(BaseModel):
@@ -23,7 +25,8 @@ class AnalyzeRequest(BaseModel):
     fdr_cutoff: float = Field(default=0.05, ge=0, le=1)
     min_overlap: int = Field(default=2, ge=1)
     namespace: Literal["all", "biological_process", "cellular_component", "molecular_function"] = Field(default="all")
-    annotation_mode: Literal["direct"] = Field(default="direct")
+    annotation_mode: Literal["direct", "propagated"] = Field(default="direct")
+    evidence_filter: Literal["all", "non_iea", "experimental"] = Field(default="non_iea")
 
     @field_validator("correction")
     @classmethod
@@ -44,6 +47,13 @@ class AnalyzeRequest(BaseModel):
     def validate_annotation_mode(cls, v: str) -> str:
         if v not in VALID_ANNOTATION_MODES:
             raise ValueError(f"annotation_mode must be one of: {', '.join(sorted(VALID_ANNOTATION_MODES))}")
+        return v
+
+    @field_validator("evidence_filter")
+    @classmethod
+    def validate_evidence_filter(cls, v: str) -> str:
+        if v not in VALID_EVIDENCE_FILTERS:
+            raise ValueError(f"evidence_filter must be one of: {', '.join(sorted(VALID_EVIDENCE_FILTERS))}")
         return v
 
 
@@ -108,6 +118,7 @@ async def analyze_enrichment(req: AnalyzeRequest, request: Request):
         min_overlap=req.min_overlap,
         namespace=req.namespace,
         annotation_mode=req.annotation_mode,
+        evidence_filter=req.evidence_filter,
     )
 
     analyzer = GOEnrichmentAnalyzer()
@@ -173,10 +184,14 @@ async def get_example_sets(request: Request):
     try:
         cur = conn.cursor()
 
-        # 选 4 个 hub GO term（每个 namespace 至少 1 个），每个 hub 取 20 个基因
-        # 要求：基因有该 hub GO term + 至少有 2 个 direct GO terms（确保 min_overlap=2 可用）
-        # 这样每个 set 内所有基因都共享 hub term，保证有 shared term 可命中
         # Step 1: 随机选 4 个 hub GO term（每个 30-600 个 direct 注释基因）
+        # 用当天日期做 seed，让同一天内结果稳定，方便用户复现和截图
+        import datetime
+        today = datetime.date.today()
+        # PostgreSQL setseed() accepts values in [-1, 1]
+        # Map YYYYMMDD to a fraction by using day's position in 4-year leap cycle
+        day_of_cycle = (today.toordinal() % 1461) / 1461.0  # 0.0 to 0.999
+        cur.execute("SELECT setseed(%s)", (day_of_cycle,))
         cur.execute("""
             SELECT gg.go_id
             FROM gene_go gg

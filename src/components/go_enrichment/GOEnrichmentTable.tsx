@@ -30,6 +30,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   const [sortField, setSortField] = useState<"fdr" | "query_count">("fdr");
 
   // Reset to page 1 whenever the terms prop changes (e.g. filter toggle)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [terms]);
 
   const sorted = [...terms].sort((a, b) => {
