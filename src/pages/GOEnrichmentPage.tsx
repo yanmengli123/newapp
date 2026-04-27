@@ -79,7 +79,7 @@ export default function GOEnrichmentPage() {
   }, []);
 
   const handleRun = useCallback(async () => {
-    const geneList = geneInput.split("\n").map((g) => g.trim()).filter(Boolean);
+    const geneList = geneInput.split(/[\n,;\s]+/).map((g) => g.trim()).filter(Boolean);
     if (geneList.length === 0) {
       setErrorMsg("Please enter at least one gene ID.");
       setPageState("error");
@@ -117,6 +117,7 @@ export default function GOEnrichmentPage() {
   };
 
   const filteredResults = result?.results.filter((term) => {
+    if (!term.significant) return false;
     const code = term.ontology;
     return ontologyFilter[code as "P" | "C" | "F"];
   }) ?? [];
@@ -168,6 +169,7 @@ export default function GOEnrichmentPage() {
         <Text c="dimmed" size="xs">
           This analysis uses the local GO annotations mapped to the NCBI GRCg6a gene set,
           not the full agriGO background. Annotation mode: direct GO terms only (no GO DAG propagation).
+          FDR correction is applied across all terms hit by query genes (min_overlap filter applied after).
         </Text>
       </Box>
 
@@ -310,7 +312,7 @@ export default function GOEnrichmentPage() {
               <Text size="xs" c="dimmed">Annotated</Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
-              <Text fw={700} fz={24}>{result.background_count.toLocaleString()}</Text>
+              <Text fw={700} fz={24}>{namespace === "all" ? "—" : result.background_count.toLocaleString()}</Text>
               <Text size="xs" c="dimmed">
                 {namespace === "all" ? "Background (per ontology ↓)" : "Background"}
               </Text>
@@ -393,7 +395,7 @@ export default function GOEnrichmentPage() {
                 <Title order={4}>Significant GO Terms ({filteredResults.length})</Title>
                 <Group gap="xs">
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadAnnotated}>
-                    Download Annotated IDs
+                    Download Hit Genes
                   </Button>
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadCSV}>
                     Download CSV

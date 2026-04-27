@@ -478,7 +478,7 @@ class GOEnrichmentAnalyzer:
             annotated_count=annotated_count,
             background_count=total_bg,
             tested_term_count=sum(s["tested_term_count"] for s in ontology_stats.values()),
-            significant_count=len(all_results),
+            significant_count=sum(s["significant_count"] for s in ontology_stats.values()),
             annotation_source="local_gallus_gallus_agrigo_grcg6a",
             annotation_mode=params.annotation_mode,
             background_mode="annotated_grcg6a_ncbi_genes",

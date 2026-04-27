@@ -37,6 +37,14 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  if (terms.length === 0) {
+    return (
+      <Box py="xl" ta="center">
+        <Text c="dimmed" size="sm">No significant GO terms found. Try relaxing the FDR cutoff or min overlap settings.</Text>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Table striped highlightOnHover withTableBorder withColumnBorders>
@@ -54,6 +62,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
             <Table.Th>BG Ratio</Table.Th>
             <Table.Th>p-value</Table.Th>
             <Table.Th>FDR</Table.Th>
+            <Table.Th>Sig</Table.Th>
             <Table.Th>Hit Genes</Table.Th>
           </Table.Tr>
         </Table.Thead>
@@ -108,6 +117,15 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
                   </Text>
                 </Table.Td>
                 <Table.Td>
+                  <Badge
+                    size="sm"
+                    color={term.significant ? "green" : "gray"}
+                    variant={term.significant ? "filled" : "outline"}
+                  >
+                    {term.significant ? "Sig" : "NS"}
+                  </Badge>
+                </Table.Td>
+                <Table.Td>
                   <Tooltip label={term.hit_genes.join(", ")} maw={400}>
                     <Text size="sm" lineClamp={1}>{term.hit_genes.slice(0, 3).join(", ")}{term.hit_genes.length > 3 ? " ..." : ""}</Text>
                   </Tooltip>
@@ -121,7 +139,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
       {totalPages > 1 && (
         <Group justify="space-between" mt="md">
           <Text size="sm" c="dimmed">
-            Showing {(page - 1) * PAGE_SIZE + 1} – {Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
+            Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
           </Text>
           <Pagination total={totalPages} value={page} onChange={setPage} size="sm" />
         </Group>
