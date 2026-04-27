@@ -176,46 +176,58 @@ async def get_example_sets(request: Request):
         # 选 4 个 hub GO term（每个 namespace 至少 1 个），每个 hub 取 20 个基因
         # 要求：基因有该 hub GO term + 至少有 2 个 direct GO terms（确保 min_overlap=2 可用）
         # 这样每个 set 内所有基因都共享 hub term，保证有 shared term 可命中
+        # Step 1: 随机选 4 个 hub GO term（每个 30-600 个 direct 注释基因）
         cur.execute("""
-            SELECT go_id, gene_symbol
-            FROM (
-                SELECT
-                    gg.go_id,
-                    gx.gene_symbol,
-                    ROW_NUMBER() OVER (PARTITION BY gg.go_id ORDER BY RANDOM()) as rn
-                FROM gene_go gg
-                JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                WHERE gx.ncbi_gene_id IS NOT NULL
-                  AND gg.evidence_code != 'IEA'
-                  AND gg.go_id IN (
-                      SELECT go_id FROM (
-                          SELECT gg2.go_id,
-                                 COUNT(DISTINCT gg2.gene_id) as gene_cnt,
-                                 ROW_NUMBER() OVER (ORDER BY RANDOM()) as rn2
+            SELECT gg.go_id
+            FROM gene_go gg
+            JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+            WHERE gx.ncbi_gene_id IS NOT NULL AND gg.evidence_code != 'IEA'
+            GROUP BY gg.go_id
+            HAVING COUNT(DISTINCT gg.gene_id) >= 30 AND COUNT(DISTINCT gg.gene_id) <= 600
+            ORDER BY RANDOM()
+            LIMIT 4
+        """)
+        hub_go_ids = [r[0] for r in cur.fetchall()]
+
+        # Step 2: 每个 hub 取 20 个基因（该 hub GO term + 总共 ≥2 个 direct GO term）
+        all_rows = []
+        for hub_id in hub_go_ids:
+            cur.execute("""
+                SELECT sub.gene_symbol
+                FROM (
+                    SELECT gx.gene_symbol,
+                           ROW_NUMBER() OVER (ORDER BY RANDOM()) as rn
+                    FROM gene_go gg
+                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    WHERE gx.ncbi_gene_id IS NOT NULL
+                      AND gg.evidence_code != 'IEA'
+                      AND gg.gene_id IN (
+                          SELECT gg2.gene_id
                           FROM gene_go gg2
                           JOIN gene_xref gx2 ON gx2.gene_id = gg2.gene_id
                           WHERE gx2.ncbi_gene_id IS NOT NULL AND gg2.evidence_code != 'IEA'
-                          GROUP BY gg2.go_id
-                          HAVING COUNT(DISTINCT gg2.gene_id) >= 30 AND COUNT(DISTINCT gg2.gene_id) <= 600
-                      ) subq WHERE rn2 <= 4
-                  )
-                GROUP BY gg.go_id, gx.gene_symbol, gx.gene_id
-                HAVING COUNT(DISTINCT gg.go_id) >= 2
-            ) sub
-            WHERE rn <= 20
-            ORDER BY go_id, RANDOM()
-        """)
-        rows = cur.fetchall()
+                          GROUP BY gg2.gene_id
+                          HAVING COUNT(DISTINCT gg2.go_id) >= 2
+                      )
+                    AND gg.go_id = %s
+                    GROUP BY gg.gene_id, gx.gene_symbol
+                ) sub
+                WHERE sub.rn <= 20
+            """, (hub_id,))
+            for row in cur.fetchall():
+                all_rows.append((hub_id, row[0]))
+
         cur.close()
 
         # 按 go_id 分组
         by_go = {}
-        for go_id, symbol in rows:
+        for go_id, symbol in all_rows:
             if go_id not in by_go:
                 by_go[go_id] = []
             by_go[go_id].append(symbol)
 
-        # 清理 go_id 注释得到 go_name（直接用 go_id 片段作描述）
+        # 构建 sets（复用同一个连接）
+        cur = conn.cursor()
         sets = []
         for i, (go_id, genes) in enumerate(by_go.items()):
             cur.execute("SELECT go_name FROM go_term WHERE go_id = %s", (go_id,))
@@ -223,9 +235,10 @@ async def get_example_sets(request: Request):
             go_name = row[0] if row else go_id
             sets.append({
                 "name": f"Example Set {i+1}",
-                "description": f"Shared GO: {go_id} — {go_name}",
+                "description": f"Genes sharing GO:{go_id} — {go_name[:60]}",
                 "genes": genes,
             })
+        cur.close()
 
         return {"sets": [s for s in sets if s["genes"]]}
 
