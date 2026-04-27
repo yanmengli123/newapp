@@ -37,6 +37,7 @@ from backend.config import (
 from backend.expression_service import ExpressionService, DatasetRegistry
 from backend.api.go_kegg_routes import router as go_kegg_router
 from backend.api.go_kegg_routes import attach_annotations_to_gene_page
+from backend.api.go_enrichment_routes import router as go_enrichment_router
 
 APP_TITLE = "GRCg6a Gene API"
 APP_VERSION = "0.1.0"
@@ -312,6 +313,7 @@ app.include_router(tool_router)
 app.include_router(chat_router)
 app.include_router(genome_router)
 app.include_router(overview_router)
+app.include_router(go_enrichment_router)
 
 # ─────────────────────────────────────────────
 # CORS（可配置来源）

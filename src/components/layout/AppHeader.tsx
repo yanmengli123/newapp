@@ -79,6 +79,9 @@ function HeaderNav() {
       <Button variant="subtle" component={Link} to="/picture-maker" leftSection={<IconPhoto size={16} />}>
         Picture Maker
       </Button>
+      <Button variant="subtle" component={Link} to="/go-enrichment" leftSection={<IconDna size={16} />}>
+        GO Enrichment
+      </Button>
       <Button variant="subtle" component={Link} to="/data">
         Datasets
       </Button>

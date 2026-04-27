@@ -22,6 +22,7 @@ import GenomeResultPage from './pages/GenomeResultPage';
 import GenomeDownloadsPage from './pages/GenomeDownloadsPage';
 import DownloadsPage from './pages/DownloadsPage';
 import PictureMakerPage from './pages/PictureMakerPage';
+import GOEnrichmentPage from './pages/GOEnrichmentPage';
 import ChatWidget from './components/chat/ChatWidget';
 
 export default function App() {
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="/genome/jobs/:jobId/downloads" element={<GenomeDownloadsPage />} />
             <Route path="/downloads" element={<DownloadsPage />} />
             <Route path="/picture-maker" element={<PictureMakerPage />} />
+            <Route path="/go-enrichment" element={<GOEnrichmentPage />} />
           </Routes>
 
           <Divider my="xl" />

@@ -1,9 +1,22 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import type { ViteDevServer } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      configureServer(server: ViteDevServer) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url === '/go-enrichment' || req.url === '/go-enrichment/') {
+            req.url = '/';
+          }
+          next();
+        });
+      },
+    },
+  ],
   server: {
     proxy: {
       '/api':      'http://localhost:8001',
@@ -18,6 +31,7 @@ export default defineConfig({
       '/genes':    'http://localhost:8001',
       '/overview': 'http://localhost:8001',
       '/bwdata':  'http://localhost:8001',
+      '/go-enrichment': 'http://localhost:8001',
     },
   },
 })
