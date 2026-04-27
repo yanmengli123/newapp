@@ -2,6 +2,7 @@
 import Plotly from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import { Box, Text } from "@mantine/core";
+import { useRef, useEffect } from "react";
 import type { BarChartEntry } from "../../lib/goEnrichmentApi";
 
 const Plot = createPlotlyComponent(Plotly);
@@ -18,6 +19,8 @@ const COLORS = {
 };
 
 export default function GOEnrichmentBarChart({ data, filtered }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const traces: any[] = [];
 
   if (filtered.P) {
@@ -71,6 +74,16 @@ export default function GOEnrichmentBarChart({ data, filtered }: Props) {
   const allEntries = [...(filtered.P ? data.P : []), ...(filtered.C ? data.C : []), ...(filtered.F ? data.F : [])];
   const totalEntries = allEntries.filter((e, i, arr) => arr.findIndex(a => a.go_id === e.go_id) === i).length;
 
+  // Block native DOM events from the Plotly SVG modebar so they don't
+  // bubble into React's onClick chain and collapse the parent Paper.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handler = (e: Event) => e.stopPropagation();
+    el.addEventListener("click", handler, true);
+    return () => el.removeEventListener("click", handler, true);
+  }, []);
+
   if (traces.length === 0) {
     return (
       <Box py="xl" ta="center">
@@ -80,7 +93,7 @@ export default function GOEnrichmentBarChart({ data, filtered }: Props) {
   }
 
   return (
-    <Box style={{ width: "100%", height: Math.min(500, totalEntries * 28 + 80) }} onClick={(e) => e.stopPropagation()}>
+    <Box ref={containerRef} style={{ width: "100%", height: Math.min(500, totalEntries * 28 + 80) }}>
       <Plot
         data={traces}
         layout={{
@@ -98,9 +111,12 @@ export default function GOEnrichmentBarChart({ data, filtered }: Props) {
         }}
         config={{
           responsive: true,
-          displayModeBar: true,
-          displaylogo: false,
-          modeBarButtonsToRemove: ["lasso2d", "select2d"],
+          displayModeBar: false,
+          modeBarButtonsToRemove: [
+            "lasso2d", "select2d", "autoScale2d", "resetScale2d",
+            "zoomIn2d", "zoomOut2d", "pan2d", "toggleSpikelines",
+            "hoverClosestCartesian", "hoverCompareCartesian",
+          ],
         }}
         style={{ width: "100%", height: "100%" }}
         useResizeHandler

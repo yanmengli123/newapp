@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Card,
-  Checkbox,
   Divider,
   Group,
   NumberInput,
@@ -37,6 +36,7 @@ import {
 import GOEnrichmentBarChart from "../components/go_enrichment/GOEnrichmentBarChart";
 import GOEnrichmentTable from "../components/go_enrichment/GOEnrichmentTable";
 import GOEnrichmentTermDrawer from "../components/go_enrichment/GOEnrichmentTermDrawer";
+import { BarChartFilters, TableFilters } from "../components/go_enrichment/GOEnrichmentPageFilters";
 
 type PageState = "idle" | "loading" | "success" | "error";
 
@@ -374,13 +374,7 @@ export default function GOEnrichmentPage() {
             <Stack gap="md">
               <Group justify="space-between">
                 <Title order={4}>GO Enrichment Bar Chart</Title>
-                <Box onClick={(e) => e.stopPropagation()}>
-                <Group gap="xs">
-                  <Checkbox label="BP" color="blue" checked={ontologyFilter.P} onChange={(e) => setOntologyFilter((f) => ({ ...f, P: e.currentTarget.checked }))} size="sm" />
-                  <Checkbox label="CC" color="orange" checked={ontologyFilter.C} onChange={(e) => setOntologyFilter((f) => ({ ...f, C: e.currentTarget.checked }))} size="sm" />
-                  <Checkbox label="MF" color="green" checked={ontologyFilter.F} onChange={(e) => setOntologyFilter((f) => ({ ...f, F: e.currentTarget.checked }))} size="sm" />
-                </Group>
-                </Box>
+                <BarChartFilters filter={ontologyFilter} onChange={setOntologyFilter} />
               </Group>
               <GOEnrichmentBarChart data={result.bar_chart_data} filtered={ontologyFilter} />
             </Stack>
@@ -402,14 +396,7 @@ export default function GOEnrichmentPage() {
               </Group>
 
               {/* Ontology Filter */}
-              <Box onClick={(e) => e.stopPropagation()}>
-              <Group gap="xs">
-                <Text size="sm" c="dimmed">Filter:</Text>
-                <Checkbox label="Biological Process" color="blue" checked={ontologyFilter.P} onChange={(e) => setOntologyFilter((f) => ({ ...f, P: e.currentTarget.checked }))} size="sm" />
-                <Checkbox label="Cellular Component" color="orange" checked={ontologyFilter.C} onChange={(e) => setOntologyFilter((f) => ({ ...f, C: e.currentTarget.checked }))} size="sm" />
-                <Checkbox label="Molecular Function" color="green" checked={ontologyFilter.F} onChange={(e) => setOntologyFilter((f) => ({ ...f, F: e.currentTarget.checked }))} size="sm" />
-              </Group>
-              </Box>
+              <TableFilters filter={ontologyFilter} onChange={setOntologyFilter} />
 
               <Divider />
 
