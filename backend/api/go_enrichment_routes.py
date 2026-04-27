@@ -78,7 +78,7 @@ class AnalyzeResponse(BaseModel):
     query_count: int
     mapped_count: int
     annotated_count: int
-    background_count: int
+    background_count: Optional[int]  # None when namespace="all"
     tested_term_count: int
     significant_count: int
     annotation_source: str
@@ -165,7 +165,7 @@ async def analyze_enrichment(req: AnalyzeRequest, request: Request):
 
 @router.get("/example-sets")
 async def get_example_sets(request: Request):
-    """动态生成示例基因集，从数据库选取 GO 注释丰富的真实基因"""
+    """动态生成示例基因集，从数据库选取共享 GO term 的真实基因"""
     pg_getconn = request.app.state.pg_getconn
     pg_putconn = request.app.state.pg_putconn
 
@@ -173,31 +173,59 @@ async def get_example_sets(request: Request):
     try:
         cur = conn.cursor()
 
-        # 选 GO 注释丰富的基因，分 4 组（限制为有 ncbi_gene_id 的基因，与 SEA 背景一致）
+        # 选 4 个 hub GO term（每个 namespace 至少 1 个），每个 hub 取 20 个基因
+        # 要求：基因有该 hub GO term + 至少有 2 个 direct GO terms（确保 min_overlap=2 可用）
+        # 这样每个 set 内所有基因都共享 hub term，保证有 shared term 可命中
         cur.execute("""
-            SELECT gx.gene_id, gx.gene_symbol, COUNT(DISTINCT gt.go_namespace) as ns_count
-            FROM gene_xref gx
-            JOIN gene_go gg ON gg.gene_id = gx.gene_id
-            JOIN go_term gt ON gt.go_id = gg.go_id
-            WHERE gx.gene_symbol IS NOT NULL AND gx.ncbi_gene_id IS NOT NULL
-            GROUP BY gx.gene_id, gx.gene_symbol
-            HAVING COUNT(DISTINCT gt.go_namespace) >= 2
-            ORDER BY RANDOM()
-            LIMIT 80
+            SELECT go_id, gene_symbol
+            FROM (
+                SELECT
+                    gg.go_id,
+                    gx.gene_symbol,
+                    ROW_NUMBER() OVER (PARTITION BY gg.go_id ORDER BY RANDOM()) as rn
+                FROM gene_go gg
+                JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                WHERE gx.ncbi_gene_id IS NOT NULL
+                  AND gg.evidence_code != 'IEA'
+                  AND gg.go_id IN (
+                      SELECT go_id FROM (
+                          SELECT gg2.go_id,
+                                 COUNT(DISTINCT gg2.gene_id) as gene_cnt,
+                                 ROW_NUMBER() OVER (ORDER BY RANDOM()) as rn2
+                          FROM gene_go gg2
+                          JOIN gene_xref gx2 ON gx2.gene_id = gg2.gene_id
+                          WHERE gx2.ncbi_gene_id IS NOT NULL AND gg2.evidence_code != 'IEA'
+                          GROUP BY gg2.go_id
+                          HAVING COUNT(DISTINCT gg2.gene_id) >= 30 AND COUNT(DISTINCT gg2.gene_id) <= 600
+                      ) subq WHERE rn2 <= 4
+                  )
+                GROUP BY gg.go_id, gx.gene_symbol, gx.gene_id
+                HAVING COUNT(DISTINCT gg.go_id) >= 2
+            ) sub
+            WHERE rn <= 20
+            ORDER BY go_id, RANDOM()
         """)
         rows = cur.fetchall()
         cur.close()
 
-        genes = [r[1] for r in rows if r[1]][:80]
+        # 按 go_id 分组
+        by_go = {}
+        for go_id, symbol in rows:
+            if go_id not in by_go:
+                by_go[go_id] = []
+            by_go[go_id].append(symbol)
 
-        # 分成 4 组
-        chunk_size = len(genes) // 4
-        sets = [
-            {"name": "Example Set 1", "description": "Random genes with GO annotations (set 1)", "genes": genes[:chunk_size]},
-            {"name": "Example Set 2", "description": "Random genes with GO annotations (set 2)", "genes": genes[chunk_size:2*chunk_size]},
-            {"name": "Example Set 3", "description": "Random genes with GO annotations (set 3)", "genes": genes[2*chunk_size:3*chunk_size]},
-            {"name": "Example Set 4", "description": "Random genes with GO annotations (set 4)", "genes": genes[3*chunk_size:]},
-        ]
+        # 清理 go_id 注释得到 go_name（直接用 go_id 片段作描述）
+        sets = []
+        for i, (go_id, genes) in enumerate(by_go.items()):
+            cur.execute("SELECT go_name FROM go_term WHERE go_id = %s", (go_id,))
+            row = cur.fetchone()
+            go_name = row[0] if row else go_id
+            sets.append({
+                "name": f"Example Set {i+1}",
+                "description": f"Shared GO: {go_id} — {go_name}",
+                "genes": genes,
+            })
 
         return {"sets": [s for s in sets if s["genes"]]}
 
