@@ -226,7 +226,8 @@ async def get_go_term(go_id: str, request: Request):
 
         cur.execute(
             "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref "
-            "WHERE gene_id IN (SELECT gene_id FROM gene_go WHERE go_id = %s)",
+            "WHERE gene_id IN (SELECT gene_id FROM gene_go WHERE go_id = %s) "
+            "AND ncbi_gene_id IS NOT NULL",
             (go_id,)
         )
         genes = [{"gene_id": r[0], "ncbi_id": r[1], "symbol": r[2]} for r in cur.fetchall()]

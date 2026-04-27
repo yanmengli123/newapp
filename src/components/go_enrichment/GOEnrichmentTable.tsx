@@ -40,7 +40,11 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   if (terms.length === 0) {
     return (
       <Box py="xl" ta="center">
-        <Text c="dimmed" size="sm">No significant GO terms found. Try relaxing the FDR cutoff or min overlap settings.</Text>
+        <Text c="dimmed" size="sm">
+          No significant GO terms found. This may mean your gene set is too small,
+          or no GO term was enriched after FDR correction. Try relaxing the FDR cutoff
+          or lowering the min overlap setting.
+        </Text>
       </Box>
     );
   }

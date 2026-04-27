@@ -37,10 +37,10 @@ interface Props {
 type ExportSizePreset = "1200x800" | "1600x1000" | "2000x1200" | "2400x1600";
 
 const EXPORT_SIZE_OPTIONS = [
-  { value: "1200x800", label: "1200×800" },
-  { value: "1600x1000", label: "1600×1000" },
-  { value: "2000x1200", label: "2000×1200" },
-  { value: "2400x1600", label: "2400×1600" },
+  { value: "1200x800", label: "1200x800" },
+  { value: "1600x1000", label: "1600x1000" },
+  { value: "2000x1200", label: "2000x1200" },
+  { value: "2400x1600", label: "2400x1600" },
 ];
 
 const COLORS = {

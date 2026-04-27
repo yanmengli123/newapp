@@ -125,7 +125,7 @@ export default function GOEnrichmentPage() {
   const handleDownloadCSV = () => {
     if (!result) return;
     const header = ["GO ID", "Ontology", "Description", "Gene Ratio", "BG Ratio", "Query", "BG", "p-value", "FDR", "Significant", "Hit Genes", "Hit NCBI IDs", "Hit Symbols"];
-    const rows = result.results.map((t) => [
+    const rows = filteredResults.map((t) => [
       t.go_id, t.ontology, t.term_name, t.gene_ratio, t.background_ratio,
       t.query_count, t.background_count, t.p_value, t.fdr,
       t.significant ? "yes" : "no",
@@ -143,7 +143,7 @@ export default function GOEnrichmentPage() {
 
   const handleDownloadAnnotated = () => {
     if (!result) return;
-    const lines = result.results.flatMap((t) => t.hit_genes);
+    const lines = filteredResults.flatMap((t) => t.hit_genes);
     const unique = [...new Set(lines)];
     const blob = new Blob([unique.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
@@ -312,9 +312,9 @@ export default function GOEnrichmentPage() {
               <Text size="xs" c="dimmed">Annotated</Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
-              <Text fw={700} fz={24}>{namespace === "all" ? "—" : result.background_count.toLocaleString()}</Text>
+              <Text fw={700} fz={24}>{namespace === "all" ? "See below" : result.background_count.toLocaleString()}</Text>
               <Text size="xs" c="dimmed">
-                {namespace === "all" ? "Background (per ontology ↓)" : "Background"}
+                {namespace === "all" ? "Background (per ontology)" : "Background"}
               </Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
@@ -356,8 +356,8 @@ export default function GOEnrichmentPage() {
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
-                  {result.mapping.map((m) => (
-                    <Table.Tr key={m.input_id}>
+                  {result.mapping.map((m, i) => (
+                    <Table.Tr key={`${m.input_id}-${i}`}>
                       <Table.Td><Text size="sm" style={{ fontFamily: "monospace" }}>{m.input_id}</Text></Table.Td>
                       <Table.Td><Text size="sm" style={{ fontFamily: "monospace" }}>{m.resolved_gene_id ?? "-"}</Text></Table.Td>
                       <Table.Td><Text size="sm">{m.ncbi_gene_id ?? "-"}</Text></Table.Td>
@@ -398,7 +398,7 @@ export default function GOEnrichmentPage() {
                     Download Hit Genes
                   </Button>
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadCSV}>
-                    Download CSV
+                    Download Significant Terms CSV
                   </Button>
                 </Group>
               </Group>
