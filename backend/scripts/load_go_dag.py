@@ -38,18 +38,19 @@ import psycopg2
 # OBO parsing
 # ---------------------------------------------------------------------------
 
-def parse_obo(path: str) -> Tuple[dict, dict, dict]:
+def parse_obo(path: str) -> Tuple[dict, dict, dict, int]:
     """
-    Parse go-basic.obo and return three structures:
+    Parse go-basic.obo and return four structures:
 
     terms:      {go_id: {name, namespace, is_obsolete, alt_ids, is_a, part_of}}
     alt_map:    {alt_go_id: primary_go_id}
     header:     {key: value} from OBO header
+    all_terms_count: total number of term blocks seen (including obsolete)
     """
     terms: dict = {}
     alt_map: dict = {}
     header: dict = {}
-    all_terms_count = 0  # accurate total including obsolete
+    all_terms_count = 0
 
     current_term: Optional[dict] = None
     in_term = False
@@ -65,9 +66,7 @@ def parse_obo(path: str) -> Tuple[dict, dict, dict]:
                     all_terms_count += 1
                     go_id = current_term.get("id")
                     if go_id:
-                        if current_term.get("is_obsolete"):
-                            pass  # skip obsolete in terms dict
-                        else:
+                        if not current_term.get("is_obsolete"):
                             terms[go_id] = {
                                 "name": current_term.get("name", ""),
                                 "namespace": current_term.get("namespace", ""),
@@ -75,7 +74,7 @@ def parse_obo(path: str) -> Tuple[dict, dict, dict]:
                                 "is_a": list(current_term.get("is_a", [])),
                                 "part_of": list(current_term.get("part_of", [])),
                             }
-                        # register alt_ids
+                        # register alt_ids even for obsolete terms
                         for alt_id in current_term.get("alt_id", []):
                             alt_map[alt_id] = go_id
 
@@ -137,7 +136,23 @@ def parse_obo(path: str) -> Tuple[dict, dict, dict]:
                 header_value = line[colon_idx + 1 :].strip()
                 header[header_key] = header_value
 
-    return terms, alt_map, header
+    # Flush: process the last term if the file didn't end with a [Typedef] block
+    if current_term is not None:
+        all_terms_count += 1
+        go_id = current_term.get("id")
+        if go_id:
+            if not current_term.get("is_obsolete"):
+                terms[go_id] = {
+                    "name": current_term.get("name", ""),
+                    "namespace": current_term.get("namespace", ""),
+                    "is_obsolete": False,
+                    "is_a": list(current_term.get("is_a", [])),
+                    "part_of": list(current_term.get("part_of", [])),
+                }
+            for alt_id in current_term.get("alt_id", []):
+                alt_map[alt_id] = go_id
+
+    return terms, alt_map, header, all_terms_count
 
 
 # ---------------------------------------------------------------------------
@@ -371,7 +386,7 @@ def main() -> None:
 
     print(f"Parsing OBO: {obo_path}")
     t0 = time.time()
-    terms, alt_map, header = parse_obo(str(obo_path))
+    terms, alt_map, header, all_terms_count = parse_obo(str(obo_path))
     elapsed = time.time() - t0
 
     term_count = all_terms_count

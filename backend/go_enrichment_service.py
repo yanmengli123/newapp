@@ -188,13 +188,20 @@ class GOBackgroundBuilder:
         try:
             cur = conn.cursor()
 
-            # Guard: propagated mode requires go_closure table
+            # Guard: propagated mode requires go_closure table with data
             if annotation_mode == "propagated":
-                cur.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'go_closure'")
-                if not cur.fetchone():
+                cur.execute("""
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_name = 'go_closure'
+                    UNION ALL
+                    SELECT 1 FROM go_closure LIMIT 1
+                """)
+                if cur.fetchone() is None:
                     raise RuntimeError(
                         "annotation_mode='propagated' requires the GO DAG closure table. "
-                        "Run: python -m backend.scripts.load_go_dag --obo <path-to-go-basic.obo> --dsn <dsn>"
+                        "Run: python -m backend.scripts.load_go_dag "
+                        "--obo /d/jbrowsedata/projectdata/downloads/go/go-basic.obo "
+                        "--dsn postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a --replace"
                     )
 
             ev_where, ev_args = GOBackgroundBuilder._evidence_filter_sql(evidence_filter)
