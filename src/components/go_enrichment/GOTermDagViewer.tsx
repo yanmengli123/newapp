@@ -519,7 +519,8 @@ export default function GOTermDagViewer({ goId }: Props) {
   const [includePartOf, setIncludePartOf] = useState(true);
   const [dagData, setDagData] = useState<GoDagResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [rendering, setRendering] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
+  const isRenderingRef = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dagMeta, setDagMeta] = useState<GoDagMetadata | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
@@ -546,7 +547,8 @@ export default function GOTermDagViewer({ goId }: Props) {
       removeDagPopups();
 
       setLoading(true);
-      setRendering(false);
+      isRenderingRef.current = false;
+      setIsRendering(false);
       setErrorMsg(null);
       setDagData(null);
 
@@ -586,7 +588,7 @@ export default function GOTermDagViewer({ goId }: Props) {
     const el = graphHostRef.current;
     if ((el as any)._cy) return;
 
-    queueMicrotask(() => setRendering(true));
+    queueMicrotask(() => { isRenderingRef.current = true; setIsRendering(true); });
 
     if (el.offsetWidth === 0 || el.offsetHeight === 0) {
       let ro: ResizeObserver | null = null;
@@ -608,8 +610,8 @@ export default function GOTermDagViewer({ goId }: Props) {
           container,
           data: dagData!,
           isFullscreen: false,
-          onReady: () => setRendering(false),
-          onError: () => setRendering(false),
+          onReady: () => { isRenderingRef.current = false; setIsRendering(false); },
+          onError: () => { isRenderingRef.current = false; setIsRendering(false); },
         });
         mainDestroyRef.current = destroy;
       };
@@ -638,13 +640,14 @@ export default function GOTermDagViewer({ goId }: Props) {
       container: el,
       data: dagData,
       isFullscreen: false,
-      onReady: () => setRendering(false),
-      onError: () => setRendering(false),
+      onReady: () => { isRenderingRef.current = false; setIsRendering(false); },
+      onError: () => { isRenderingRef.current = false; setIsRendering(false); },
     });
     mainDestroyRef.current = destroy;
 
     return () => {
       destroy();
+      isRenderingRef.current = false;
       mainDestroyRef.current = null;
     };
   }, [dagData]);
@@ -820,7 +823,7 @@ export default function GOTermDagViewer({ goId }: Props) {
               <Text c="dimmed" size="sm">Loading DAG...</Text>
             </Box>
           )}
-          {!loading && rendering && (
+          {!loading && isRendering && (
             <Box
               style={{
                 position: "absolute", inset: 0,
@@ -831,7 +834,7 @@ export default function GOTermDagViewer({ goId }: Props) {
               <Text c="dimmed" size="sm">Rendering graph...</Text>
             </Box>
           )}
-          {!loading && !rendering && dagData && dagData.nodes.length === 0 && (
+          {!loading && !isRendering && dagData && dagData.nodes.length === 0 && (
             <Box style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Text c="dimmed" size="sm">No DAG relationships found for this term with current filters.</Text>
             </Box>

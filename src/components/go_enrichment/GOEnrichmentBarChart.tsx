@@ -119,7 +119,7 @@ export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props
           layout={{
             barmode: "group",
             margin: { l: leftMargin, r: 50, t: 20, b: 70 },
-            xaxis: { title: "-log10(FDR)", tickangle: -30 },
+            xaxis: { title: "-log10(FDR)", tickangle: -30, tickfont: { size: 10 } },
             yaxis: { title: "", automargin: true, tickangle: 0, tickfont: { size: 11, color: "#1f2937" } },
             font: { size: 11 },
             showlegend: true,

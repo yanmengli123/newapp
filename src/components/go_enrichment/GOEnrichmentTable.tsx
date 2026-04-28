@@ -76,38 +76,30 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   );
 
   return (
-    <Box>
+    <Box style={{ overflowX: "auto" }}>
       <Table striped highlightOnHover withTableBorder withColumnBorders>
         <Table.Thead>
           <Table.Tr>
-            <Table.Th>GO ID</Table.Th>
-            <Table.Th>ON</Table.Th>
+            <Table.Th style={{ whiteSpace: "nowrap" }}>GO ID</Table.Th>
+            <Table.Th style={{ whiteSpace: "nowrap" }}>ON</Table.Th>
             <Table.Th>Description</Table.Th>
-            <Table.Th
-              style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("query_count"); }}
-            >
+            <Table.Th style={{ cursor: "pointer", whiteSpace: "nowrap" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("query_count"); }}>
               {sortLabel("query_count", "Gene Ratio")}
             </Table.Th>
-            <Table.Th
-              style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("background_count"); }}
-            >
+            <Table.Th style={{ cursor: "pointer", whiteSpace: "nowrap" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("background_count"); }}>
               {sortLabel("background_count", "BG Ratio")}
             </Table.Th>
-            <Table.Th
-              style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("p_value"); }}
-            >
+            <Table.Th style={{ cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("p_value"); }}>
               {sortLabel("p_value", "p-value")}
             </Table.Th>
-            <Table.Th
-              style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("fdr"); }}
-            >
+            <Table.Th style={{ cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("fdr"); }}>
               {sortLabel("fdr", "FDR")}
             </Table.Th>
-            <Table.Th>Sig</Table.Th>
+            <Table.Th style={{ whiteSpace: "nowrap" }}>Sig</Table.Th>
             <Table.Th>Hit Genes</Table.Th>
           </Table.Tr>
         </Table.Thead>

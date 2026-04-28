@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Button, Drawer, Badge, Stack, Text, Group, Box, Chip,
   Tooltip, Skeleton, Tabs,
@@ -35,6 +35,7 @@ interface TermDetail {
 export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
   const [termDetail, setTermDetail] = useState<TermDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const fetchCountRef = useRef(0);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -44,10 +45,11 @@ export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
     }
     setLoadingDetail(true);
     setTermDetail(null);
+    const fetchId = ++fetchCountRef.current;
     getGOTermDetail(term.go_id)
-      .then((d) => setTermDetail(d as unknown as TermDetail))
-      .catch(() => setTermDetail(null))
-      .finally(() => setLoadingDetail(false));
+      .then((d) => { if (fetchId === fetchCountRef.current) setTermDetail(d as unknown as TermDetail); })
+      .catch(() => { if (fetchId === fetchCountRef.current) setTermDetail(null); })
+      .finally(() => { if (fetchId === fetchCountRef.current) setLoadingDetail(false); });
   }, [term]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
