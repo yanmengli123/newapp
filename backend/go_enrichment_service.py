@@ -248,38 +248,32 @@ class GOBackgroundBuilder:
             else:
                 # propagated: genes annotated to a descendant GO term count for all ancestors
                 if namespace == "all":
-                    # alt_id branch: resolve go_id → primary_go_id → closure → ancestor
+                    # Use UNION + COUNT(DISTINCT) to avoid double-counting genes
+                    # that appear in both alt_id and direct branches
                     cur.execute(f"""
-                        SELECT gc.ancestor_go_id AS go_id,
-                               COUNT(DISTINCT gg.gene_id) AS bg_count
-                        FROM gene_go gg
-                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                        JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
-                        JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
-                        JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
-                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
-                        WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
-                        GROUP BY gc.ancestor_go_id
+                        SELECT ancestor_go_id AS go_id, COUNT(DISTINCT gene_id) AS bg_count
+                        FROM (
+                            SELECT DISTINCT gg.gene_id, gc.ancestor_go_id
+                            FROM gene_go gg
+                            JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                            JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
+                            JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
+                            JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                            JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                            WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
+                            UNION
+                            SELECT DISTINCT gg.gene_id, gc.ancestor_go_id
+                            FROM gene_go gg
+                            JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                            JOIN go_closure gc ON gc.descendant_go_id = gg.go_id
+                            JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                            WHERE gx.ncbi_gene_id IS NOT NULL
+                              AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
+                              {ev_where}
+                        ) combined
+                        GROUP BY ancestor_go_id
                     """, ev_args)
                     bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
-                    # direct (non-alt_id) branch
-                    cur.execute(f"""
-                        SELECT gc.ancestor_go_id AS go_id,
-                               COUNT(DISTINCT gg.gene_id) AS bg_count
-                        FROM gene_go gg
-                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                        JOIN go_closure gc ON gc.descendant_go_id = gg.go_id
-                        JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
-                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
-                        WHERE gx.ncbi_gene_id IS NOT NULL
-                          AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
-                          {ev_where}
-                        GROUP BY gc.ancestor_go_id
-                    """, ev_args)
-                    for r in cur.fetchall():
-                        go_id = r[0]
-                        bg_count = r[1]
-                        bg_go_counts[go_id] = bg_go_counts.get(go_id, 0) + bg_count
                 else:
                     # specific namespace: filter by ancestor's namespace AND annotation's namespace
                     # Use UNION to avoid double-counting genes that appear in both alt_id and direct branches

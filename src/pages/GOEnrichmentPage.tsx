@@ -10,6 +10,7 @@ import {
   Group,
   NumberInput,
   Paper,
+  ScrollArea,
   Select,
   SimpleGrid,
   Skeleton,
@@ -75,6 +76,7 @@ export default function GOEnrichmentPage() {
   const [selectedTerm, setSelectedTerm] = useState<GOEnrichmentResult | null>(null);
   const [fullscreenChartOpened, setFullscreenChartOpened] = useState(false);
   const [showAllTerms, setShowAllTerms] = useState(false);
+  const [showAllMappings, setShowAllMappings] = useState(false);
 
   // Load example sets on mount
   useEffect(() => {
@@ -117,6 +119,7 @@ export default function GOEnrichmentPage() {
     setResult(null);
     setPageState("idle");
     setOntologyFilter({ P: true, C: true, F: true });
+    setShowAllMappings(false);
   };
 
   const handleFillExample = (genes: string[]) => {
@@ -131,19 +134,22 @@ export default function GOEnrichmentPage() {
 
   const handleDownloadCSV = () => {
     if (!result) return;
+    const sanitize = (v: string) => String(v).replace(/\t/g, " ").replace(/\r/g, "").replace(/\n/g, " ");
     const header = ["GO ID", "Ontology", "Description", "Gene Ratio", "BG Ratio", "Query", "BG", "p-value", "FDR", "Significant", "Hit Genes", "Hit NCBI IDs", "Hit Symbols"];
     const rows = filteredResults.map((t) => [
-      t.go_id, t.ontology, t.term_name, t.gene_ratio, t.background_ratio,
+      t.go_id, t.ontology, sanitize(t.term_name), t.gene_ratio, t.background_ratio,
       t.query_count, t.background_count, t.p_value, t.fdr,
       t.significant ? "yes" : "no",
-      t.hit_genes.join(";"), t.hit_ncbi_ids.join(";"), t.hit_symbols.join(";"),
+      t.hit_genes.map(sanitize).join(";"),
+      t.hit_ncbi_ids.map(sanitize).join(";"),
+      t.hit_symbols.map(sanitize).join(";"),
     ]);
-    const csv = [header.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n");
-    const blob = new Blob([csv], { type: "text/tab-separated-values" });
+    const tsv = [header.join("\t"), ...rows.map((r) => r.join("\t"))].join("\n");
+    const blob = new Blob([tsv], { type: "text/tab-separated-values" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `significant_go_terms_${Date.now()}.tsv`;
+    a.download = `go_enrichment_${correction}_fdr${fdrCutoff}_min${minOverlap}_${namespace}_${Date.now()}.tsv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -248,7 +254,7 @@ export default function GOEnrichmentPage() {
               data={[
                 { value: "all", label: "All evidence" },
                 { value: "non_iea", label: "Exclude IEA (non-electronic)" },
-                { value: "experimental", label: "Experimental only" },
+                { value: "experimental", label: "Non-IEA curated (ISS/ISA/IBA excluded)" },
               ]}
               value={evidenceFilter}
               onChange={(v) => v && setEvidenceFilter(v)}
@@ -377,36 +383,58 @@ export default function GOEnrichmentPage() {
           {/* Mapping Report */}
           {result.mapping && result.mapping.length > 0 && (
             <Paper withBorder radius="lg" p="lg">
-              <Title order={4} mb="sm">Mapping Report</Title>
-              <Table striped withTableBorder withColumnBorders>
-                <Table.Thead>
-                  <Table.Tr>
-                    <Table.Th>Input ID</Table.Th>
-                    <Table.Th>Resolved Gene ID</Table.Th>
-                    <Table.Th>NCBI ID</Table.Th>
-                    <Table.Th>Symbol</Table.Th>
-                    <Table.Th>Status</Table.Th>
-                  </Table.Tr>
-                </Table.Thead>
-                <Table.Tbody>
-                  {result.mapping.map((m, i) => (
-                    <Table.Tr key={`${m.input_id}-${i}`}>
-                      <Table.Td><Text size="sm" style={{ fontFamily: "monospace" }}>{m.input_id}</Text></Table.Td>
-                      <Table.Td><Text size="sm" style={{ fontFamily: "monospace" }}>{m.resolved_gene_id ?? "-"}</Text></Table.Td>
-                      <Table.Td><Text size="sm">{m.ncbi_gene_id ?? "-"}</Text></Table.Td>
-                      <Table.Td><Text size="sm">{m.gene_symbol ?? "-"}</Text></Table.Td>
-                      <Table.Td>
-                        <Badge
-                          color={m.status === "mapped" ? "green" : m.status === "no_go_annotation" ? "yellow" : "red"}
-                          size="sm"
-                        >
-                          {m.status}
-                        </Badge>
-                      </Table.Td>
+              <Group justify="space-between" mb="sm">
+                <Title order={4}>Mapping Report</Title>
+                <Group gap="xs">
+                  {(() => {
+                    const mapped = result.mapping.filter(m => m.status === "mapped").length;
+                    const abnormal = result.mapping.length - mapped;
+                    return (
+                      <Text size="xs" c="dimmed">
+                        {mapped} mapped, {abnormal} abnormal
+                        {abnormal > 0 && " — toggle to see all"}
+                      </Text>
+                    );
+                  })()}
+                  <Switch
+                    size="xs"
+                    label="Show all"
+                    checked={showAllMappings}
+                    onChange={(e) => setShowAllMappings(e.currentTarget.checked)}
+                  />
+                </Group>
+              </Group>
+              <ScrollArea style={{ maxHeight: 320, overflow: "auto" }}>
+                <Table striped withTableBorder withColumnBorders>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Input ID</Table.Th>
+                      <Table.Th>Resolved Gene ID</Table.Th>
+                      <Table.Th>NCBI ID</Table.Th>
+                      <Table.Th>Symbol</Table.Th>
+                      <Table.Th>Status</Table.Th>
                     </Table.Tr>
-                  ))}
-                </Table.Tbody>
-              </Table>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {(showAllMappings ? result.mapping : result.mapping.filter(m => m.status !== "mapped")).map((m, i) => (
+                      <Table.Tr key={`${m.input_id}-${i}`}>
+                        <Table.Td><Text size="sm" style={{ fontFamily: "monospace" }}>{m.input_id}</Text></Table.Td>
+                        <Table.Td><Text size="sm" style={{ fontFamily: "monospace" }}>{m.resolved_gene_id ?? "-"}</Text></Table.Td>
+                        <Table.Td><Text size="sm">{m.ncbi_gene_id ?? "-"}</Text></Table.Td>
+                        <Table.Td><Text size="sm">{m.gene_symbol ?? "-"}</Text></Table.Td>
+                        <Table.Td>
+                          <Badge
+                            color={m.status === "mapped" ? "green" : m.status === "no_go_annotation" ? "yellow" : "red"}
+                            size="sm"
+                          >
+                            {m.status === "mapped" ? "Mapped" : m.status === "no_go_annotation" ? "No annotation" : "Not found"}
+                          </Badge>
+                        </Table.Td>
+                      </Table.Tr>
+                    ))}
+                  </Table.Tbody>
+                </Table>
+              </ScrollArea>
             </Paper>
           )}
 
@@ -453,7 +481,7 @@ export default function GOEnrichmentPage() {
                     Download Hit Genes
                   </Button>
                   <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={handleDownloadCSV}>
-                    {showAllTerms ? "Download All Terms CSV" : "Download Significant CSV"}
+                    {showAllTerms ? "Download All (TSV)" : "Download Significant (TSV)"}
                   </Button>
                 </Group>
               </Group>
