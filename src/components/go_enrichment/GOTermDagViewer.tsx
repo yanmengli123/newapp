@@ -177,7 +177,7 @@ function buildCyStyle(isFullscreen: boolean): any[] {
         "font-size": "10px",
         "font-family": "Inter, Arial, sans-serif",
         color: "#475569",
-        "background-color": "#ffffff",
+        "background-color": "#f8fafc",
         "border-width": 1.5,
         "border-color": "#cbd5e1",
       } as any,
@@ -225,7 +225,7 @@ function buildCyStyle(isFullscreen: boolean): any[] {
       style: {
         width: 2,
         "curve-style": "taxi",
-        "taxi-direction": "downward",
+        "taxi-direction": "upward",
         "taxi-turn": 20,
         "line-color": "#94a3b8",
         "target-arrow-color": "#94a3b8",
@@ -261,7 +261,7 @@ function getLayoutOptions(isFullscreen: boolean): any {
   if (isFullscreen) {
     return {
       name: "dagre",
-      rankDir: "TB",
+      rankDir: "BT",
       nodeSep: 140,
       rankSep: 180,
       edgeSep: 30,
@@ -273,7 +273,7 @@ function getLayoutOptions(isFullscreen: boolean): any {
   }
   return {
     name: "dagre",
-    rankDir: "TB",
+    rankDir: "BT",
     nodeSep: 80,
     rankSep: 120,
     edgeSep: 20,
@@ -733,6 +733,10 @@ export default function GOTermDagViewer({ goId }: Props) {
           ))}
           <Group gap={4}><Box w={20} h={2} style={{ background: "#94a3b8" }} /><Text size="xs">is_a</Text></Group>
           <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #f59e0b" }} /><Text size="xs">part_of</Text></Group>
+          <Group gap={4}>
+            <Box w={12} h={12} style={{ borderRadius: 3, border: "2px solid #ca8a04", background: "#fef08a" }} />
+            <Text size="xs">Target term</Text>
+          </Group>
         </Group>
 
         {/* Main Cytoscape container */}
