@@ -44,10 +44,11 @@ const NS_LABELS: Record<string, string> = {
   molecular_function: "MF",
 };
 
-// ─── Cytoscape Module Loader ───────────────────────────────────────────────
+// ─── Cytoscape Loader (module-level singleton) ───────────────────────────────
 
 type CyDeps = { cytoscape: any; dagreLayout: any };
 let cyLoader: Promise<CyDeps> | null = null;
+let dagreRegistered = false;
 
 function loadCytoscape(): Promise<CyDeps> {
   if (!cyLoader) {
@@ -60,16 +61,38 @@ function loadCytoscape(): Promise<CyDeps> {
   return cyLoader;
 }
 
-// Module-level dagre registration guard (once across all instances)
-let dagreRegistered = false;
-
-// ─── Popup Helpers ─────────────────────────────────────────────────────────
+// ─── Popup helpers ─────────────────────────────────────────────────────────
 
 function removeDagPopups() {
   document.querySelectorAll(".cy-popup").forEach((p) => p.remove());
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────
+// ─── Cytoscape element builder ───────────────────────────────────────────────
+
+function buildCyElements(data: GoDagResponse): any[] {
+  return [
+    ...data.nodes.map((n) => ({
+      data: {
+        id: n.id,
+        label: `${n.id}\n${n.label.length > 40 ? n.label.slice(0, 39) + "..." : n.label}`,
+        fullLabel: n.label,
+        namespace: n.namespace,
+        isCenter: n.is_center,
+        depth: n.depth,
+        geneCountDirect: n.gene_count_direct ?? 0,
+        geneCountPropagated: n.gene_count_propagated ?? 0,
+      },
+    })),
+    ...data.edges.map((e) => ({
+      data: {
+        id: `${e.source}-${e.target}-${e.relation}`,
+        source: e.source,
+        target: e.target,
+        relation: e.relation,
+      },
+    })),
+  ];
+}
 
 function buildCyStyle(): any[] {
   return [
@@ -121,14 +144,16 @@ function buildCyStyle(): any[] {
     {
       selector: "edge",
       style: {
-        width: 1.5, "line-color": "#666", "target-arrow-color": "#666",
-        "target-arrow-shape": "triangle", "curve-style": "bezier",
-        "line-style": "solid",
+        width: 1.5,
+        "line-color": "#666",
+        "target-arrow-color": "#666",
+        "target-arrow-shape": "triangle",
+        "curve-style": "bezier",
       } as any,
     },
     {
       selector: 'edge[relation="part_of"]',
-      style: { "line-style": "dashed", "line-dash-pattern": [4, 3] } as any,
+      style: { "line-style": "dashed", "line-dash-pattern": [6, 3] } as any,
     },
     {
       selector: "node:selected",
@@ -141,51 +166,29 @@ function buildCyStyle(): any[] {
   ];
 }
 
-function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "..." : s;
-}
+// ─── Cytoscape instance builder ──────────────────────────────────────────────
+// Stores live cy instance on container._cy for external access (zoom/fit buttons)
 
-// ─── Cytoscape Init (returns cy instance, caller manages lifecycle) ─────────
+function createCytoscape(opts: {
+  container: HTMLDivElement;
+  data: GoDagResponse;
+  isFullscreen: boolean;
+  onReady?: (cy: any) => void;
+}): void {
+  let disposed = false;
 
-function initCytoscape(
-  container: HTMLDivElement,
-  data: GoDagResponse,
-  isFullscreen: boolean,
-  onLayoutDone: () => void
-): any | null {
-  let resolved = false;
+  loadCytoscape().then(({ cytoscape, dagreLayout }) => {
+    if (disposed || !opts.container) return;
 
-  const deps = loadCytoscape().then(({ cytoscape, dagreLayout }) => {
     if (!dagreRegistered) {
       cytoscape.use(dagreLayout);
       dagreRegistered = true;
     }
 
-    const elements: any[] = [
-      ...data.nodes.map((n) => ({
-        data: {
-          id: n.id,
-          label: `${n.id}\n${truncate(n.label, 40)}`,
-          fullLabel: n.label,
-          namespace: n.namespace,
-          isCenter: n.is_center,
-          depth: n.depth,
-          geneCountDirect: n.gene_count_direct ?? 0,
-          geneCountPropagated: n.gene_count_propagated ?? 0,
-        },
-      })),
-      ...data.edges.map((e) => ({
-        data: {
-          id: `${e.source}-${e.target}-${e.relation}`,
-          source: e.source,
-          target: e.target,
-          relation: e.relation,
-        },
-      })),
-    ];
+    const elements = buildCyElements(opts.data);
 
     const cy = cytoscape({
-      container,
+      container: opts.container,
       elements,
       style: buildCyStyle(),
       layout: { name: "preset" } as any,
@@ -194,36 +197,90 @@ function initCytoscape(
       maxZoom: 5,
     });
 
-    if (resolved) { cy.destroy(); return; }
+    // Store on container for zoom/fit access
+    (opts.container as any)._cy = cy;
 
-    // Register layoutstop before running layout
-    cy.one("layoutstop", () => {
-      onLayoutDone();
+    if (disposed) { cy.destroy(); return; }
+
+    // Tap handlers
+    cy.on("tap", (evt: any) => {
+      if (evt.target === cy) { removeDagPopups(); return; }
+      const d = evt.target.data();
+
+      if (evt.target.isNode()) {
+        removeDagPopups();
+        const popup = document.createElement("div");
+        popup.className = "cy-popup";
+        popup.style.cssText = `
+          position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 230)}px;
+          left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 330)}px;
+          background:#fff; border:1px solid #ddd; border-radius:6px;
+          padding:8px 12px; font-size:12px; max-width:300px; z-index:99999;
+          box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
+          pointer-events:none;
+        `;
+        const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
+          const e = Object.assign(document.createElement("span"), { textContent: t });
+          if (s) Object.assign(e.style, s);
+          return e;
+        };
+        popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(mk(d.fullLabel, { color: "#555" }));
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(mk("Direct: "));
+        popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(mk("Propagated: "));
+        popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
+        popup.appendChild(Object.assign(document.createElement("span"), { textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" } }));
+        document.body.appendChild(popup);
+      } else if (evt.target.isEdge()) {
+        removeDagPopups();
+        const popup = document.createElement("div");
+        popup.className = "cy-popup";
+        popup.style.cssText = `
+          position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 80)}px;
+          left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 240)}px;
+          background:#fff; border:1px solid #ddd; border-radius:6px;
+          padding:6px 10px; font-size:12px; z-index:99999;
+          box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
+          pointer-events:none;
+        `;
+        const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
+        popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
+        popup.appendChild(document.createTextNode(" relationship"));
+        document.body.appendChild(popup);
+      }
     });
 
-    // Run dagre layout after container is visible
-    const layoutOptions = {
+    // Run dagre layout — register listener BEFORE run()
+    const layoutOpts = {
       name: "dagre" as const,
       rankDir: "TB" as const,
-      nodeSep: isFullscreen ? 55 : 40,
-      rankSep: isFullscreen ? 80 : 60,
+      nodeSep: opts.isFullscreen ? 55 : 40,
+      rankSep: opts.isFullscreen ? 80 : 60,
       fit: true,
-      padding: isFullscreen ? 50 : 30,
+      padding: opts.isFullscreen ? 50 : 30,
       animate: true,
-      animationDuration: 350,
+      animationDuration: 400,
     };
 
-    cy.layout(layoutOptions as any).run();
+    cy.one("layoutstop", () => {
+      if (disposed) return;
+      if (opts.onReady) opts.onReady(cy);
+    });
 
-    // Fallback: ensure spinner hides even if layoutstop never fires
-    setTimeout(() => { if (!resolved) onLayoutDone(); }, 1800);
+    cy.layout(layoutOpts as any).run();
 
-    return cy;
+    // Safety fallback
+    setTimeout(() => {
+      if (disposed) return;
+      if (opts.onReady) opts.onReady(cy);
+    }, 2000);
   });
-
-  // Attach to container synchronously so caller can hold reference
-  // The actual cy instance is resolved after async module load
-  return { waitForDeps: deps };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -236,7 +293,6 @@ export default function GOTermDagViewer({ goId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 
-  // Per-instance state
   const [direction, setDirection] = useState<DagDirection>("ancestors");
   const [depth, setDepth] = useState<number>(3);
   const [includeIsA, setIncludeIsA] = useState(true);
@@ -248,43 +304,39 @@ export default function GOTermDagViewer({ goId }: Props) {
   const [dagMeta, setDagMeta] = useState<GoDagMetadata | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
-  // Live Cytoscape instances (controlled independently)
-  const cyRef = useRef<any>(null);
-  const cyFsRef = useRef<any>(null);
+  // Destroy callbacks for cleanup
+  const mainDestroyRef = useRef<(() => void) | null>(null);
+  const fsDestroyRef = useRef<(() => void) | null>(null);
 
-  // Cancel token for data fetching only (not rendering)
-  const fetchCancelledRef = useRef(false);
-
-  // Fullscreen init guard: ensure we only init once per open
-  const fsInitRef = useRef(false);
-
-  // Load DAG metadata once
   useEffect(() => {
-    getGODagMetadata()
-      .then(setDagMeta)
-      .catch(() => {});
+    getGODagMetadata().then(setDagMeta).catch(() => {});
   }, []);
 
-  // Preload Cytoscape modules on mount
   useEffect(() => {
     loadCytoscape().catch(() => {});
   }, []);
 
-  // ── Fetch lifecycle (pure — only deals with data, not rendering) ──
+  // ── Fetch ───────────────────────────────────────────────────────────────────
+
   const fetchDag = useCallback(
     (dir: DagDirection, d: number, isa: boolean, part: boolean) => {
-      fetchCancelledRef.current = true;
-
-      // Destroy old instances
-      if (cyRef.current) { cyRef.current.destroy(); cyRef.current = null; }
-      if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
+      // Cleanup existing instances
+      if (mainDestroyRef.current) {
+        mainDestroyRef.current();
+        mainDestroyRef.current = null;
+      }
+      if (fsDestroyRef.current) {
+        fsDestroyRef.current();
+        fsDestroyRef.current = null;
+      }
+      if (containerRef.current) (containerRef.current as any)._cy = null;
+      if (fullscreenContainerRef.current) (fullscreenContainerRef.current as any)._cy = null;
       removeDagPopups();
 
       setLoading(true);
       setRendering(false);
       setErrorMsg(null);
       setDagData(null);
-      fetchCancelledRef.current = false;
 
       getGOTermDag(goId, {
         direction: dir, depth: d,
@@ -292,12 +344,10 @@ export default function GOTermDagViewer({ goId }: Props) {
         max_nodes: 80,
       })
         .then((data) => {
-          if (fetchCancelledRef.current) return;
           setDagData(data);
           setLoading(false);
         })
         .catch((err: Error) => {
-          if (fetchCancelledRef.current) return;
           setErrorMsg(err.message ?? "Failed to load DAG");
           setLoading(false);
         });
@@ -305,44 +355,34 @@ export default function GOTermDagViewer({ goId }: Props) {
     [goId]
   );
 
-  // Trigger fetch on mount and when params change
   useEffect(() => {
     fetchDag(direction, depth, includeIsA, includePartOf);
+    return () => {
+      if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
+      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
+      removeDagPopups();
+    };
   }, [fetchDag, direction, depth, includeIsA, includePartOf]);
 
-  // ── Main graph rendering (triggered by dagData + container readiness) ──
+  // ── Main graph effect ─────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!dagData || !containerRef.current || loading) return;
     if (dagData.nodes.length === 0) return;
-    if (cyRef.current) return; // already rendered
+    if ((containerRef.current as any)._cy) return; // already has instance
 
     setRendering(true);
+    let destroyed = false;
 
     loadCytoscape().then(({ cytoscape, dagreLayout }) => {
-      if (fetchCancelledRef.current) return;
+      if (destroyed) return;
 
       if (!dagreRegistered) {
         cytoscape.use(dagreLayout);
         dagreRegistered = true;
       }
 
-      const elements: any[] = [
-        ...dagData.nodes.map((n) => ({
-          data: {
-            id: n.id, label: `${n.id}\n${truncate(n.label, 40)}`,
-            fullLabel: n.label, namespace: n.namespace,
-            isCenter: n.is_center, depth: n.depth,
-            geneCountDirect: n.gene_count_direct ?? 0,
-            geneCountPropagated: n.gene_count_propagated ?? 0,
-          },
-        })),
-        ...dagData.edges.map((e) => ({
-          data: {
-            id: `${e.source}-${e.target}-${e.relation}`,
-            source: e.source, target: e.target, relation: e.relation,
-          },
-        })),
-      ];
+      const elements = buildCyElements(dagData);
 
       const cy = cytoscape({
         container: containerRef.current,
@@ -354,93 +394,14 @@ export default function GOTermDagViewer({ goId }: Props) {
         maxZoom: 4,
       });
 
-      cy.one("layoutstop", () => setRendering(false));
-      cy.layout({
-        name: "dagre", rankDir: "TB",
-        nodeSep: 40, rankSep: 60,
-        fit: true, padding: 30,
-        animate: true, animationDuration: 350,
-      } as any).run();
+      (containerRef.current as any)._cy = cy;
 
-      cyRef.current = cy;
-
-      // Cleanup on unmount
-      return () => {
-        removeDagPopups();
-        if (cyRef.current) { cyRef.current.destroy(); cyRef.current = null; }
-      };
-    });
-
-    // Fallback hide spinner
-    const t = setTimeout(() => setRendering(false), 1800);
-    return () => clearTimeout(t);
-  }, [dagData, loading]);
-
-  // ── Toolbar handlers ──
-  const handleFit = () => { cyRef.current?.fit(undefined, 30); };
-  const handleZoomIn = () => { cyRef.current?.zoom(cyRef.current.zoom() * 1.3); };
-  const handleZoomOut = () => { cyRef.current?.zoom(cyRef.current.zoom() / 1.3); };
-
-  // ── Fullscreen Modal ──
-  const handleOpenFullscreen = () => {
-    fsInitRef.current = false;
-    setFullscreenOpen(true);
-  };
-
-  // useElementSize-style approach: wait for container to have non-zero size
-  // then initialize Cytoscape ONCE
-  const tryInitFullscreen = useCallback(() => {
-    if (fsInitRef.current) return;
-    if (!fullscreenContainerRef.current) return;
-    if (!dagData) return;
-
-    const el = fullscreenContainerRef.current;
-    if (el.offsetWidth === 0 || el.offsetHeight === 0) return; // keep waiting
-
-    fsInitRef.current = true;
-    removeDagPopups();
-    if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
-
-    loadCytoscape().then(({ cytoscape, dagreLayout }) => {
-      if (!dagreRegistered) {
-        cytoscape.use(dagreLayout);
-        dagreRegistered = true;
-      }
-
-      const elements: any[] = [
-        ...dagData.nodes.map((n) => ({
-          data: {
-            id: n.id, label: `${n.id}\n${truncate(n.label, 40)}`,
-            fullLabel: n.label, namespace: n.namespace,
-            isCenter: n.is_center, depth: n.depth,
-            geneCountDirect: n.gene_count_direct ?? 0,
-            geneCountPropagated: n.gene_count_propagated ?? 0,
-          },
-        })),
-        ...dagData.edges.map((e) => ({
-          data: {
-            id: `${e.source}-${e.target}-${e.relation}`,
-            source: e.source, target: e.target, relation: e.relation,
-          },
-        })),
-      ];
-
-      const cy = cytoscape({
-        container: fullscreenContainerRef.current,
-        elements,
-        style: buildCyStyle(),
-        layout: { name: "preset" } as any,
-        wheelSensitivity: 0.3,
-        minZoom: 0.1,
-        maxZoom: 5,
-      });
-
-      // Attach popup handlers
       cy.on("tap", (evt: any) => {
         if (evt.target === cy) { removeDagPopups(); return; }
+        const d = evt.target.data();
+
         if (evt.target.isNode()) {
           removeDagPopups();
-          const d = evt.target.data();
           const popup = document.createElement("div");
           popup.className = "cy-popup";
           popup.style.cssText = `
@@ -451,11 +412,10 @@ export default function GOTermDagViewer({ goId }: Props) {
             box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
             pointer-events:none;
           `;
-          const mk = (txt: string, style?: Partial<CSSStyleDeclaration>) => {
-            const el = document.createElement("span");
-            if (style) Object.assign(el.style, style);
-            el.textContent = txt;
-            return el;
+          const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
+            const e = Object.assign(document.createElement("span"), { textContent: t });
+            if (s) Object.assign(e.style, s);
+            return e;
           };
           popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
           popup.appendChild(document.createElement("br"));
@@ -464,25 +424,14 @@ export default function GOTermDagViewer({ goId }: Props) {
           popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
           popup.appendChild(document.createElement("br"));
           popup.appendChild(mk("Direct: "));
-          const db = document.createElement("b");
-          db.textContent = String(d.geneCountDirect);
-          popup.appendChild(db);
+          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
           popup.appendChild(document.createElement("br"));
           popup.appendChild(mk("Propagated: "));
-          const pb = document.createElement("b");
-          pb.textContent = String(d.geneCountPropagated);
-          popup.appendChild(pb);
-          const pn = document.createElement("span");
-          pn.style.color = "#aaa";
-          pn.style.fontSize = "10px";
-          pn.textContent = " (via full closure)";
-          popup.appendChild(pn);
+          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
+          popup.appendChild(Object.assign(document.createElement("span"), { textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" } }));
           document.body.appendChild(popup);
-          return;
-        }
-        if (evt.target.isEdge()) {
+        } else if (evt.target.isEdge()) {
           removeDagPopups();
-          const d = evt.target.data();
           const popup = document.createElement("div");
           popup.className = "cy-popup";
           popup.style.cssText = `
@@ -493,61 +442,190 @@ export default function GOTermDagViewer({ goId }: Props) {
             box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
             pointer-events:none;
           `;
-          const b = document.createElement("b");
-          b.textContent = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
-          popup.appendChild(b);
+          const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
+          popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
           popup.appendChild(document.createTextNode(" relationship"));
           document.body.appendChild(popup);
         }
       });
 
-      // Run dagre layout
+      mainDestroyRef.current = () => {
+        destroyed = true;
+        if (containerRef.current) (containerRef.current as any)._cy = null;
+        cy.destroy();
+      };
+
+      cy.one("layoutstop", () => { if (!destroyed) setRendering(false); });
+
       cy.layout({
         name: "dagre", rankDir: "TB",
-        nodeSep: 55, rankSep: 80,
-        fit: true, padding: 50,
+        nodeSep: 40, rankSep: 60,
+        fit: true, padding: 30,
         animate: true, animationDuration: 400,
       } as any).run();
 
-      cyFsRef.current = cy;
+      setTimeout(() => { if (!destroyed) setRendering(false); }, 2000);
+    });
 
-      // Resize + fit after layout settles
+    return () => {
+      if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
+    };
+  }, [dagData, loading]);
+
+  // ── Fullscreen ─────────────────────────────────────────────────────────────
+
+  const handleOpenFullscreen = () => {
+    if (containerRef.current) {
+      const cy = (containerRef.current as any)._cy;
+      if (cy && fullscreenContainerRef.current) {
+        (fullscreenContainerRef.current as any)._cy = cy;
+      }
+    }
+    setFullscreenOpen(true);
+  };
+
+  const handleCloseFullscreen = () => {
+    setFullscreenOpen(false);
+  };
+
+  // When fullscreen modal opens, init Cytoscape in the fullscreen container
+  useEffect(() => {
+    if (!fullscreenOpen) return;
+    if (!dagData) return;
+    if (!fullscreenContainerRef.current) return;
+    if ((fullscreenContainerRef.current as any)._cy) return; // already has cy
+
+    // Poll container size until ready
+    let pollCount = 0;
+    const poll = setInterval(() => {
+      pollCount++;
+      const el = fullscreenContainerRef.current;
+      if (!el) { clearInterval(poll); return; }
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+        clearInterval(poll);
+        initFullscreenCy();
+      } else if (pollCount > 60) { // 60 * 50ms = 3s timeout
+        clearInterval(poll);
+      }
+    }, 50);
+
+    return () => clearInterval(poll);
+  }, [fullscreenOpen, dagData]);
+
+  function initFullscreenCy() {
+    if (!fullscreenContainerRef.current || !dagData) return;
+    if ((fullscreenContainerRef.current as any)._cy) return;
+
+    const container = fullscreenContainerRef.current;
+
+    loadCytoscape().then(({ cytoscape, dagreLayout }) => {
+      if (!dagreRegistered) {
+        cytoscape.use(dagreLayout);
+        dagreRegistered = true;
+      }
+
+      const elements = buildCyElements(dagData);
+      const cy = cytoscape({
+        container,
+        elements,
+        style: buildCyStyle(),
+        layout: { name: "preset" } as any,
+        wheelSensitivity: 0.3,
+        minZoom: 0.1,
+        maxZoom: 5,
+      });
+
+      (container as any)._cy = cy;
+
+      fsDestroyRef.current = () => {
+        (container as any)._cy = null;
+        cy.destroy();
+      };
+
+      cy.on("tap", (evt: any) => {
+        if (evt.target === cy) { removeDagPopups(); return; }
+        const d = evt.target.data();
+
+        if (evt.target.isNode()) {
+          removeDagPopups();
+          const popup = document.createElement("div");
+          popup.className = "cy-popup";
+          popup.style.cssText = `
+            position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 230)}px;
+            left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 330)}px;
+            background:#fff; border:1px solid #ddd; border-radius:6px;
+            padding:8px 12px; font-size:12px; max-width:300px; z-index:99999;
+            box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
+            pointer-events:none;
+          `;
+          const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
+            const e = Object.assign(document.createElement("span"), { textContent: t });
+            if (s) Object.assign(e.style, s);
+            return e;
+          };
+          popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
+          popup.appendChild(document.createElement("br"));
+          popup.appendChild(mk(d.fullLabel, { color: "#555" }));
+          popup.appendChild(document.createElement("br"));
+          popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
+          popup.appendChild(document.createElement("br"));
+          popup.appendChild(mk("Direct: "));
+          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
+          popup.appendChild(document.createElement("br"));
+          popup.appendChild(mk("Propagated: "));
+          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
+          popup.appendChild(Object.assign(document.createElement("span"), { textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" } }));
+          document.body.appendChild(popup);
+        } else if (evt.target.isEdge()) {
+          removeDagPopups();
+          const popup = document.createElement("div");
+          popup.className = "cy-popup";
+          popup.style.cssText = `
+            position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 80)}px;
+            left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 240)}px;
+            background:#fff; border:1px solid #ddd; border-radius:6px;
+            padding:6px 10px; font-size:12px; z-index:99999;
+            box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
+            pointer-events:none;
+          `;
+          const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
+          popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
+          popup.appendChild(document.createTextNode(" relationship"));
+          document.body.appendChild(popup);
+        }
+      });
+
+      cy.layout({
+        name: "dagre", rankDir: "TB",
+        nodeSep: 55, rankSep: 80,
+        fit: false, padding: 50,
+        animate: true, animationDuration: 400,
+      } as any).run();
+
+      // Fit after layout settles
       setTimeout(() => {
-        if (cyFsRef.current) {
-          cyFsRef.current.resize();
-          cyFsRef.current.fit(undefined, 50);
+        if ((container as any)._cy === cy) {
+          cy.resize();
+          cy.fit(undefined, 50);
         }
       }, 500);
     });
-  }, [dagData]);
+  }
 
-  // Poll fullscreen container size until ready
-  useEffect(() => {
-    if (!fullscreenOpen) return;
+  // ── UI helpers ─────────────────────────────────────────────────────────────
 
-    // Reset init guard when modal closes
-    fsInitRef.current = false;
+  const doZoom = (containerRef: React.RefObject<HTMLDivElement>, factor: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const cy = (el as any)._cy;
+    if (cy) cy.zoom(cy.zoom() * factor);
+  };
 
-    // Check size immediately
-    tryInitFullscreen();
-
-    // Poll every 100ms for up to 3 seconds
-    const interval = setInterval(() => {
-      if (!fullscreenOpen) { clearInterval(interval); return; }
-      tryInitFullscreen();
-    }, 100);
-
-    const timeout = setTimeout(() => clearInterval(interval), 3000);
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [fullscreenOpen, dagData, tryInitFullscreen]);
-
-  const handleCloseFullscreen = () => {
-    if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
-    removeDagPopups();
-    setFullscreenOpen(false);
+  const doFit = (containerRef: React.RefObject<HTMLDivElement>, padding: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const cy = (el as any)._cy;
+    if (cy) { cy.resize(); cy.fit(undefined, padding); }
   };
 
   const version = dagMeta?.data_version ?? "--";
@@ -589,16 +667,24 @@ export default function GOTermDagViewer({ goId }: Props) {
         </Group>
         <Group gap={2} align="flex-end" mt={4}>
           <Tooltip label="Zoom in">
-            <ActionIcon variant="light" size="sm" onClick={handleZoomIn}><IconZoomIn size={14} /></ActionIcon>
+            <ActionIcon variant="light" size="sm" onClick={() => doZoom(containerRef, 1.3)}>
+              <IconZoomIn size={14} />
+            </ActionIcon>
           </Tooltip>
           <Tooltip label="Zoom out">
-            <ActionIcon variant="light" size="sm" onClick={handleZoomOut}><IconZoomOut size={14} /></ActionIcon>
+            <ActionIcon variant="light" size="sm" onClick={() => doZoom(containerRef, 1 / 1.3)}>
+              <IconZoomOut size={14} />
+            </ActionIcon>
           </Tooltip>
           <Tooltip label="Fit to view">
-            <ActionIcon variant="light" size="sm" onClick={handleFit}><IconFocusCentered size={14} /></ActionIcon>
+            <ActionIcon variant="light" size="sm" onClick={() => doFit(containerRef, 30)}>
+              <IconFocusCentered size={14} />
+            </ActionIcon>
           </Tooltip>
           <Tooltip label="Fullscreen">
-            <ActionIcon variant="light" size="sm" onClick={handleOpenFullscreen}><IconMaximize size={14} /></ActionIcon>
+            <ActionIcon variant="light" size="sm" onClick={handleOpenFullscreen}>
+              <IconMaximize size={14} />
+            </ActionIcon>
           </Tooltip>
         </Group>
       </Group>
@@ -628,7 +714,7 @@ export default function GOTermDagViewer({ goId }: Props) {
         <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #666" }} /><Text size="xs">part_of</Text></Group>
       </Group>
 
-      {/* Main Cytoscape container */}
+      {/* Main container */}
       <Box
         ref={containerRef}
         style={{
@@ -680,7 +766,7 @@ export default function GOTermDagViewer({ goId }: Props) {
           header: { padding: "12px 16px" },
         }}
       >
-        {/* Fullscreen container with popup-safe wrapper */}
+        {/* Fullscreen graph container */}
         <Box
           ref={fullscreenContainerRef}
           style={{
@@ -691,15 +777,8 @@ export default function GOTermDagViewer({ goId }: Props) {
           }}
         />
 
-        {/* Floating controls — inside the same position:relative container */}
-        <Box
-          style={{
-            position: "absolute",
-            bottom: 24,
-            right: 24,
-            zIndex: 10,
-          }}
-        >
+        {/* Floating controls */}
+        <Box style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10 }}>
           <Box
             style={{
               background: "#fff",
@@ -710,22 +789,17 @@ export default function GOTermDagViewer({ goId }: Props) {
           >
             <Group gap={6}>
               <Tooltip label="Zoom in">
-                <ActionIcon variant="light" size="md" onClick={() => cyFsRef.current?.zoom(cyFsRef.current.zoom() * 1.3)}>
+                <ActionIcon variant="light" size="md" onClick={() => doZoom(fullscreenContainerRef, 1.3)}>
                   <IconZoomIn size={16} />
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Zoom out">
-                <ActionIcon variant="light" size="md" onClick={() => cyFsRef.current?.zoom(cyFsRef.current.zoom() / 1.3)}>
+                <ActionIcon variant="light" size="md" onClick={() => doZoom(fullscreenContainerRef, 1 / 1.3)}>
                   <IconZoomOut size={16} />
                 </ActionIcon>
               </Tooltip>
               <Tooltip label="Fit">
-                <ActionIcon variant="light" size="md" onClick={() => {
-                  if (cyFsRef.current) {
-                    cyFsRef.current.resize();
-                    cyFsRef.current.fit(undefined, 50);
-                  }
-                }}>
+                <ActionIcon variant="light" size="md" onClick={() => doFit(fullscreenContainerRef, 50)}>
                   <IconFocusCentered size={16} />
                 </ActionIcon>
               </Tooltip>
