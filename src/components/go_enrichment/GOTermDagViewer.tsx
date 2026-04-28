@@ -75,7 +75,7 @@ export default function GOTermDagViewer({ goId }: Props) {
       .catch(() => {});
   }, []);
 
-  // Preload Cytoscape + dagre on mount so first render is faster
+  // Preload Cytoscape + dagre on mount
   useEffect(() => {
     const preload = async () => {
       try {
@@ -85,30 +85,22 @@ export default function GOTermDagViewer({ goId }: Props) {
           cytoscape.use(dagreLayout);
           dagreRegistered = true;
         }
-        // Cache on window for cross-request reuse
         (window as any).__cyCache = { cytoscape, dagreLayout };
       } catch (_) {
-        // non-critical — will fall back to per-request import
+        // non-critical
       }
     };
     preload();
   }, []);
 
-  // Shared Cytoscape init (used by both normal and fullscreen instances)
+  // Shared Cytoscape init
   const initCytoscape = useCallback(
-    (
-      container: HTMLDivElement,
-      data: GoDagResponse,
-      isFullscreen = false,
-      existingCy: any
-    ) => {
+    (container: HTMLDivElement, data: GoDagResponse, isFullscreen = false) => {
       const cache = (window as any).__cyCache;
       const cytoscape = cache?.cytoscape;
       const dagreLayout = cache?.dagreLayout;
-
       if (!cytoscape || !dagreLayout) return null;
 
-      // Register dagre extension only once
       if (!dagreRegistered) {
         cytoscape.use(dagreLayout);
         dagreRegistered = true;
@@ -137,20 +129,11 @@ export default function GOTermDagViewer({ goId }: Props) {
         })),
       ];
 
-      if (existingCy) {
-        existingCy.destroy();
-      }
-
       const cy = cytoscape({
         container,
         elements,
         style: buildCyStyle(),
-        layout: {
-          name: "dagre",
-          rankDir: "TB",           // top-to-bottom: root at top, children below
-          nodeSep: isFullscreen ? 55 : 40,
-          rankSep: isFullscreen ? 80 : 60,
-        } as any,
+        layout: { name: "preset" } as any,
         wheelSensitivity: 0.3,
         minZoom: 0.2,
         maxZoom: 4,
@@ -161,12 +144,8 @@ export default function GOTermDagViewer({ goId }: Props) {
         document.querySelectorAll(".cy-popup").forEach((p) => p.remove());
       };
 
-      // Tap background -> close popup
       cy.on("tap", (evt: any) => {
-        if (evt.target === cy) {
-          removePopup();
-          return;
-        }
+        if (evt.target === cy) { removePopup(); return; }
         if (evt.target.isEdge()) {
           removePopup();
           const d = evt.target.data();
@@ -183,9 +162,8 @@ export default function GOTermDagViewer({ goId }: Props) {
           const relLabel = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
           const b = document.createElement("b");
           b.textContent = relLabel;
-          const s = document.createTextNode(" relationship");
           popup.appendChild(b);
-          popup.appendChild(s);
+          popup.appendChild(document.createTextNode(" relationship"));
           document.body.appendChild(popup);
           return;
         }
@@ -232,6 +210,20 @@ export default function GOTermDagViewer({ goId }: Props) {
         }
       });
 
+      // Run dagre layout immediately after init
+      const layoutOptions = {
+        name: "dagre",
+        rankDir: "TB" as const,
+        nodeSep: isFullscreen ? 55 : 40,
+        rankSep: isFullscreen ? 80 : 60,
+        fit: true,
+        padding: isFullscreen ? 50 : 30,
+        animate: true,
+        animationDuration: 300,
+      };
+
+      cy.layout(layoutOptions as any).run();
+
       return cy;
     },
     []
@@ -241,14 +233,8 @@ export default function GOTermDagViewer({ goId }: Props) {
   const fetchDag = useCallback(
     (dir: DagDirection, d: number, isa: boolean, part: boolean) => {
       cancelledRef.current = true;
-      if (cyRef.current) {
-        cyRef.current.destroy();
-        cyRef.current = null;
-      }
-      if (cyFsRef.current) {
-        cyFsRef.current.destroy();
-        cyFsRef.current = null;
-      }
+      if (cyRef.current) { cyRef.current.destroy(); cyRef.current = null; }
+      if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
 
       setLoading(true);
       setRendering(false);
@@ -267,42 +253,31 @@ export default function GOTermDagViewer({ goId }: Props) {
           if (cancelledRef.current) return;
           setDagData(data);
           setLoading(false);
-          // Begin Cytoscape rendering after data arrives
+
           if (!containerRef.current || cancelledRef.current) return;
           setRendering(true);
-          const wasCancelled = cancelledRef.current;
 
+          const wasCancelled = cancelledRef.current;
           const doInit = async () => {
-            // Use cache if available (preloaded), otherwise dynamic import
-            let cytoscape: any, dagreLayout: any;
             const cache = (window as any).__cyCache;
-            if (cache?.cytoscape && cache?.dagreLayout) {
-              cytoscape = cache.cytoscape;
-              dagreLayout = cache.dagreLayout;
-            } else {
-              cytoscape = (await import("cytoscape")).default;
-              dagreLayout = (await import("cytoscape-dagre")).default;
+            // Ensure cytoscape is available (use cache or dynamic import)
+            if (!cache?.cytoscape) {
+              const cytoscape = (await import("cytoscape")).default;
+              const dagreLayout = (await import("cytoscape-dagre")).default;
+              if (!dagreRegistered) {
+                cytoscape.use(dagreLayout);
+                dagreRegistered = true;
+              }
+              (window as any).__cyCache = { cytoscape, dagreLayout };
             }
             if (cancelledRef.current || wasCancelled) return;
             if (cyRef.current) return;
 
-            const cy = initCytoscape(containerRef.current, data, false, null);
+            const cy = initCytoscape(containerRef.current, data, false);
             if (cy) {
               cyRef.current = cy;
-              // Wait for layout to complete before hiding spinner
               cy.one("layoutstop", () => setRendering(false));
-              cy.layout({
-                name: "dagre",
-                rankDir: "TB",
-                nodeSep: 40,
-                rankSep: 60,
-                animate: true,
-                animationDuration: 300,
-                fit: true,
-                padding: 30,
-              } as any).run();
-              // Fallback: hide spinner after max render time
-              setTimeout(() => setRendering(false), 1200);
+              setTimeout(() => setRendering(false), 1500);
             } else {
               setRendering(false);
             }
@@ -329,7 +304,7 @@ export default function GOTermDagViewer({ goId }: Props) {
     };
   }, [fetchDag, direction, depth, includeIsA, includePartOf]);
 
-  // Rebuild graph when dagData changes without cyRef
+  // Rebuild if cyRef missing but dagData available
   useEffect(() => {
     if (!dagData || !containerRef.current || loading) return;
     if (dagData.nodes.length === 0) return;
@@ -338,204 +313,55 @@ export default function GOTermDagViewer({ goId }: Props) {
 
     const wasCancelled = cancelledRef.current;
     const doInit = async () => {
-      let cytoscape: any, dagreLayout: any;
       const cache = (window as any).__cyCache;
-      if (cache?.cytoscape && cache?.dagreLayout) {
-        cytoscape = cache.cytoscape;
-        dagreLayout = cache.dagreLayout;
-      } else {
-        cytoscape = (await import("cytoscape")).default;
-        dagreLayout = (await import("cytoscape-dagre")).default;
+      if (!cache?.cytoscape) {
+        const cytoscape = (await import("cytoscape")).default;
+        const dagreLayout = (await import("cytoscape-dagre")).default;
+        (window as any).__cyCache = { cytoscape, dagreLayout };
       }
       if (cancelledRef.current || wasCancelled) return;
       if (cyRef.current) return;
-      const cy = initCytoscape(containerRef.current, dagData, false, null);
+
+      const cy = initCytoscape(containerRef.current, dagData, false);
       if (cy) {
         cyRef.current = cy;
         cy.one("layoutstop", () => setRendering(false));
-        cy.layout({
-          name: "dagre",
-          rankDir: "TB",
-          nodeSep: 40,
-          rankSep: 60,
-          animate: true,
-          animationDuration: 300,
-          fit: true,
-          padding: 30,
-        } as any).run();
-        setTimeout(() => setRendering(false), 1200);
+        setTimeout(() => setRendering(false), 1500);
       }
     };
     doInit();
   }, [dagData, loading, initCytoscape]);
 
   const handleFit = () => cyRef.current?.fit(undefined, 30);
-  const handleZoomIn = () => {
-    const cy = cyRef.current;
-    if (cy) cy.zoom(cy.zoom() * 1.3);
-  };
-  const handleZoomOut = () => {
-    const cy = cyRef.current;
-    if (cy) cy.zoom(cy.zoom() / 1.3);
-  };
+  const handleZoomIn = () => cyRef.current?.zoom(cyRef.current.zoom() * 1.3);
+  const handleZoomOut = () => cyRef.current?.zoom(cyRef.current.zoom() / 1.3);
 
-  // Open fullscreen modal
-  const handleOpenFullscreen = () => {
-    setFullscreenOpen(true);
-  };
+  const handleOpenFullscreen = () => setFullscreenOpen(true);
 
-  // Init fullscreen Cytoscape after modal is mounted
-  const handleFullscreenOpened = async () => {
-    if (cancelledRef.current || !fullscreenRef.current || !dagData) return;
-    if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
+  const handleFullscreenOpened = () => {
+    // Use setTimeout to ensure Modal has fully painted + animated
+    // This is the critical fix for white-screen: container must have non-zero size
+    const tryInit = () => {
+      if (!fullscreenRef.current || !dagData || cancelledRef.current) return;
+      const { offsetWidth, offsetHeight } = fullscreenRef.current;
+      if (offsetWidth === 0 || offsetHeight === 0) return; // keep waiting
 
-    let cytoscape: any, dagreLayout: any;
-    const cache = (window as any).__cyCache;
-    if (cache?.cytoscape && cache?.dagreLayout) {
-      cytoscape = cache.cytoscape;
-      dagreLayout = cache.dagreLayout;
-    } else {
-      cytoscape = (await import("cytoscape")).default;
-      dagreLayout = (await import("cytoscape-dagre")).default;
-    }
-    if (cancelledRef.current) return;
+      if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
 
-    const cy = cytoscape({
-      container: fullscreenRef.current,
-      elements: [
-        ...dagData.nodes.map((n) => ({
-          data: {
-            id: n.id,
-            label: `${n.id}\n${truncate(n.label, 40)}`,
-            fullLabel: n.label,
-            namespace: n.namespace,
-            isCenter: n.is_center,
-            depth: n.depth,
-            geneCountDirect: n.gene_count_direct ?? 0,
-            geneCountPropagated: n.gene_count_propagated ?? 0,
-          },
-        })),
-        ...dagData.edges.map((e) => ({
-          data: {
-            id: `${e.source}-${e.target}-${e.relation}`,
-            source: e.source,
-            target: e.target,
-            relation: e.relation,
-          },
-        })),
-      ],
-      style: buildCyStyle(),
-      layout: {
-        name: "dagre",
-        rankDir: "TB",
-        nodeSep: 60,
-        rankSep: 90,
-        fit: false,
-      } as any,
-      wheelSensitivity: 0.3,
-      minZoom: 0.1,
-      maxZoom: 5,
-    });
+      const cache = (window as any).__cyCache;
+      if (!cache?.cytoscape) return;
 
-    cyFsRef.current = cy;
-
-    // CRITICAL: use ResizeObserver to wait for modal to paint before fitting
-    // This prevents white-screen because the container has 0 size on first render
-    let fitted = false;
-    const fitGraph = () => {
-      if (fitted || !cyFsRef.current) return;
-      const el = fullscreenRef.current;
-      if (!el) return;
-      const { offsetWidth, offsetHeight } = el;
-      if (offsetWidth === 0 || offsetHeight === 0) return;
-      fitted = true;
-      cyFsRef.current.resize();
-      cyFsRef.current.fit(undefined, 50);
+      const cy = initCytoscape(fullscreenRef.current, dagData, true);
+      if (cy) cyFsRef.current = cy;
     };
 
-    // Try immediately (if modal already painted)
-    fitGraph();
-
-    // Also try after a delay (modal animation may still be running)
-    setTimeout(fitGraph, 250);
-    setTimeout(fitGraph, 600);
-
-    // Fullscreen popup reuse same handlers as main graph via tap on cy
-    const removePopup = () => {
-      document.querySelectorAll(".cy-popup").forEach((p) => p.remove());
-    };
-    cy.on("tap", (evt: any) => {
-      if (evt.target === cy) { removePopup(); return; }
-      if (evt.target.isEdge()) {
-        removePopup();
-        const d = evt.target.data();
-        const popup = document.createElement("div");
-        popup.className = "cy-popup";
-        popup.style.cssText = `
-          position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 80)}px;
-          left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 240)}px;
-          background:#fff; border:1px solid #ddd; border-radius:6px;
-          padding:6px 10px; font-size:12px; z-index:99999;
-          box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-          pointer-events:none;
-        `;
-        const relLabel = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
-        const b = document.createElement("b");
-        b.textContent = relLabel;
-        popup.appendChild(b);
-        popup.appendChild(document.createTextNode(" relationship"));
-        document.body.appendChild(popup);
-        return;
-      }
-      if (evt.target.isNode()) {
-        removePopup();
-        const d = evt.target.data();
-        const popup = document.createElement("div");
-        popup.className = "cy-popup";
-        popup.style.cssText = `
-          position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 230)}px;
-          left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 330)}px;
-          background:#fff; border:1px solid #ddd; border-radius:6px;
-          padding:8px 12px; font-size:12px; max-width:300px; z-index:99999;
-          box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-          pointer-events:none;
-        `;
-        const mk = (txt: string, style?: Partial<CSSStyleDeclaration>) => {
-          const el = document.createElement("span");
-          if (style) Object.assign(el.style, style);
-          el.textContent = txt;
-          return el;
-        };
-        popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk(d.fullLabel, { color: "#555" }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk("Direct: "));
-        const db = document.createElement("b");
-        db.textContent = String(d.geneCountDirect);
-        popup.appendChild(db);
-        popup.appendChild(document.createElement("br"));
-        const pb = document.createElement("b");
-        pb.textContent = String(d.geneCountPropagated);
-        const pn = document.createElement("span");
-        pn.style.color = "#aaa";
-        pn.style.fontSize = "10px";
-        pn.textContent = " (via full closure)";
-        popup.appendChild(mk("Propagated: "));
-        popup.appendChild(pb);
-        popup.appendChild(pn);
-        document.body.appendChild(popup);
-      }
-    });
+    // Try at multiple intervals to handle different modal animation speeds
+    const intervals = [100, 300, 600, 1000];
+    intervals.forEach((ms) => setTimeout(tryInit, ms));
   };
 
   const handleCloseFullscreen = () => {
-    if (cyFsRef.current) {
-      cyFsRef.current.destroy();
-      cyFsRef.current = null;
-    }
+    if (cyFsRef.current) { cyFsRef.current.destroy(); cyFsRef.current = null; }
     setFullscreenOpen(false);
   };
 
@@ -718,49 +544,64 @@ export default function GOTermDagViewer({ goId }: Props) {
         }
         size="100%"
         styles={{
-          content: { display: "flex", flexDirection: "column", height: "100vh" },
-          body: { flex: 1, display: "flex", flexDirection: "column", padding: 0, gap: 0 },
+          content: { display: "flex", flexDirection: "column" },
+          body: { flex: 1, display: "flex", flexDirection: "column", padding: 0 },
+          header: { padding: "12px 16px" },
         }}
       >
+        {/* Fullscreen container: needs position:relative so controls overlay works */}
         <Box
           ref={fullscreenRef}
           style={{
             flex: 1,
+            minHeight: 0,
             background: "#fafafa",
             position: "relative",
           }}
         />
-        {/* Floating controls overlay */}
+
+        {/* Floating controls overlay — position:absolute relative to the container */}
         <Box
           style={{
             position: "absolute",
             bottom: 24,
             right: 24,
             zIndex: 10,
+            pointerEvents: "none",
           }}
         >
-          <Group gap={6} style={{ background: "#fff", borderRadius: 8, padding: "8px 10px", boxShadow: "0 2px 12px rgba(0,0,0,0.18)" }}>
-            <Tooltip label="Zoom in">
-              <ActionIcon variant="light" size="md" onClick={() => cyFsRef.current?.zoom(cyFsRef.current.zoom() * 1.3)}>
-                <IconZoomIn size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Zoom out">
-              <ActionIcon variant="light" size="md" onClick={() => cyFsRef.current?.zoom(cyFsRef.current.zoom() / 1.3)}>
-                <IconZoomOut size={16} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label="Fit">
-              <ActionIcon variant="light" size="md" onClick={() => {
-                if (cyFsRef.current) {
-                  cyFsRef.current.resize();
-                  cyFsRef.current.fit(undefined, 50);
-                }
-              }}>
-                <IconFocusCentered size={16} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
+          <Box
+            style={{
+              pointerEvents: "auto",
+              background: "#fff",
+              borderRadius: 8,
+              padding: "8px 10px",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+            }}
+          >
+            <Group gap={6}>
+              <Tooltip label="Zoom in">
+                <ActionIcon variant="light" size="md" onClick={() => cyFsRef.current?.zoom(cyFsRef.current.zoom() * 1.3)}>
+                  <IconZoomIn size={16} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Zoom out">
+                <ActionIcon variant="light" size="md" onClick={() => cyFsRef.current?.zoom(cyFsRef.current.zoom() / 1.3)}>
+                  <IconZoomOut size={16} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Fit">
+                <ActionIcon variant="light" size="md" onClick={() => {
+                  if (cyFsRef.current) {
+                    cyFsRef.current.resize();
+                    cyFsRef.current.fit(undefined, 50);
+                  }
+                }}>
+                  <IconFocusCentered size={16} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </Box>
         </Box>
       </Modal>
     </Stack>
