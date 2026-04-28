@@ -44,7 +44,7 @@ const NS_LABELS: Record<string, string> = {
   molecular_function: "MF",
 };
 
-// ─── Cytoscape Loader (module-level singleton) ───────────────────────────────
+// ─── Cytoscape Loader ────────────────────────────────────────────────────────
 
 type CyDeps = { cytoscape: any; dagreLayout: any };
 let cyLoader: Promise<CyDeps> | null = null;
@@ -64,10 +64,73 @@ function loadCytoscape(): Promise<CyDeps> {
 // ─── Popup helpers ─────────────────────────────────────────────────────────
 
 function removeDagPopups() {
-  document.querySelectorAll(".cy-popup").forEach((p) => p.remove());
+  try {
+    const popups = document.querySelectorAll(".cy-popup");
+    for (let i = 0; i < popups.length; i++) {
+      try { popups[i].remove(); } catch { /* already detached */ }
+    }
+  } catch { /* querySelectorAll failed */ }
 }
 
-// ─── Cytoscape element builder ───────────────────────────────────────────────
+function showNodePopup(node: any, clientX: number, clientY: number) {
+  removeDagPopups();
+  const d = node.data();
+  const popup = document.createElement("div");
+  popup.className = "cy-popup";
+  popup.style.cssText = [
+    "position:fixed",
+    `top:${Math.min(clientY + 10, window.innerHeight - 230)}px`,
+    `left:${Math.min(clientX + 10, window.innerWidth - 330)}px`,
+    "background:#fff;border:1px solid #ddd;border-radius:6px",
+    "padding:8px 12px;font-size:12px;max-width:300px;z-index:99999",
+    "box-shadow:0 2px 8px rgba(0,0,0,0.15);font-family:monospace",
+    "pointer-events:none",
+  ].join(";");
+
+  const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
+    const e = Object.assign(document.createElement("span"), { textContent: t });
+    if (s) Object.assign(e.style, s);
+    return e;
+  };
+
+  popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
+  popup.appendChild(document.createElement("br"));
+  popup.appendChild(mk(d.fullLabel, { color: "#555" }));
+  popup.appendChild(document.createElement("br"));
+  popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
+  popup.appendChild(document.createElement("br"));
+  popup.appendChild(mk("Direct: "));
+  popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
+  popup.appendChild(document.createElement("br"));
+  popup.appendChild(mk("Propagated: "));
+  popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
+  popup.appendChild(Object.assign(document.createElement("span"), {
+    textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" }
+  }));
+  document.body.appendChild(popup);
+}
+
+function showEdgePopup(edge: any, clientX: number, clientY: number) {
+  removeDagPopups();
+  const d = edge.data();
+  const popup = document.createElement("div");
+  popup.className = "cy-popup";
+  popup.style.cssText = [
+    "position:fixed",
+    `top:${Math.min(clientY + 10, window.innerHeight - 80)}px`,
+    `left:${Math.min(clientX + 10, window.innerWidth - 240)}px`,
+    "background:#fff;border:1px solid #ddd;border-radius:6px",
+    "padding:6px 10px;font-size:12px;z-index:99999",
+    "box-shadow:0 2px 8px rgba(0,0,0,0.15);font-family:monospace",
+    "pointer-events:none",
+  ].join(";");
+  const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
+  popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
+  popup.appendChild(document.createTextNode(" relationship"));
+  document.body.appendChild(popup);
+}
+
+// ─── Graph builders ──────────────────────────────────────────────────────────
 
 function buildCyElements(data: GoDagResponse): any[] {
   return [
@@ -166,18 +229,20 @@ function buildCyStyle(): any[] {
   ];
 }
 
-// ─── Cytoscape instance builder ──────────────────────────────────────────────
-// Stores live cy instance on container._cy for external access (zoom/fit buttons)
+// ─── Mount Cytoscape into a container ──────────────────────────────────────
+// Returns a destroy() function.
 
-function createCytoscape(opts: {
+function mountCytoscape(opts: {
   container: HTMLDivElement;
   data: GoDagResponse;
   isFullscreen: boolean;
-  onReady?: (cy: any) => void;
-}): void {
+  onLayoutDone?: () => void;
+}): () => void {
   let disposed = false;
+  let resolvedCy: any = null;
 
-  loadCytoscape().then(({ cytoscape, dagreLayout }) => {
+  loadCytoscape()
+  .then(({ cytoscape, dagreLayout }) => {
     if (disposed || !opts.container) return;
 
     if (!dagreRegistered) {
@@ -193,94 +258,61 @@ function createCytoscape(opts: {
       style: buildCyStyle(),
       layout: { name: "preset" } as any,
       wheelSensitivity: 0.3,
-      minZoom: 0.15,
-      maxZoom: 5,
+      minZoom: 0.1,
+      maxZoom: opts.isFullscreen ? 5 : 4,
     });
 
-    // Store on container for zoom/fit access
+    resolvedCy = cy;
     (opts.container as any)._cy = cy;
 
     if (disposed) { cy.destroy(); return; }
 
-    // Tap handlers
-    cy.on("tap", (evt: any) => {
-      if (evt.target === cy) { removeDagPopups(); return; }
-      const d = evt.target.data();
-
-      if (evt.target.isNode()) {
-        removeDagPopups();
-        const popup = document.createElement("div");
-        popup.className = "cy-popup";
-        popup.style.cssText = `
-          position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 230)}px;
-          left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 330)}px;
-          background:#fff; border:1px solid #ddd; border-radius:6px;
-          padding:8px 12px; font-size:12px; max-width:300px; z-index:99999;
-          box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-          pointer-events:none;
-        `;
-        const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
-          const e = Object.assign(document.createElement("span"), { textContent: t });
-          if (s) Object.assign(e.style, s);
-          return e;
-        };
-        popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk(d.fullLabel, { color: "#555" }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk("Direct: "));
-        popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
-        popup.appendChild(document.createElement("br"));
-        popup.appendChild(mk("Propagated: "));
-        popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
-        popup.appendChild(Object.assign(document.createElement("span"), { textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" } }));
-        document.body.appendChild(popup);
-      } else if (evt.target.isEdge()) {
-        removeDagPopups();
-        const popup = document.createElement("div");
-        popup.className = "cy-popup";
-        popup.style.cssText = `
-          position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 80)}px;
-          left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 240)}px;
-          background:#fff; border:1px solid #ddd; border-radius:6px;
-          padding:6px 10px; font-size:12px; z-index:99999;
-          box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-          pointer-events:none;
-        `;
-        const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
-        popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
-        popup.appendChild(document.createTextNode(" relationship"));
-        document.body.appendChild(popup);
-      }
+    // Selector-based tap handlers
+    cy.on("tap", "node", (evt: any) => {
+      showNodePopup(evt.target, evt.originalEvent.clientX, evt.originalEvent.clientY);
     });
 
-    // Run dagre layout — register listener BEFORE run()
-    const layoutOpts = {
-      name: "dagre" as const,
-      rankDir: "TB" as const,
+    cy.on("tap", "edge", (evt: any) => {
+      showEdgePopup(evt.target, evt.originalEvent.clientX, evt.originalEvent.clientY);
+    });
+
+    // Tap on background → close popups
+    cy.on("tap", (evt: any) => {
+      if (evt.target === cy) removeDagPopups();
+    });
+
+    // Register layoutstop listener BEFORE running layout
+    cy.one("layoutstop", () => {
+      if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
+    });
+
+    cy.layout({
+      name: "dagre",
+      rankDir: "TB",
       nodeSep: opts.isFullscreen ? 55 : 40,
       rankSep: opts.isFullscreen ? 80 : 60,
       fit: true,
       padding: opts.isFullscreen ? 50 : 30,
       animate: true,
       animationDuration: 400,
-    };
+    } as any).run();
 
-    cy.one("layoutstop", () => {
-      if (disposed) return;
-      if (opts.onReady) opts.onReady(cy);
-    });
-
-    cy.layout(layoutOpts as any).run();
-
-    // Safety fallback
+    // Safety fallback for layoutstop
     setTimeout(() => {
-      if (disposed) return;
-      if (opts.onReady) opts.onReady(cy);
+      if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
     }, 2000);
+  })
+  .catch((err) => {
+    console.error("[GOTermDagViewer] Cytoscape mount failed:", err);
   });
+
+  return function destroy() {
+    disposed = true;
+    if (opts.container) (opts.container as any)._cy = null;
+    if (resolvedCy) {
+      try { resolvedCy.destroy(); } catch { /* already destroyed */ }
+    }
+  };
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -304,14 +336,17 @@ export default function GOTermDagViewer({ goId }: Props) {
   const [dagMeta, setDagMeta] = useState<GoDagMetadata | null>(null);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
-  // Destroy callbacks for cleanup
+  // Lifecycle refs
   const mainDestroyRef = useRef<(() => void) | null>(null);
   const fsDestroyRef = useRef<(() => void) | null>(null);
+  const fetchCountRef = useRef(0); // track fetch cycles to ignore stale responses
 
+  // Load metadata once
   useEffect(() => {
     getGODagMetadata().then(setDagMeta).catch(() => {});
   }, []);
 
+  // Preload cytoscape on mount
   useEffect(() => {
     loadCytoscape().catch(() => {});
   }, []);
@@ -320,17 +355,9 @@ export default function GOTermDagViewer({ goId }: Props) {
 
   const fetchDag = useCallback(
     (dir: DagDirection, d: number, isa: boolean, part: boolean) => {
-      // Cleanup existing instances
-      if (mainDestroyRef.current) {
-        mainDestroyRef.current();
-        mainDestroyRef.current = null;
-      }
-      if (fsDestroyRef.current) {
-        fsDestroyRef.current();
-        fsDestroyRef.current = null;
-      }
-      if (containerRef.current) (containerRef.current as any)._cy = null;
-      if (fullscreenContainerRef.current) (fullscreenContainerRef.current as any)._cy = null;
+      // Cleanup existing instances synchronously
+      if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
+      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
       removeDagPopups();
 
       setLoading(true);
@@ -338,16 +365,21 @@ export default function GOTermDagViewer({ goId }: Props) {
       setErrorMsg(null);
       setDagData(null);
 
+      const fetchId = ++fetchCountRef.current;
+
       getGOTermDag(goId, {
         direction: dir, depth: d,
         include_is_a: isa, include_part_of: part,
         max_nodes: 80,
       })
         .then((data) => {
+          // Ignore stale responses
+          if (fetchId !== fetchCountRef.current) return;
           setDagData(data);
           setLoading(false);
         })
         .catch((err: Error) => {
+          if (fetchId !== fetchCountRef.current) return;
           setErrorMsg(err.message ?? "Failed to load DAG");
           setLoading(false);
         });
@@ -357,272 +389,172 @@ export default function GOTermDagViewer({ goId }: Props) {
 
   useEffect(() => {
     fetchDag(direction, depth, includeIsA, includePartOf);
-    return () => {
-      if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
-      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
-      removeDagPopups();
-    };
   }, [fetchDag, direction, depth, includeIsA, includePartOf]);
 
   // ── Main graph effect ─────────────────────────────────────────────────────
 
+  // No `loading` in deps — only dagData triggers (or re-trigger via fetchDag)
   useEffect(() => {
-    if (!dagData || !containerRef.current || loading) return;
+    if (!dagData || !containerRef.current) return;
     if (dagData.nodes.length === 0) return;
-    if ((containerRef.current as any)._cy) return; // already has instance
+
+    const el = containerRef.current;
+
+    // Skip if already mounted
+    if ((el as any)._cy) return;
 
     setRendering(true);
-    let destroyed = false;
 
-    loadCytoscape().then(({ cytoscape, dagreLayout }) => {
-      if (destroyed) return;
+    // Guard: ensure container has non-zero size before mounting
+    if (el.offsetWidth === 0 || el.offsetHeight === 0) {
+      let ro: ResizeObserver | null = null;
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout>;
 
-      if (!dagreRegistered) {
-        cytoscape.use(dagreLayout);
-        dagreRegistered = true;
-      }
+      const tryInit = () => {
+        if (settled || !containerRef.current) return;
+        const container = containerRef.current;
+        if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
+        settled = true;
+        if (ro) { ro.disconnect(); ro = null; }
+        clearTimeout(timeout);
 
-      const elements = buildCyElements(dagData);
+        if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
+        removeDagPopups();
 
-      const cy = cytoscape({
-        container: containerRef.current,
-        elements,
-        style: buildCyStyle(),
-        layout: { name: "preset" } as any,
-        wheelSensitivity: 0.3,
-        minZoom: 0.15,
-        maxZoom: 4,
-      });
-
-      (containerRef.current as any)._cy = cy;
-
-      cy.on("tap", (evt: any) => {
-        if (evt.target === cy) { removeDagPopups(); return; }
-        const d = evt.target.data();
-
-        if (evt.target.isNode()) {
-          removeDagPopups();
-          const popup = document.createElement("div");
-          popup.className = "cy-popup";
-          popup.style.cssText = `
-            position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 230)}px;
-            left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 330)}px;
-            background:#fff; border:1px solid #ddd; border-radius:6px;
-            padding:8px 12px; font-size:12px; max-width:300px; z-index:99999;
-            box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-            pointer-events:none;
-          `;
-          const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
-            const e = Object.assign(document.createElement("span"), { textContent: t });
-            if (s) Object.assign(e.style, s);
-            return e;
-          };
-          popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk(d.fullLabel, { color: "#555" }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk("Direct: "));
-          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk("Propagated: "));
-          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
-          popup.appendChild(Object.assign(document.createElement("span"), { textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" } }));
-          document.body.appendChild(popup);
-        } else if (evt.target.isEdge()) {
-          removeDagPopups();
-          const popup = document.createElement("div");
-          popup.className = "cy-popup";
-          popup.style.cssText = `
-            position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 80)}px;
-            left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 240)}px;
-            background:#fff; border:1px solid #ddd; border-radius:6px;
-            padding:6px 10px; font-size:12px; z-index:99999;
-            box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-            pointer-events:none;
-          `;
-          const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
-          popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
-          popup.appendChild(document.createTextNode(" relationship"));
-          document.body.appendChild(popup);
-        }
-      });
-
-      mainDestroyRef.current = () => {
-        destroyed = true;
-        if (containerRef.current) (containerRef.current as any)._cy = null;
-        cy.destroy();
+        const destroy = mountCytoscape({
+          container,
+          data: dagData!,
+          isFullscreen: false,
+          onLayoutDone: () => setRendering(false),
+        });
+        mainDestroyRef.current = destroy;
       };
 
-      cy.one("layoutstop", () => { if (!destroyed) setRendering(false); });
+      tryInit();
 
-      cy.layout({
-        name: "dagre", rankDir: "TB",
-        nodeSep: 40, rankSep: 60,
-        fit: true, padding: 30,
-        animate: true, animationDuration: 400,
-      } as any).run();
+      ro = new ResizeObserver(() => { if (!settled) tryInit(); });
+      ro.observe(el);
 
-      setTimeout(() => { if (!destroyed) setRendering(false); }, 2000);
+      timeout = setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          if (ro) { ro.disconnect(); ro = null; }
+          if (containerRef.current && !((containerRef.current as any)._cy)) tryInit();
+        }
+      }, 1500);
+
+      return () => {
+        settled = true;
+        if (ro) { ro.disconnect(); ro = null; }
+        clearTimeout(timeout);
+        if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
+      };
+    }
+
+    removeDagPopups();
+
+    const destroy = mountCytoscape({
+      container: el,
+      data: dagData,
+      isFullscreen: false,
+      onLayoutDone: () => setRendering(false),
     });
+    mainDestroyRef.current = destroy;
 
     return () => {
-      if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
+      destroy();
+      mainDestroyRef.current = null;
     };
-  }, [dagData, loading]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [dagData]); // intentionally omitting `loading` — fetchDag manages it
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
 
   const handleOpenFullscreen = () => {
-    if (containerRef.current) {
-      const cy = (containerRef.current as any)._cy;
-      if (cy && fullscreenContainerRef.current) {
-        (fullscreenContainerRef.current as any)._cy = cy;
-      }
-    }
+    if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
     setFullscreenOpen(true);
   };
 
   const handleCloseFullscreen = () => {
+    if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
+    removeDagPopups();
     setFullscreenOpen(false);
   };
 
-  // When fullscreen modal opens, init Cytoscape in the fullscreen container
+  // Fullscreen init — triggered when modal is open AND dagData is ready
   useEffect(() => {
-    if (!fullscreenOpen) return;
-    if (!dagData) return;
-    if (!fullscreenContainerRef.current) return;
-    if ((fullscreenContainerRef.current as any)._cy) return; // already has cy
+    if (!fullscreenOpen || !dagData) return;
 
-    // Poll container size until ready
-    let pollCount = 0;
-    const poll = setInterval(() => {
-      pollCount++;
-      const el = fullscreenContainerRef.current;
-      if (!el) { clearInterval(poll); return; }
-      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-        clearInterval(poll);
-        initFullscreenCy();
-      } else if (pollCount > 60) { // 60 * 50ms = 3s timeout
-        clearInterval(poll);
-      }
-    }, 50);
+    const el = fullscreenContainerRef.current;
+    if (!el) return;
+    if ((el as any)._cy) return; // already mounted
 
-    return () => clearInterval(poll);
+    let settled = false;
+    let ro: ResizeObserver | null = null;
+    let retryTimeout: ReturnType<typeof setTimeout>;
+
+    const tryInit = () => {
+      if (settled || !fullscreenContainerRef.current) return;
+      const container = fullscreenContainerRef.current;
+
+      // Skip if container has no size yet — ResizeObserver will retry
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
+
+      settled = true;
+      if (ro) { ro.disconnect(); ro = null; }
+      clearTimeout(retryTimeout);
+
+      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
+      removeDagPopups();
+
+      const destroy = mountCytoscape({
+        container,
+        data: dagData,
+        isFullscreen: true,
+        onLayoutDone: undefined,
+      });
+      fsDestroyRef.current = destroy;
+
+      // Fit after layout runs
+      setTimeout(() => {
+        const cy = (container as any)._cy;
+        if (cy) { cy.resize(); cy.fit(undefined, 50); }
+      }, 600);
+    };
+
+    // ResizeObserver handles retry when Modal expands
+    ro = new ResizeObserver(() => {
+      if (!settled) tryInit();
+    });
+    ro.observe(el);
+
+    // Backup setTimeout in case ResizeObserver misses the resize
+    retryTimeout = setTimeout(() => {
+      if (!settled) tryInit();
+    }, 1500);
+
+    // Also try immediately once DOM has had a chance to paint
+    requestAnimationFrame(() => { if (!settled) tryInit(); });
+
+    return () => {
+      settled = true;
+      if (ro) ro.disconnect();
+      clearTimeout(retryTimeout);
+    };
   }, [fullscreenOpen, dagData]);
 
-  function initFullscreenCy() {
-    if (!fullscreenContainerRef.current || !dagData) return;
-    if ((fullscreenContainerRef.current as any)._cy) return;
+  // ── Toolbar helpers ──────────────────────────────────────────────────────
 
-    const container = fullscreenContainerRef.current;
-
-    loadCytoscape().then(({ cytoscape, dagreLayout }) => {
-      if (!dagreRegistered) {
-        cytoscape.use(dagreLayout);
-        dagreRegistered = true;
-      }
-
-      const elements = buildCyElements(dagData);
-      const cy = cytoscape({
-        container,
-        elements,
-        style: buildCyStyle(),
-        layout: { name: "preset" } as any,
-        wheelSensitivity: 0.3,
-        minZoom: 0.1,
-        maxZoom: 5,
-      });
-
-      (container as any)._cy = cy;
-
-      fsDestroyRef.current = () => {
-        (container as any)._cy = null;
-        cy.destroy();
-      };
-
-      cy.on("tap", (evt: any) => {
-        if (evt.target === cy) { removeDagPopups(); return; }
-        const d = evt.target.data();
-
-        if (evt.target.isNode()) {
-          removeDagPopups();
-          const popup = document.createElement("div");
-          popup.className = "cy-popup";
-          popup.style.cssText = `
-            position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 230)}px;
-            left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 330)}px;
-            background:#fff; border:1px solid #ddd; border-radius:6px;
-            padding:8px 12px; font-size:12px; max-width:300px; z-index:99999;
-            box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-            pointer-events:none;
-          `;
-          const mk = (t: string, s?: Partial<CSSStyleDeclaration>) => {
-            const e = Object.assign(document.createElement("span"), { textContent: t });
-            if (s) Object.assign(e.style, s);
-            return e;
-          };
-          popup.appendChild(mk(d.id, { fontWeight: "bold", fontSize: "11px" }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk(d.fullLabel, { color: "#555" }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk(`${NS_LABELS[d.namespace] ?? d.namespace}  depth=${d.depth}`, { color: "#888" }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk("Direct: "));
-          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountDirect) }));
-          popup.appendChild(document.createElement("br"));
-          popup.appendChild(mk("Propagated: "));
-          popup.appendChild(Object.assign(document.createElement("b"), { textContent: String(d.geneCountPropagated) }));
-          popup.appendChild(Object.assign(document.createElement("span"), { textContent: " (via full closure)", style: { color: "#aaa", fontSize: "10px" } }));
-          document.body.appendChild(popup);
-        } else if (evt.target.isEdge()) {
-          removeDagPopups();
-          const popup = document.createElement("div");
-          popup.className = "cy-popup";
-          popup.style.cssText = `
-            position:fixed; top:${Math.min(evt.originalEvent.clientY + 10, window.innerHeight - 80)}px;
-            left:${Math.min(evt.originalEvent.clientX + 10, window.innerWidth - 240)}px;
-            background:#fff; border:1px solid #ddd; border-radius:6px;
-            padding:6px 10px; font-size:12px; z-index:99999;
-            box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
-            pointer-events:none;
-          `;
-          const label = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
-          popup.appendChild(Object.assign(document.createElement("b"), { textContent: label }));
-          popup.appendChild(document.createTextNode(" relationship"));
-          document.body.appendChild(popup);
-        }
-      });
-
-      cy.layout({
-        name: "dagre", rankDir: "TB",
-        nodeSep: 55, rankSep: 80,
-        fit: false, padding: 50,
-        animate: true, animationDuration: 400,
-      } as any).run();
-
-      // Fit after layout settles
-      setTimeout(() => {
-        if ((container as any)._cy === cy) {
-          cy.resize();
-          cy.fit(undefined, 50);
-        }
-      }, 500);
-    });
-  }
-
-  // ── UI helpers ─────────────────────────────────────────────────────────────
-
-  const doZoom = (containerRef: React.RefObject<HTMLDivElement>, factor: number) => {
-    const el = containerRef.current;
+  const doZoom = (ref: React.RefObject<HTMLDivElement>, factor: number) => {
+    const el = ref.current;
     if (!el) return;
     const cy = (el as any)._cy;
     if (cy) cy.zoom(cy.zoom() * factor);
   };
 
-  const doFit = (containerRef: React.RefObject<HTMLDivElement>, padding: number) => {
-    const el = containerRef.current;
+  const doFit = (ref: React.RefObject<HTMLDivElement>, padding: number) => {
+    const el = ref.current;
     if (!el) return;
     const cy = (el as any)._cy;
     if (cy) { cy.resize(); cy.fit(undefined, padding); }
@@ -714,7 +646,7 @@ export default function GOTermDagViewer({ goId }: Props) {
         <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #666" }} /><Text size="xs">part_of</Text></Group>
       </Group>
 
-      {/* Main container */}
+      {/* Main Cytoscape container */}
       <Box
         ref={containerRef}
         style={{
@@ -725,7 +657,7 @@ export default function GOTermDagViewer({ goId }: Props) {
           position: "relative",
         }}
       >
-        {(loading || rendering) && (
+        {loading && (
           <Box
             style={{
               position: "absolute", inset: 0,
@@ -733,12 +665,21 @@ export default function GOTermDagViewer({ goId }: Props) {
               background: "rgba(250,250,250,0.9)", zIndex: 3,
             }}
           >
-            <Text c="dimmed" size="sm">
-              {loading ? "Loading DAG..." : "Rendering graph..."}
-            </Text>
+            <Text c="dimmed" size="sm">Loading DAG...</Text>
           </Box>
         )}
-        {!loading && !rendering && !errorMsg && dagData && dagData.nodes.length === 0 && (
+        {!loading && rendering && (
+          <Box
+            style={{
+              position: "absolute", inset: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: "rgba(250,250,250,0.85)", zIndex: 2,
+            }}
+          >
+            <Text c="dimmed" size="sm">Rendering graph...</Text>
+          </Box>
+        )}
+        {!loading && !rendering && dagData && dagData.nodes.length === 0 && (
           <Box style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Text c="dimmed" size="sm">No DAG relationships found for this term with current filters.</Text>
           </Box>
@@ -761,17 +702,19 @@ export default function GOTermDagViewer({ goId }: Props) {
         }
         size="100%"
         styles={{
-          content: { display: "flex", flexDirection: "column" },
-          body: { flex: 1, display: "flex", flexDirection: "column", padding: 0 },
-          header: { padding: "12px 16px" },
+          root: { top: 0, left: 0 },
+          content: { width: "100vw", height: "100vh", display: "flex", flexDirection: "column" },
+          body: { flex: 1, display: "flex", flexDirection: "column", padding: 0, minHeight: 0 },
+          header: { padding: "12px 16px", flexShrink: 0 },
         }}
       >
-        {/* Fullscreen graph container */}
+        {/* Fullscreen graph container — explicit height so flex:1 always has a defined size */}
         <Box
           ref={fullscreenContainerRef}
           style={{
             flex: 1,
             minHeight: 0,
+            height: "100%",
             background: "#fafafa",
             position: "relative",
           }}
