@@ -252,9 +252,9 @@ export default function GOEnrichmentPage() {
             <Select
               label="Evidence"
               data={[
-                { value: "all", label: "All evidence" },
-                { value: "non_iea", label: "Exclude IEA (non-electronic)" },
-                { value: "experimental", label: "Non-IEA curated (ISS/ISA/IBA excluded)" },
+                { value: "all", label: "All evidence (incl. electronic)" },
+                { value: "non_iea", label: "Exclude IEA only" },
+                { value: "experimental", label: "Curated only (no ISS/ISA/IBA)" },
               ]}
               value={evidenceFilter}
               onChange={(v) => v && setEvidenceFilter(v)}

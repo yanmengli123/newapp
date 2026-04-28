@@ -201,12 +201,13 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
 - `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
 
-### GO Enrichment — SEA (5, prefix `/go-enrichment`)
+### GO Enrichment — SEA (6, prefix `/go-enrichment`)
 - `POST /go-enrichment/analyze` — Singular Enrichment Analysis for Gallus gallus GRCg6a genes. Params: `gene_list`, `correction` (bh/by/bonferroni/none), `fdr_cutoff` (0–1), `min_overlap` (≥1), `namespace` (all/biological_process/cellular_component/molecular_function), `annotation_mode` (direct/propagated), `evidence_filter` (all/non_iea/experimental). FDR correction applied per ontology (BP/CC/MF corrected separately within each namespace). Returns `results[]` (enriched GO terms with hit genes/symbols/ncbi_ids), `bar_chart_data`, `mapping[]`, `ontology_stats`.
 - `GET /go-enrichment/example-sets` — Dynamically generated example gene sets (stable within same day via PostgreSQL `setseed`). Returns 4 sets × 20 genes each, drawn from real shared GO terms in the database.
 - `GET /go-enrichment/term/{go_id}` — GO term detail: name, namespace, definition, total_genes, genes[] (gene_id/ncbi_id/symbol).
 - `GET /go-enrichment/dag/metadata` — GO DAG metadata: ready status, term/edge/closure counts, data version, loaded timestamp.
 - `GET /go-enrichment/term/{go_id}/dag` — GO DAG sub-graph via BFS on `go_edge` table. Params: `direction` (ancestors/descendants/both), `depth` (1–6), `include_is_a` (bool), `include_part_of` (bool), `max_nodes` (default 80). Returns `{center, resolved_center, direction, depth, nodes[], edges[], truncated, node_count_total, node_count_returned}`.
+- `POST /go-enrichment/dag/overview` — Enrichment DAG Overview for SEA results. Accepts `terms[]` (GO terms with p-value/FDR/hit counts), `ontology` (P/C/F), `fdr_cutoff`, `include_is_a`, `include_part_of`, `max_nodes`. Returns DAG subgraph showing all significant terms in GO hierarchy context, with FDR-based significance coloring (sig_level 0-9). Uses BFS via `go_closure` + `go_edge`; `ANY()` params must use `list()` not `tuple()` for psycopg2.
 
 ### KEGG Images (2, prefix `/kegg-images`)
 - `GET /kegg-images/{pathway_id}.png` — KEGG 通路图片
@@ -403,7 +404,7 @@ interface GeneExpressionExpandResponse {
 | 路由文件 | 前缀 | 接口数 |
 |---|---|---|
 | main.py (inline) | `/` | 11 |
-| go_enrichment_routes.py | `/go-enrichment` | 5 |
+| go_enrichment_routes.py | `/go-enrichment` | 6 |
 | go_kegg_routes.py | `/annotations` | 11 |
 | kegg_image_router.py | `/kegg-images` | 2 |
 | tool_routes.py | `/tools` | 2 |
