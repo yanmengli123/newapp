@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Box,
   Text,
@@ -517,9 +518,164 @@ function FullscreenOverlay({
           </ActionIcon>
         </Tooltip>
       </div>
-    </div>,
-    document.body
+    </div>
   );
+}
+
+// ─── Render fullscreen via portal ──────────────────────────────────────────
+
+function renderFullscreenOverlay(
+  dagData: EnrichmentDagOverviewResponse,
+  rankDir: string,
+  onClose: () => void,
+  onNodeClick?: (goId: string) => void
+) {
+  function FullscreenContent() {
+    const innerRef = useRef<HTMLDivElement>(null);
+    const fsDestroyRef = useRef<(() => void) | null>(null);
+
+    useEffect(() => {
+      const el = innerRef.current;
+      if (!el) return;
+      removeDagPopups();
+      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
+      const destroy = mountCytoscape({ container: el, data: dagData, rankDir, isFullscreen: true, onNodeClick });
+      fsDestroyRef.current = destroy;
+      return () => { if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; } };
+    }, [dagData, rankDir, onNodeClick]);
+
+    const doZoom = (factor: number) => {
+      const el = innerRef.current;
+      if (!el) return;
+      const cy = (el as any)._cy;
+      if (cy) cy.zoom(cy.zoom() * factor);
+    };
+
+    const doFit = (padding: number) => {
+      const el = innerRef.current;
+      if (!el) return;
+      const cy = (el as any)._cy;
+      if (cy) { cy.resize(); cy.fit(undefined, padding); }
+    };
+
+    const doExportPng = () => {
+      const el = innerRef.current;
+      if (!el) return;
+      const cy = (el as any)._cy;
+      if (!cy) return;
+      const png = cy.png({ full: true, scale: 2, bg: "#ffffff" });
+      const a = document.createElement("a");
+      a.href = png;
+      a.download = `enrichment_dag_${dagData.ontology}_${Date.now()}.png`;
+      a.click();
+    };
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 10000,
+          background: "rgba(0,0,0,0.75)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 16px",
+            background: "#fff",
+            borderBottom: "1px solid #e0e0e0",
+            flexShrink: 0,
+          }}
+        >
+          <Group gap="xs">
+            <Text fw={700}>Enrichment DAG Overview</Text>
+            <Badge size="xs" variant="light" color="blue">{dagData.ontology === "P" ? "Biological Process" : dagData.ontology === "C" ? "Cellular Component" : "Molecular Function"}</Badge>
+            <Text size="xs" c="dimmed">{dagData.node_count_returned} nodes</Text>
+          </Group>
+          <Group gap="xs">
+            <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={doExportPng}>Export PNG</Button>
+            <ActionIcon variant="subtle" size="lg" onClick={onClose}>
+              <IconX size={18} />
+            </ActionIcon>
+          </Group>
+        </div>
+
+        {/* Graph area */}
+        <div
+          ref={innerRef}
+          style={{
+            flex: 1,
+            width: "100%",
+            minHeight: 0,
+            background: "#fafafa",
+            position: "relative",
+            paddingTop: 40,
+          }}
+        >
+          {/* Title */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              padding: "8px 16px",
+              background: "rgba(255,255,255,0.96)",
+              borderBottom: "1px solid #e5e7eb",
+              zIndex: 5,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#374151",
+              fontFamily: "Inter, Arial, sans-serif",
+            }}
+          >
+            Enrichment DAG — {dagData.ontology === "P" ? "Biological Process" : dagData.ontology === "C" ? "Cellular Component" : "Molecular Function"}
+            {dagData.truncated && <span style={{ color: "#f59e0b", marginLeft: 8 }}>⚠ truncated</span>}
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 24,
+            right: 24,
+            zIndex: 10,
+            background: "#fff",
+            borderRadius: 8,
+            padding: "8px 10px",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+            display: "flex",
+            gap: 6,
+          }}
+        >
+          <Tooltip label="Zoom in">
+            <ActionIcon variant="light" size="md" onClick={() => doZoom(1.3)}>
+              <IconZoomIn size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Zoom out">
+            <ActionIcon variant="light" size="md" onClick={() => doZoom(1 / 1.3)}>
+              <IconZoomOut size={16} />
+            </ActionIcon>
+          </Tooltip>
+          <Tooltip label="Fit to view">
+            <ActionIcon variant="light" size="md" onClick={() => doFit(60)}>
+              <IconFocusCentered size={16} />
+            </ActionIcon>
+          </Tooltip>
+        </div>
+      </div>
+    );
+  }
+
+  return createPortal(<FullscreenContent />, document.body);
 }
 
 // ─── Legend ──────────────────────────────────────────────────────────────────
@@ -913,18 +1069,18 @@ export default function GOEnrichmentDagOverview({ results, fdrCutoff, onTermClic
 
       {/* Fullscreen */}
       {fullscreenOpen && dagData && (
-        <FullscreenOverlay
-          dagData={dagData}
-          rankDir={rankDir}
-          onClose={() => setFullscreenOpen(false)}
-          onNodeClick={(goId) => {
+        renderFullscreenOverlay(
+          dagData,
+          rankDir,
+          () => setFullscreenOpen(false),
+          (goId: string) => {
             const term = results.find((r) => r.go_id === goId);
             if (term && onTermClick) {
               onTermClick(term);
               setFullscreenOpen(false);
             }
-          }}
-        />
+          }
+        )
       )}
     </>
   );
