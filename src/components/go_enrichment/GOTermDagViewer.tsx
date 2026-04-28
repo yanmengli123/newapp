@@ -33,17 +33,14 @@ import {
   type DagDirection,
 } from "../../lib/goDagApi";
 
-const NS_COLORS: Record<string, string> = {
-  biological_process: "#228BE6",
-  cellular_component: "#FA5252",
-  molecular_function: "#40C057",
-};
+// ─── Label / text helpers ────────────────────────────────────────────────────
 
-const NS_LABELS: Record<string, string> = {
-  biological_process: "BP",
-  cellular_component: "CC",
-  molecular_function: "MF",
-};
+const MAX_CHARS_MAIN = 55;
+const MAX_CHARS_FULLSCREEN = 80;
+
+function truncateName(name: string, maxChars: number): string {
+  return name.length > maxChars ? `${name.slice(0, maxChars - 1)}...` : name;
+}
 
 // ─── Cytoscape Loader ────────────────────────────────────────────────────────
 
@@ -133,12 +130,13 @@ function showEdgePopup(edge: any, clientX: number, clientY: number) {
 
 // ─── Graph builders ──────────────────────────────────────────────────────────
 
-function buildCyElements(data: GoDagResponse): any[] {
+function buildCyElements(data: GoDagResponse, isFullscreen: boolean): any[] {
+  const maxChars = isFullscreen ? MAX_CHARS_FULLSCREEN : MAX_CHARS_MAIN;
   return [
     ...data.nodes.map((n) => ({
       data: {
         id: n.id,
-        label: `${n.id}\n${n.label.length > 40 ? n.label.slice(0, 39) + "..." : n.label}`,
+        label: `${n.id}\n${truncateName(n.label, maxChars)}`,
         fullLabel: n.label,
         namespace: n.namespace,
         isCenter: n.is_center,
@@ -158,67 +156,96 @@ function buildCyElements(data: GoDagResponse): any[] {
   ];
 }
 
-function buildCyStyle(): any[] {
+function buildCyStyle(isFullscreen: boolean): any[] {
+  const textMaxWidth = isFullscreen ? 220 : 160;
+
   return [
+    // ── Base node: roundrectangle, label-wrap, size auto-fitted ──────────────
     {
       selector: "node",
       style: {
+        shape: "roundrectangle",
         label: "data(label)",
-        "text-valign": "top",
+        "text-wrap": "wrap",
+        "text-max-width": textMaxWidth,
+        "text-valign": "center",
         "text-halign": "center",
-        "text-margin-y": 4,
-        "font-size": "9px",
-        "font-family": "monospace",
-        color: "#333",
-        "background-color": "#e8e8e8",
+        "text-justification": "center",
+        width: "label",
+        height: "label",
+        padding: "12px",
+        "font-size": "10px",
+        "font-family": "Inter, Arial, sans-serif",
+        color: "#475569",
+        "background-color": "#ffffff",
         "border-width": 1.5,
-        "border-color": "#aaa",
-        width: 120,
-        height: 50,
+        "border-color": "#cbd5e1",
       } as any,
     },
-    {
-      selector: "node[isCenter]",
-      style: { "border-width": 3, "border-color": "#222", "background-color": "#fff3cd" },
-    },
+    // ── Namespace: light pastel fills, darker border ─────────────────────────
     {
       selector: 'node[namespace="biological_process"]',
-      style: { "background-color": "#d0e8ff", "border-color": "#228BE6" },
+      style: { "background-color": "#eff6ff", "border-color": "#3b82f6" },
     },
     {
       selector: 'node[namespace="cellular_component"]',
-      style: { "background-color": "#ffd0d0", "border-color": "#FA5252" },
+      style: { "background-color": "#fff1f2", "border-color": "#ef4444" },
     },
     {
       selector: 'node[namespace="molecular_function"]',
-      style: { "background-color": "#d0ffd0", "border-color": "#40C057" },
+      style: { "background-color": "#f0fdf4", "border-color": "#22c55e" },
     },
+    // ── Center node: always most prominent (placed AFTER namespace rules) ───
+    {
+      selector: "node[isCenter]",
+      style: {
+        "background-color": "#fffbeb",
+        "border-color": "#f59e0b",
+        "border-width": 3,
+        "font-weight": "700",
+        color: "#111827",
+      },
+    },
+    // ── Center + Namespace overlays (override namespace base) ───────────────
     {
       selector: 'node[isCenter][namespace="biological_process"]',
-      style: { "background-color": "#c8e6ff", "border-color": "#1e70bf" },
+      style: { "background-color": "#fef9c3", "border-color": "#ca8a04", "border-width": 3, "font-weight": "700", color: "#111827" },
     },
     {
       selector: 'node[isCenter][namespace="cellular_component"]',
-      style: { "background-color": "#ffbfbf", "border-color": "#c0392b" },
+      style: { "background-color": "#fef2f2", "border-color": "#dc2626", "border-width": 3, "font-weight": "700", color: "#111827" },
     },
     {
       selector: 'node[isCenter][namespace="molecular_function"]',
-      style: { "background-color": "#bfffe0", "border-color": "#2b9e50" },
+      style: { "background-color": "#f0fdf4", "border-color": "#16a34a", "border-width": 3, "font-weight": "700", color: "#111827" },
     },
+    // ── Edges: taxi routing, gray for is_a ─────────────────────────────────
     {
       selector: "edge",
       style: {
-        width: 1.5,
-        "line-color": "#666",
-        "target-arrow-color": "#666",
+        width: 2,
+        "curve-style": "taxi",
+        "taxi-direction": "downward",
+        "taxi-turn": 20,
+        "line-color": "#94a3b8",
+        "target-arrow-color": "#94a3b8",
         "target-arrow-shape": "triangle",
-        "curve-style": "bezier",
+        "arrow-scale": 1.0,
       } as any,
     },
+    // ── part_of: dashed orange (distinct from is_a) ─────────────────────────
     {
       selector: 'edge[relation="part_of"]',
-      style: { "line-style": "dashed", "line-dash-pattern": [6, 3] } as any,
+      style: {
+        "line-style": "dashed",
+        "line-dash-pattern": [6, 4],
+        "line-color": "#f59e0b",
+        "target-arrow-color": "#f59e0b",
+        "target-arrow-shape": "triangle",
+        width: 1.5,
+      } as any,
     },
+    // ── Selection state ─────────────────────────────────────────────────────
     {
       selector: "node:selected",
       style: { "border-width": 3, "border-color": "#e67700" },
@@ -230,14 +257,39 @@ function buildCyStyle(): any[] {
   ];
 }
 
+function getLayoutOptions(isFullscreen: boolean): any {
+  if (isFullscreen) {
+    return {
+      name: "dagre",
+      rankDir: "TB",
+      nodeSep: 140,
+      rankSep: 180,
+      edgeSep: 30,
+      ranker: "network-simplex",
+      fit: true,
+      padding: 60,
+      animate: false,
+    };
+  }
+  return {
+    name: "dagre",
+    rankDir: "TB",
+    nodeSep: 80,
+    rankSep: 120,
+    edgeSep: 20,
+    ranker: "network-simplex",
+    fit: true,
+    padding: 30,
+    animate: false,
+  };
+}
+
 // ─── Mount Cytoscape into a container ──────────────────────────────────────
-// Returns a destroy() function.
 
 function mountCytoscape(opts: {
   container: HTMLDivElement;
   data: GoDagResponse;
   isFullscreen: boolean;
-  onLayoutDone?: () => void;
 }): () => void {
   let disposed = false;
   let resolvedCy: any = null;
@@ -251,12 +303,12 @@ function mountCytoscape(opts: {
       dagreRegistered = true;
     }
 
-    const elements = buildCyElements(opts.data);
+    const elements = buildCyElements(opts.data, opts.isFullscreen);
 
     const cy = cytoscape({
       container: opts.container,
       elements,
-      style: buildCyStyle(),
+      style: buildCyStyle(opts.isFullscreen),
       layout: { name: "preset" } as any,
       minZoom: 0.1,
       maxZoom: opts.isFullscreen ? 5 : 4,
@@ -279,46 +331,13 @@ function mountCytoscape(opts: {
       if (evt.target === cy) removeDagPopups();
     });
 
-    if (opts.isFullscreen) {
-      // Fullscreen: stable init — no animation, explicit resize+fit
-      cy.ready(() => {
-        if (disposed) return;
-        cy.resize();
-        cy.layout({
-          name: "dagre",
-          rankDir: "TB",
-          nodeSep: 55,
-          rankSep: 80,
-          fit: true,
-          padding: 50,
-          animate: false,
-        } as any).run();
-        requestAnimationFrame(() => {
-          if (!disposed) { cy.resize(); cy.fit(undefined, 50); }
-          if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
-        });
-      });
-    } else {
-      cy.one("layoutstop", () => {
-        if (!disposed) { cy.resize(); cy.fit(undefined, 30); }
-        if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
-      });
-      cy.layout({
-        name: "dagre",
-        rankDir: "TB",
-        nodeSep: 40,
-        rankSep: 60,
-        fit: true,
-        padding: 30,
-        animate: true,
-        animationDuration: 400,
-      } as any).run();
+    // Init layout with no animation — avoids first-render white screen
+    cy.layout(getLayoutOptions(opts.isFullscreen)).run();
 
-      setTimeout(() => {
-        if (!disposed) { cy.resize(); cy.fit(undefined, 30); }
-        if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
-      }, 2000);
-    }
+    // Ensure graph fits after layout
+    requestAnimationFrame(() => {
+      if (!disposed) { cy.resize(); cy.fit(undefined, opts.isFullscreen ? 50 : 30); }
+    });
   })
   .catch((err) => {
     console.error("[GOTermDagViewer] Cytoscape mount failed:", err);
@@ -334,9 +353,6 @@ function mountCytoscape(opts: {
 }
 
 // ─── Fullscreen Portal Overlay ──────────────────────────────────────────────
-// Rendered via createPortal into document.body — completely outside
-// the GOTermDagViewer component tree, so closing the parent Drawer
-// never races with Cytoscape's unmount.
 
 function FullscreenOverlay({
   dagData,
@@ -383,7 +399,7 @@ function FullscreenOverlay({
         position: "fixed",
         inset: 0,
         zIndex: 10000,
-        background: "rgba(0,0,0,0.7)",
+        background: "rgba(0,0,0,0.75)",
         display: "flex",
         flexDirection: "column",
       }}
@@ -456,6 +472,20 @@ function FullscreenOverlay({
     document.body
   );
 }
+
+// ─── Legend colours (pastel to match new node palette) ─────────────────────
+
+const LEGEND_COLORS: Record<string, string> = {
+  biological_process: "#3b82f6",
+  cellular_component: "#ef4444",
+  molecular_function: "#22c55e",
+};
+
+const NS_LABELS: Record<string, string> = {
+  biological_process: "BP",
+  cellular_component: "CC",
+  molecular_function: "MF",
+};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -558,12 +588,7 @@ export default function GOTermDagViewer({ goId }: Props) {
         if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
         removeDagPopups();
 
-        const destroy = mountCytoscape({
-          container,
-          data: dagData!,
-          isFullscreen: false,
-          onLayoutDone: () => setRendering(false),
-        });
+        const destroy = mountCytoscape({ container, data: dagData!, isFullscreen: false });
         mainDestroyRef.current = destroy;
       };
 
@@ -587,12 +612,7 @@ export default function GOTermDagViewer({ goId }: Props) {
     }
 
     removeDagPopups();
-    const destroy = mountCytoscape({
-      container: el,
-      data: dagData,
-      isFullscreen: false,
-      onLayoutDone: () => setRendering(false),
-    });
+    const destroy = mountCytoscape({ container: el, data: dagData, isFullscreen: false });
     mainDestroyRef.current = destroy;
 
     return () => {
@@ -703,16 +723,16 @@ export default function GOTermDagViewer({ goId }: Props) {
           <Alert color="red" variant="light" py={4}>{errorMsg}</Alert>
         )}
 
-        {/* Legend */}
+        {/* Legend — updated to pastel palette + orange for part_of */}
         <Group gap="lg">
           {Object.entries(NS_LABELS).map(([ns, label]) => (
             <Group key={ns} gap={4}>
-              <Box w={12} h={12} style={{ borderRadius: 3, background: NS_COLORS[ns] }} />
+              <Box w={12} h={12} style={{ borderRadius: 3, border: `2px solid ${LEGEND_COLORS[ns]}`, background: `${LEGEND_COLORS[ns]}22` }} />
               <Text size="xs">{label}</Text>
             </Group>
           ))}
-          <Group gap={4}><Box w={20} h={2} style={{ background: "#666" }} /><Text size="xs">is_a</Text></Group>
-          <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #666" }} /><Text size="xs">part_of</Text></Group>
+          <Group gap={4}><Box w={20} h={2} style={{ background: "#94a3b8" }} /><Text size="xs">is_a</Text></Group>
+          <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #f59e0b" }} /><Text size="xs">part_of</Text></Group>
         </Group>
 
         {/* Main Cytoscape container */}
@@ -770,7 +790,7 @@ export default function GOTermDagViewer({ goId }: Props) {
         </Text>
       </Stack>
 
-      {/* Fullscreen overlay — rendered via portal into document.body, completely outside component tree */}
+      {/* Fullscreen overlay */}
       {fullscreenOpen && dagData && (
         <FullscreenOverlay
           dagData={dagData}
