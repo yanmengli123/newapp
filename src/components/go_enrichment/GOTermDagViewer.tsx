@@ -182,42 +182,29 @@ function buildCyStyle(isFullscreen: boolean): any[] {
         "border-color": "#cbd5e1",
       } as any,
     },
-    // ── Namespace: light pastel fills, darker border ─────────────────────────
+    // ── Namespace: white background, colored border only (ancestor nodes stay neutral) ──
     {
       selector: 'node[namespace="biological_process"]',
-      style: { "background-color": "#eff6ff", "border-color": "#3b82f6" },
+      style: { "border-color": "#3b82f6" },
     },
     {
       selector: 'node[namespace="cellular_component"]',
-      style: { "background-color": "#fff1f2", "border-color": "#ef4444" },
+      style: { "border-color": "#ef4444" },
     },
     {
       selector: 'node[namespace="molecular_function"]',
-      style: { "background-color": "#f0fdf4", "border-color": "#22c55e" },
+      style: { "border-color": "#22c55e" },
     },
-    // ── Center node: always most prominent (placed AFTER namespace rules) ───
+    // ── Center node: amber highlight — target of the query ─────────────────
     {
       selector: "node[isCenter]",
       style: {
-        "background-color": "#fffbeb",
-        "border-color": "#f59e0b",
+        "background-color": "#fef08a",
+        "border-color": "#ca8a04",
         "border-width": 3,
         "font-weight": "700",
         color: "#111827",
       },
-    },
-    // ── Center + Namespace overlays (override namespace base) ───────────────
-    {
-      selector: 'node[isCenter][namespace="biological_process"]',
-      style: { "background-color": "#fef9c3", "border-color": "#ca8a04", "border-width": 3, "font-weight": "700", color: "#111827" },
-    },
-    {
-      selector: 'node[isCenter][namespace="cellular_component"]',
-      style: { "background-color": "#fef2f2", "border-color": "#dc2626", "border-width": 3, "font-weight": "700", color: "#111827" },
-    },
-    {
-      selector: 'node[isCenter][namespace="molecular_function"]',
-      style: { "background-color": "#f0fdf4", "border-color": "#16a34a", "border-width": 3, "font-weight": "700", color: "#111827" },
     },
     // ── Edges: taxi routing, gray for is_a ─────────────────────────────────
     {
@@ -434,8 +421,30 @@ function FullscreenOverlay({
           minHeight: 0,
           background: "#fafafa",
           position: "relative",
+          paddingTop: 44,
         }}
-      />
+      >
+        {/* DAG title bar */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            padding: "8px 16px",
+            background: "rgba(255,255,255,0.96)",
+            borderBottom: "1px solid #e5e7eb",
+            zIndex: 5,
+            fontSize: 12,
+            fontWeight: 600,
+            color: "#374151",
+            fontFamily: "Inter, Arial, sans-serif",
+          }}
+        >
+          Ancestor Chart for&nbsp;
+          <span style={{ color: "#1d4ed8" }}>{dagData?.center}</span>
+        </div>
+      </div>
 
       {/* Floating toolbar */}
       <div
@@ -751,6 +760,26 @@ export default function GOTermDagViewer({ goId }: Props) {
             overflow: "hidden",
           }}
         >
+          {/* DAG title bar */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              padding: "6px 12px",
+              background: "rgba(255,255,255,0.96)",
+              borderBottom: "1px solid #e5e7eb",
+              zIndex: 5,
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#374151",
+              fontFamily: "Inter, Arial, sans-serif",
+            }}
+          >
+            Ancestor Chart for&nbsp;
+            <span style={{ color: "#1d4ed8" }}>{dagData?.center ?? goId}</span>
+          </div>
           <div
             ref={graphHostRef}
             style={{
@@ -758,6 +787,7 @@ export default function GOTermDagViewer({ goId }: Props) {
               inset: 0,
               width: "100%",
               height: "100%",
+              paddingTop: 32,
             }}
           />
           {loading && (
