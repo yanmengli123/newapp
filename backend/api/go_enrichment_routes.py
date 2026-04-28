@@ -442,6 +442,7 @@ async def get_go_term_dag(
         # BFS using go_edge (respects relation filter)
         all_nodes: dict[str, int] = {resolved_center: 0}  # go_id → min distance
         all_edges: list[tuple[str, str, str]] = []  # (child, parent, relation)
+        edge_seen: set[tuple[str, str, str]] = set()  # O(1) dedup without rebuilding set each iteration
 
         if relations:
             # Ancestors BFS: from frontier, find rows where child is in frontier → those are edges
@@ -465,7 +466,8 @@ async def get_go_term_dag(
                     next_frontier: set[str] = set()
                     for child_id, parent_id, rel in cur.fetchall():
                         edge_key = (child_id, parent_id, rel)
-                        if edge_key not in {(e[0], e[1], e[2]) for e in all_edges}:
+                        if edge_key not in edge_seen:
+                            edge_seen.add(edge_key)
                             all_edges.append(edge_key)
                         if parent_id not in all_nodes:
                             all_nodes[parent_id] = all_nodes[child_id] + 1
@@ -494,7 +496,8 @@ async def get_go_term_dag(
                     next_frontier: set[str] = set()
                     for child_id, parent_id, rel in cur.fetchall():
                         edge_key = (child_id, parent_id, rel)
-                        if edge_key not in {(e[0], e[1], e[2]) for e in all_edges}:
+                        if edge_key not in edge_seen:
+                            edge_seen.add(edge_key)
                             all_edges.append(edge_key)
                         if child_id not in all_nodes:
                             all_nodes[child_id] = all_nodes[parent_id] + 1
