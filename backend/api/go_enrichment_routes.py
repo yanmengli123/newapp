@@ -587,3 +587,305 @@ async def get_go_term_dag(
         )
     finally:
         pg_putconn(conn)
+
+
+# ---------------------------------------------------------------------------
+# Enrichment DAG Overview endpoint
+# ---------------------------------------------------------------------------
+
+class OverviewTermItem(BaseModel):
+    go_id: str
+    term_name: str
+    namespace: str
+    ontology: str
+    query_count: int
+    query_total: int
+    background_count: int
+    background_total: int
+    p_value: float
+    fdr: float
+    significant: bool
+
+
+class EnrichmentDagOverviewRequest(BaseModel):
+    terms: list[OverviewTermItem]
+    ontology: Literal["P", "C", "F"]
+    fdr_cutoff: float = 0.05
+    include_is_a: bool = True
+    include_part_of: bool = True
+    max_nodes: int = 150
+
+
+class OverviewDagNode(BaseModel):
+    id: str
+    label: str
+    namespace: str
+    depth: int
+    is_root: bool
+    is_enriched: bool
+    significant: bool
+    p_value: Optional[float] = None
+    fdr: Optional[float] = None
+    query_count: Optional[int] = None
+    query_total: Optional[int] = None
+    background_count: Optional[int] = None
+    background_total: Optional[int] = None
+    significance_level: int = 0
+
+
+class OverviewDagEdge(BaseModel):
+    source: str
+    target: str
+    relation: Literal["is_a", "part_of"]
+    both_significant: bool = False
+    one_significant: bool = False
+
+
+class EnrichmentDagOverviewResponse(BaseModel):
+    ontology: str
+    root_go_id: str
+    nodes: list[OverviewDagNode]
+    edges: list[OverviewDagEdge]
+    truncated: bool = False
+    node_count_total: int = 0
+    node_count_returned: int = 0
+
+
+# Root GO IDs per ontology
+ONTOLOGY_ROOTS: dict[str, str] = {
+    "P": "GO:0008150",
+    "F": "GO:0003674",
+    "C": "GO:0005575",
+}
+
+# Significance level thresholds (FDR → level 0-9)
+SIG_THRESHOLDS = [
+    (1e-9, 9), (1e-8, 8), (1e-7, 7), (1e-6, 6),
+    (1e-5, 5), (1e-4, 4), (1e-3, 3), (1e-2, 2), (5e-2, 1),
+]
+
+
+def _sig_level(fdr: float) -> int:
+    for threshold, level in SIG_THRESHOLDS:
+        if fdr <= threshold:
+            return level
+    return 0
+
+
+@router.post("/dag/overview", response_model=EnrichmentDagOverviewResponse)
+async def get_enrichment_dag_overview(
+    request_data: EnrichmentDagOverviewRequest,
+    request: Request,
+):
+    """
+    返回整次 SEA 结果的 Enrichment DAG Overview 图。
+    按 ontology (P/C/F) 分别构建，展示显著 GO terms 在 GO 层级中的全局位置。
+    """
+    pg_getconn = request.app.state.pg_getconn
+    pg_putconn = request.app.state.pg_putconn
+    conn = pg_getconn()
+    try:
+        cur = conn.cursor()
+
+        root_go_id = ONTOLOGY_ROOTS.get(request_data.ontology, "GO:0008150")
+        fdr_cutoff = request_data.fdr_cutoff
+
+        # Filter significant terms for the requested ontology
+        sig_go_ids: set[str] = set(
+            t.go_id for t in request_data.terms
+            if t.ontology == request_data.ontology and t.significant and t.fdr <= fdr_cutoff
+        )
+        if not sig_go_ids:
+            return EnrichmentDagOverviewResponse(
+                ontology=request_data.ontology,
+                root_go_id=root_go_id,
+                nodes=[],
+                edges=[],
+                truncated=False,
+                node_count_total=0,
+                node_count_returned=0,
+            )
+
+        # Build relations filter
+        relations: list[str] = []
+        if request_data.include_is_a:
+            relations.append("is_a")
+        if request_data.include_part_of:
+            relations.append("part_of")
+        if not relations:
+            relations = ["is_a", "part_of"]
+
+        max_nodes = max(20, min(request_data.max_nodes, 500))
+
+        # Step 1: Get all ancestors via go_closure for significant terms
+        cur.execute(
+            """
+            SELECT DISTINCT ancestor_go_id
+            FROM go_closure
+            WHERE descendant_go_id = ANY(%s)
+            LIMIT %s
+            """,
+            (tuple(sig_go_ids), max_nodes * 2),
+        )
+        ancestor_ids = {row[0] for row in cur.fetchall()}
+
+        # Candidate nodes = sig terms + ancestors + root
+        candidate_ids: set[str] = sig_go_ids | ancestor_ids
+        if root_go_id not in candidate_ids:
+            cur.execute("SELECT go_id FROM go_term WHERE go_id = %s", (root_go_id,))
+            if cur.fetchone():
+                candidate_ids.add(root_go_id)
+
+        # Enforce max_nodes by depth order (prefer enriched nodes)
+        all_candidate_ids = sorted(candidate_ids)
+        if len(all_candidate_ids) > max_nodes:
+            # Keep enriched first, then fill with ancestors
+            enriched_sorted = sorted(sig_go_ids)
+            others = [x for x in all_candidate_ids if x not in sig_go_ids]
+            all_candidate_ids = enriched_sorted + others[: max_nodes - len(enriched_sorted)]
+
+        node_id_list = list(all_candidate_ids)
+        node_id_set = set(node_id_list)
+        total_candidates = len(node_id_set)
+
+        # Step 2: Fetch term details
+        cur.execute(
+            "SELECT go_id, go_name, go_namespace FROM go_term WHERE go_id = ANY(%s)",
+            (tuple(node_id_list[:max_nodes]),),
+        )
+        term_info: dict[str, tuple[str, str]] = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+
+        # Filter to only nodes that exist in go_term
+        valid_ids = set(term_info.keys())
+        sig_go_ids &= valid_ids
+        truncated = total_candidates > max_nodes
+
+        # Step 3: Collect edges (go_edge, both endpoints in valid_ids)
+        if relations:
+            cur.execute(
+                """
+                SELECT child_go_id, parent_go_id, relation
+                FROM go_edge
+                WHERE child_go_id = ANY(%s)
+                  AND parent_go_id = ANY(%s)
+                  AND relation = ANY(%s)
+                """,
+                (tuple(valid_ids), tuple(valid_ids), tuple(relations)),
+            )
+            raw_edges = cur.fetchall()
+        else:
+            raw_edges = []
+
+        # Step 4: Build go_id → significance data
+        sig_data: dict[str, OverviewTermItem] = {
+            t.go_id: t for t in request_data.terms
+            if t.go_id in sig_go_ids
+        }
+
+        # Step 5: Compute depth from root for each node
+        cur.execute(
+            """
+            SELECT descendant_go_id, ancestor_go_id, distance
+            FROM go_closure
+            WHERE descendant_go_id = ANY(%s)
+              AND ancestor_go_id = ANY(%s)
+            """,
+            (tuple(sig_go_ids), tuple(valid_ids)),
+        )
+        depth_map: dict[tuple[str, str], int] = {}
+        for desc, anc, dist in cur.fetchall():
+            key = (desc, anc)
+            if key not in depth_map or dist < depth_map[key]:
+                depth_map[key] = dist
+
+        root_depth = max((depth_map.get((g, root_go_id), 999) for g in sig_go_ids), default=0) + 1
+
+        # Step 6: Build nodes
+        nodes: list[OverviewDagNode] = []
+        for go_id in node_id_list:
+            if go_id not in valid_ids:
+                continue
+            go_name, go_namespace = term_info[go_id]
+            is_root = go_id == root_go_id
+            is_enriched = go_id in sig_data
+            significant = is_enriched
+
+            if is_root:
+                sig_lvl = 0
+                pval = None
+                fdr_val = None
+                qc = None
+                qt = None
+                bc = None
+                bt = None
+            elif is_enriched:
+                td = sig_data[go_id]
+                sig_lvl = _sig_level(td.fdr)
+                pval = td.p_value
+                fdr_val = td.fdr
+                qc = td.query_count
+                qt = td.query_total
+                bc = td.background_count
+                bt = td.background_total
+            else:
+                sig_lvl = 0
+                pval = None
+                fdr_val = None
+                qc = None
+                qt = None
+                bc = None
+                bt = None
+
+            label = go_name[:80] + "..." if len(go_name) > 80 else go_name
+
+            if is_enriched and fdr_val is not None:
+                display_lines = f"{go_id}\np={pval:.2e}\n{label}"
+            else:
+                display_lines = f"{go_id}\n{label}"
+
+            nodes.append(OverviewDagNode(
+                id=go_id,
+                label=display_lines,
+                namespace=go_namespace,
+                depth=root_depth if is_root else depth_map.get((go_id, root_go_id), 0),
+                is_root=is_root,
+                is_enriched=is_enriched,
+                significant=significant,
+                p_value=pval,
+                fdr=fdr_val,
+                query_count=qc,
+                query_total=qt,
+                background_count=bc,
+                background_total=bt,
+                significance_level=sig_lvl,
+            ))
+
+        # Step 7: Build edges
+        valid_node_set = set(n.id for n in nodes)
+        edges: list[OverviewDagEdge] = []
+        for child_id, parent_id, rel in raw_edges:
+            if child_id not in valid_node_set or parent_id not in valid_node_set:
+                continue
+            child_sig = child_id in sig_go_ids
+            parent_sig = parent_id in sig_go_ids
+            edges.append(OverviewDagEdge(
+                source=child_id,
+                target=parent_id,
+                relation=rel,
+                both_significant=child_sig and parent_sig,
+                one_significant=child_sig or parent_sig,
+            ))
+
+        nodes.sort(key=lambda n: (0 if n.is_root else 1, n.depth, n.label))
+
+        return EnrichmentDagOverviewResponse(
+            ontology=request_data.ontology,
+            root_go_id=root_go_id,
+            nodes=nodes,
+            edges=edges,
+            truncated=truncated,
+            node_count_total=total_candidates,
+            node_count_returned=len(nodes),
+        )
+    finally:
+        pg_putconn(conn)

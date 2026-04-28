@@ -38,6 +38,7 @@ import GOEnrichmentBarChart from "../components/go_enrichment/GOEnrichmentBarCha
 import GOEnrichmentBarChartFullscreen from "../components/go_enrichment/GOEnrichmentBarChartFullscreen";
 import GOEnrichmentTable from "../components/go_enrichment/GOEnrichmentTable";
 import GOEnrichmentTermDrawer from "../components/go_enrichment/GOEnrichmentTermDrawer";
+import GOEnrichmentDagOverview from "../components/go_enrichment/GOEnrichmentDagOverview";
 import { BarChartFilters, TableFilters } from "../components/go_enrichment/GOEnrichmentPageFilters";
 
 type PageState = "idle" | "loading" | "success" | "error";
@@ -417,6 +418,20 @@ export default function GOEnrichmentPage() {
                 <BarChartFilters filter={ontologyFilter} onChange={setOntologyFilter} />
               </Group>
               <GOEnrichmentBarChart data={result.bar_chart_data} filtered={ontologyFilter} onExpand={() => setFullscreenChartOpened(true)} />
+            </Stack>
+          </Paper>
+
+          {/* Enrichment DAG Overview */}
+          <Paper withBorder radius="lg" p="lg">
+            <Stack gap="md">
+              <Group justify="space-between">
+                <Title order={4}>Enrichment DAG Overview</Title>
+              </Group>
+              <GOEnrichmentDagOverview
+                results={result.results}
+                fdrCutoff={fdrCutoff}
+                onTermClick={setSelectedTerm}
+              />
             </Stack>
           </Paper>
 

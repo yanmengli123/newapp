@@ -75,3 +75,72 @@ export async function getGOTermDag(
 export async function getGODagMetadata(): Promise<GoDagMetadata> {
   return apiFetch<GoDagMetadata>("/go-enrichment/dag/metadata");
 }
+
+// ─── Enrichment DAG Overview ─────────────────────────────────────────────────
+
+export interface EnrichmentDagOverviewNode {
+  id: string;
+  label: string;
+  namespace: string;
+  depth: number;
+  is_root: boolean;
+  is_enriched: boolean;
+  significant: boolean;
+  p_value: number | null;
+  fdr: number | null;
+  query_count: number | null;
+  query_total: number | null;
+  background_count: number | null;
+  background_total: number | null;
+  significance_level: number;
+}
+
+export interface EnrichmentDagOverviewEdge {
+  source: string;
+  target: string;
+  relation: "is_a" | "part_of";
+  both_significant: boolean;
+  one_significant: boolean;
+}
+
+export interface EnrichmentDagOverviewResponse {
+  ontology: string;
+  root_go_id: string;
+  nodes: EnrichmentDagOverviewNode[];
+  edges: EnrichmentDagOverviewEdge[];
+  truncated: boolean;
+  node_count_total: number;
+  node_count_returned: number;
+}
+
+export interface EnrichmentTermItem {
+  go_id: string;
+  term_name: string;
+  namespace: string;
+  ontology: string;
+  query_count: number;
+  query_total: number;
+  background_count: number;
+  background_total: number;
+  p_value: number;
+  fdr: number;
+  significant: boolean;
+}
+
+export interface EnrichmentDagOverviewRequest {
+  terms: EnrichmentTermItem[];
+  ontology: "P" | "C" | "F";
+  fdr_cutoff: number;
+  include_is_a?: boolean;
+  include_part_of?: boolean;
+  max_nodes?: number;
+}
+
+export async function getEnrichmentDagOverview(
+  request: EnrichmentDagOverviewRequest
+): Promise<EnrichmentDagOverviewResponse> {
+  return apiFetch<EnrichmentDagOverviewResponse>("/go-enrichment/dag/overview", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+}
