@@ -52,6 +52,7 @@ interface Props {
 export default function GOTermDagViewer({ goId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<any>(null);
+  const cancelledRef = useRef(false);
   const [direction, setDirection] = useState<DagDirection>("ancestors");
   const [depth, setDepth] = useState<number>(3);
   const [includeIsA, setIncludeIsA] = useState(true);
@@ -71,14 +72,19 @@ export default function GOTermDagViewer({ goId }: Props) {
   // Fetch DAG data
   const fetchDag = useCallback(
     (dir: DagDirection, d: number, isa: boolean, part: boolean) => {
-      setLoading(true);
-      setErrorMsg(null);
-      setDagData(null);
-      // Destroy existing Cytoscape instance before fetching new data
+      // Mark any in-flight async as cancelled before starting a new fetch
+      cancelledRef.current = true;
       if (cyRef.current) {
         cyRef.current.destroy();
         cyRef.current = null;
       }
+
+      setLoading(true);
+      setErrorMsg(null);
+      setDagData(null);
+      // Reset cancelled flag for this new request
+      cancelledRef.current = false;
+
       getGOTermDag(goId, {
         direction: dir,
         depth: d,
@@ -87,12 +93,17 @@ export default function GOTermDagViewer({ goId }: Props) {
         max_nodes: 80,
       })
         .then((data) => {
+          if (cancelledRef.current) return;
           setDagData(data);
         })
         .catch((err: Error) => {
+          if (cancelledRef.current) return;
           setErrorMsg(err.message ?? "Failed to load DAG");
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (cancelledRef.current) return;
+          setLoading(false);
+        });
     },
     [goId]
   );
@@ -101,6 +112,7 @@ export default function GOTermDagViewer({ goId }: Props) {
   useEffect(() => {
     fetchDag(direction, depth, includeIsA, includePartOf);
     return () => {
+      cancelledRef.current = true;
       if (cyRef.current) {
         cyRef.current.destroy();
         cyRef.current = null;
@@ -114,10 +126,15 @@ export default function GOTermDagViewer({ goId }: Props) {
     if (dagData.nodes.length === 0) return;
 
     let cleanupPopup: (() => void) | null = null;
+    const wasCancelled = cancelledRef.current;
 
     const initCy = async () => {
+      // Dynamically import Cytoscape + dagre layout
       const cytoscape = (await import("cytoscape")).default;
       const dagreLayout = (await import("cytoscape-dagre")).default;
+
+      // Race guard: abandon init if component unmounted or new request started
+      if (wasCancelled || cancelledRef.current) return;
 
       if (!dagreRegistered) {
         (cytoscape as any).use(dagreLayout);
@@ -166,6 +183,12 @@ export default function GOTermDagViewer({ goId }: Props) {
         maxZoom: 3,
       });
 
+      // Race guard: don't assign to cyRef if we've been cancelled
+      if (cancelledRef.current) {
+        cy.destroy();
+        return;
+      }
+
       // Cleanup old popup helper
       const removePopup = () => {
         const old = document.querySelector(".cy-popup");
@@ -173,12 +196,12 @@ export default function GOTermDagViewer({ goId }: Props) {
       };
       cleanupPopup = removePopup;
 
-      // Tap background → close popup
+      // Tap background -> close popup
       cy.on("tap", (evt: any) => {
         if (evt.target === cy) removePopup();
       });
 
-      // Node tap → show popup
+      // Node tap -> show popup (textContent for untrusted DB text)
       cy.on("tap", "node", (evt: any) => {
         removePopup();
         const node = evt.target;
@@ -193,19 +216,45 @@ export default function GOTermDagViewer({ goId }: Props) {
           box-shadow:0 2px 8px rgba(0,0,0,0.15); font-family:monospace;
           pointer-events:none;
         `;
-        popup.innerHTML = `
-          <b style="font-size:11px">${d.id}</b><br/>
-          <span style="color:#555">${d.fullLabel}</span><br/>
-          <span style="color:#888">${NS_LABELS[d.namespace] ?? d.namespace}</span>
-          &nbsp;depth=${d.depth}<br/>
-          Direct genes: <b>${d.geneCountDirect}</b><br/>
-          Propagated (all): <b>${d.geneCountPropagated}</b>
-          <span style="color:#aaa;font-size:10px">(via full closure)</span>
-        `;
+        // Use textContent for DB-derived text to avoid XSS
+        const idLine = document.createElement("b");
+        idLine.style.fontSize = "11px";
+        idLine.textContent = d.id;
+        const labelLine = document.createElement("span");
+        labelLine.style.color = "#555";
+        labelLine.textContent = d.fullLabel;
+        const nsLine = document.createElement("span");
+        nsLine.style.color = "#888";
+        nsLine.textContent = `${NS_LABELS[d.namespace] ?? d.namespace} depth=${d.depth}`;
+        const directLine = document.createElement("span");
+        directLine.textContent = `Direct genes: `;
+        const directBold = document.createElement("b");
+        directBold.textContent = String(d.geneCountDirect);
+        directLine.appendChild(directBold);
+        const propLine = document.createElement("span");
+        propLine.textContent = "Propagated (all): ";
+        const propBold = document.createElement("b");
+        propBold.textContent = String(d.geneCountPropagated);
+        propLine.appendChild(propBold);
+        const propNote = document.createElement("span");
+        propNote.style.color = "#aaa";
+        propNote.style.fontSize = "10px";
+        propNote.textContent = "(via full closure)";
+
+        popup.appendChild(idLine);
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(labelLine);
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(nsLine);
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(directLine);
+        popup.appendChild(document.createElement("br"));
+        popup.appendChild(propLine);
+        popup.appendChild(propNote);
         document.body.appendChild(popup);
       });
 
-      // Edge tap → show popup
+      // Edge tap -> show popup (textContent for relation label)
       cy.on("tap", "edge", (evt: any) => {
         removePopup();
         const edge = evt.target;
@@ -221,13 +270,18 @@ export default function GOTermDagViewer({ goId }: Props) {
           pointer-events:none;
         `;
         const relLabel = d.relation === "is_a" ? "is_a (inheritance)" : "part_of (partonomy)";
-        popup.innerHTML = `<b>${relLabel}</b> relationship`;
+        const bold = document.createElement("b");
+        bold.textContent = relLabel;
+        const suffix = document.createTextNode(" relationship");
+        popup.appendChild(bold);
+        popup.appendChild(suffix);
         document.body.appendChild(popup);
       });
 
       // Fit after render
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+          if (cancelledRef.current) return;
           cy.resize();
           cy.fit(undefined, 30);
         });
@@ -239,6 +293,7 @@ export default function GOTermDagViewer({ goId }: Props) {
     initCy();
 
     return () => {
+      cancelledRef.current = true;
       if (cleanupPopup) cleanupPopup();
       const p = document.querySelector(".cy-popup");
       if (p) p.remove();
@@ -255,10 +310,10 @@ export default function GOTermDagViewer({ goId }: Props) {
     if (cy) cy.zoom(cy.zoom() / 1.3);
   };
 
-  const version = dagMeta?.data_version ?? "—";
+  const version = dagMeta?.data_version ?? "--";
   const loadedAt = dagMeta?.loaded_at
     ? new Date(dagMeta.loaded_at).toLocaleDateString()
-    : "—";
+    : "--";
 
   return (
     <Stack gap="xs">
@@ -418,7 +473,7 @@ export default function GOTermDagViewer({ goId }: Props) {
 }
 
 function truncate(s: string, max: number): string {
-  return s.length > max ? s.slice(0, max - 1) + "…" : s;
+  return s.length > max ? s.slice(0, max - 1) + "..." : s;
 }
 
 function buildCyStyle(): any[] {
