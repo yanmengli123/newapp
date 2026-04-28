@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   Box,
   NumberInput,
@@ -12,7 +13,6 @@ import {
   ActionIcon,
   Alert,
   SegmentedControl,
-  Modal,
 } from "@mantine/core";
 import {
   IconZoomIn,
@@ -23,6 +23,7 @@ import {
   IconArrowDown,
   IconArrowsExchange,
   IconMaximize,
+  IconX,
 } from "@tabler/icons-react";
 import {
   getGOTermDag,
@@ -257,7 +258,6 @@ function mountCytoscape(opts: {
       elements,
       style: buildCyStyle(),
       layout: { name: "preset" } as any,
-      wheelSensitivity: 0.3,
       minZoom: 0.1,
       maxZoom: opts.isFullscreen ? 5 : 4,
     });
@@ -267,7 +267,6 @@ function mountCytoscape(opts: {
 
     if (disposed) { cy.destroy(); return; }
 
-    // Selector-based tap handlers
     cy.on("tap", "node", (evt: any) => {
       showNodePopup(evt.target, evt.originalEvent.clientX, evt.originalEvent.clientY);
     });
@@ -276,31 +275,50 @@ function mountCytoscape(opts: {
       showEdgePopup(evt.target, evt.originalEvent.clientX, evt.originalEvent.clientY);
     });
 
-    // Tap on background → close popups
     cy.on("tap", (evt: any) => {
       if (evt.target === cy) removeDagPopups();
     });
 
-    // Register layoutstop listener BEFORE running layout
-    cy.one("layoutstop", () => {
-      if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
-    });
+    if (opts.isFullscreen) {
+      // Fullscreen: stable init — no animation, explicit resize+fit
+      cy.ready(() => {
+        if (disposed) return;
+        cy.resize();
+        cy.layout({
+          name: "dagre",
+          rankDir: "TB",
+          nodeSep: 55,
+          rankSep: 80,
+          fit: true,
+          padding: 50,
+          animate: false,
+        } as any).run();
+        requestAnimationFrame(() => {
+          if (!disposed) { cy.resize(); cy.fit(undefined, 50); }
+          if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
+        });
+      });
+    } else {
+      cy.one("layoutstop", () => {
+        if (!disposed) { cy.resize(); cy.fit(undefined, 30); }
+        if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
+      });
+      cy.layout({
+        name: "dagre",
+        rankDir: "TB",
+        nodeSep: 40,
+        rankSep: 60,
+        fit: true,
+        padding: 30,
+        animate: true,
+        animationDuration: 400,
+      } as any).run();
 
-    cy.layout({
-      name: "dagre",
-      rankDir: "TB",
-      nodeSep: opts.isFullscreen ? 55 : 40,
-      rankSep: opts.isFullscreen ? 80 : 60,
-      fit: true,
-      padding: opts.isFullscreen ? 50 : 30,
-      animate: true,
-      animationDuration: 400,
-    } as any).run();
-
-    // Safety fallback for layoutstop
-    setTimeout(() => {
-      if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
-    }, 2000);
+      setTimeout(() => {
+        if (!disposed) { cy.resize(); cy.fit(undefined, 30); }
+        if (!disposed && opts.onLayoutDone) opts.onLayoutDone();
+      }, 2000);
+    }
   })
   .catch((err) => {
     console.error("[GOTermDagViewer] Cytoscape mount failed:", err);
@@ -315,6 +333,130 @@ function mountCytoscape(opts: {
   };
 }
 
+// ─── Fullscreen Portal Overlay ──────────────────────────────────────────────
+// Rendered via createPortal into document.body — completely outside
+// the GOTermDagViewer component tree, so closing the parent Drawer
+// never races with Cytoscape's unmount.
+
+function FullscreenOverlay({
+  dagData,
+  onClose,
+}: {
+  dagData: GoDagResponse;
+  onClose: () => void;
+}) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const fsDestroyRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+
+    removeDagPopups();
+    if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
+
+    const destroy = mountCytoscape({ container: el, data: dagData, isFullscreen: true });
+    fsDestroyRef.current = destroy;
+
+    return () => {
+      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
+    };
+  }, [dagData]);
+
+  const doZoom = (factor: number) => {
+    const el = innerRef.current;
+    if (!el) return;
+    const cy = (el as any)._cy;
+    if (cy) cy.zoom(cy.zoom() * factor);
+  };
+
+  const doFit = (padding: number) => {
+    const el = innerRef.current;
+    if (!el) return;
+    const cy = (el as any)._cy;
+    if (cy) { cy.resize(); cy.fit(undefined, padding); }
+  };
+
+  return createPortal(
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 10000,
+        background: "rgba(0,0,0,0.7)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Header bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "8px 16px",
+          background: "#fff",
+          borderBottom: "1px solid #e0e0e0",
+          flexShrink: 0,
+        }}
+      >
+        <Group gap="xs">
+          <Text fw={700}>DAG View — Fullscreen</Text>
+          <Badge size="xs" variant="light" color="gray">{dagData.center}</Badge>
+        </Group>
+        <ActionIcon variant="subtle" size="lg" onClick={onClose}>
+          <IconX size={18} />
+        </ActionIcon>
+      </div>
+
+      {/* Graph area */}
+      <div
+        ref={innerRef}
+        style={{
+          flex: 1,
+          width: "100%",
+          minHeight: 0,
+          background: "#fafafa",
+          position: "relative",
+        }}
+      />
+
+      {/* Floating toolbar */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 24,
+          right: 24,
+          zIndex: 10,
+          background: "#fff",
+          borderRadius: 8,
+          padding: "8px 10px",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+          display: "flex",
+          gap: 6,
+        }}
+      >
+        <Tooltip label="Zoom in">
+          <ActionIcon variant="light" size="md" onClick={() => doZoom(1.3)}>
+            <IconZoomIn size={16} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Zoom out">
+          <ActionIcon variant="light" size="md" onClick={() => doZoom(1 / 1.3)}>
+            <IconZoomOut size={16} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Fit to view">
+          <ActionIcon variant="light" size="md" onClick={() => doFit(50)}>
+            <IconFocusCentered size={16} />
+          </ActionIcon>
+        </Tooltip>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface Props {
@@ -323,7 +465,7 @@ interface Props {
 
 export default function GOTermDagViewer({ goId }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const fullscreenContainerRef = useRef<HTMLDivElement>(null);
+  const graphHostRef = useRef<HTMLDivElement>(null);
 
   const [direction, setDirection] = useState<DagDirection>("ancestors");
   const [depth, setDepth] = useState<number>(3);
@@ -338,8 +480,7 @@ export default function GOTermDagViewer({ goId }: Props) {
 
   // Lifecycle refs
   const mainDestroyRef = useRef<(() => void) | null>(null);
-  const fsDestroyRef = useRef<(() => void) | null>(null);
-  const fetchCountRef = useRef(0); // track fetch cycles to ignore stale responses
+  const fetchCountRef = useRef(0);
 
   // Load metadata once
   useEffect(() => {
@@ -355,9 +496,7 @@ export default function GOTermDagViewer({ goId }: Props) {
 
   const fetchDag = useCallback(
     (dir: DagDirection, d: number, isa: boolean, part: boolean) => {
-      // Cleanup existing instances synchronously
       if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
-      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
       removeDagPopups();
 
       setLoading(true);
@@ -373,7 +512,6 @@ export default function GOTermDagViewer({ goId }: Props) {
         max_nodes: 80,
       })
         .then((data) => {
-          // Ignore stale responses
           if (fetchId !== fetchCountRef.current) return;
           setDagData(data);
           setLoading(false);
@@ -388,36 +526,34 @@ export default function GOTermDagViewer({ goId }: Props) {
   );
 
   useEffect(() => {
-    fetchDag(direction, depth, includeIsA, includePartOf);
+    queueMicrotask(() => {
+      fetchDag(direction, depth, includeIsA, includePartOf);
+    });
   }, [fetchDag, direction, depth, includeIsA, includePartOf]);
 
   // ── Main graph effect ─────────────────────────────────────────────────────
 
-  // No `loading` in deps — only dagData triggers (or re-trigger via fetchDag)
   useEffect(() => {
-    if (!dagData || !containerRef.current) return;
+    if (!dagData || !graphHostRef.current) return;
     if (dagData.nodes.length === 0) return;
 
-    const el = containerRef.current;
-
-    // Skip if already mounted
+    const el = graphHostRef.current;
     if ((el as any)._cy) return;
 
-    setRendering(true);
+    queueMicrotask(() => setRendering(true));
 
-    // Guard: ensure container has non-zero size before mounting
     if (el.offsetWidth === 0 || el.offsetHeight === 0) {
       let ro: ResizeObserver | null = null;
       let settled = false;
-      let timeout: ReturnType<typeof setTimeout>;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
 
       const tryInit = () => {
-        if (settled || !containerRef.current) return;
-        const container = containerRef.current;
+        if (settled || !graphHostRef.current) return;
+        const container = graphHostRef.current;
         if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
         settled = true;
         if (ro) { ro.disconnect(); ro = null; }
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
 
         if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
         removeDagPopups();
@@ -432,28 +568,25 @@ export default function GOTermDagViewer({ goId }: Props) {
       };
 
       tryInit();
-
       ro = new ResizeObserver(() => { if (!settled) tryInit(); });
       ro.observe(el);
-
       timeout = setTimeout(() => {
         if (!settled) {
           settled = true;
           if (ro) { ro.disconnect(); ro = null; }
-          if (containerRef.current && !((containerRef.current as any)._cy)) tryInit();
+          if (graphHostRef.current && !((graphHostRef.current as any)._cy)) tryInit();
         }
       }, 1500);
 
       return () => {
         settled = true;
         if (ro) { ro.disconnect(); ro = null; }
-        clearTimeout(timeout);
+        if (timeout) clearTimeout(timeout);
         if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
       };
     }
 
     removeDagPopups();
-
     const destroy = mountCytoscape({
       container: el,
       data: dagData,
@@ -466,95 +599,30 @@ export default function GOTermDagViewer({ goId }: Props) {
       destroy();
       mainDestroyRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  }, [dagData]); // intentionally omitting `loading` — fetchDag manages it
+  }, [dagData]);
 
   // ── Fullscreen ─────────────────────────────────────────────────────────────
 
   const handleOpenFullscreen = () => {
-    if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
     setFullscreenOpen(true);
   };
 
   const handleCloseFullscreen = () => {
-    if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
     removeDagPopups();
     setFullscreenOpen(false);
   };
 
-  // Fullscreen init — triggered when modal is open AND dagData is ready
-  useEffect(() => {
-    if (!fullscreenOpen || !dagData) return;
-
-    const el = fullscreenContainerRef.current;
-    if (!el) return;
-    if ((el as any)._cy) return; // already mounted
-
-    let settled = false;
-    let ro: ResizeObserver | null = null;
-    let retryTimeout: ReturnType<typeof setTimeout>;
-
-    const tryInit = () => {
-      if (settled || !fullscreenContainerRef.current) return;
-      const container = fullscreenContainerRef.current;
-
-      // Skip if container has no size yet — ResizeObserver will retry
-      if (container.offsetWidth === 0 || container.offsetHeight === 0) return;
-
-      settled = true;
-      if (ro) { ro.disconnect(); ro = null; }
-      clearTimeout(retryTimeout);
-
-      if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; }
-      removeDagPopups();
-
-      const destroy = mountCytoscape({
-        container,
-        data: dagData,
-        isFullscreen: true,
-        onLayoutDone: undefined,
-      });
-      fsDestroyRef.current = destroy;
-
-      // Fit after layout runs
-      setTimeout(() => {
-        const cy = (container as any)._cy;
-        if (cy) { cy.resize(); cy.fit(undefined, 50); }
-      }, 600);
-    };
-
-    // ResizeObserver handles retry when Modal expands
-    ro = new ResizeObserver(() => {
-      if (!settled) tryInit();
-    });
-    ro.observe(el);
-
-    // Backup setTimeout in case ResizeObserver misses the resize
-    retryTimeout = setTimeout(() => {
-      if (!settled) tryInit();
-    }, 1500);
-
-    // Also try immediately once DOM has had a chance to paint
-    requestAnimationFrame(() => { if (!settled) tryInit(); });
-
-    return () => {
-      settled = true;
-      if (ro) ro.disconnect();
-      clearTimeout(retryTimeout);
-    };
-  }, [fullscreenOpen, dagData]);
-
   // ── Toolbar helpers ──────────────────────────────────────────────────────
 
-  const doZoom = (ref: React.RefObject<HTMLDivElement>, factor: number) => {
-    const el = ref.current;
+  const doZoom = (factor: number) => {
+    const el = graphHostRef.current;
     if (!el) return;
     const cy = (el as any)._cy;
     if (cy) cy.zoom(cy.zoom() * factor);
   };
 
-  const doFit = (ref: React.RefObject<HTMLDivElement>, padding: number) => {
-    const el = ref.current;
+  const doFit = (padding: number) => {
+    const el = graphHostRef.current;
     if (!el) return;
     const cy = (el as any)._cy;
     if (cy) { cy.resize(); cy.fit(undefined, padding); }
@@ -566,190 +634,149 @@ export default function GOTermDagViewer({ goId }: Props) {
     : "--";
 
   return (
-    <Stack gap="xs">
-      {/* Metadata badge */}
-      <Group gap="xs">
-        <Text size="xs" c="dimmed">GO DAG:</Text>
-        <Badge size="xs" variant="light" color="gray">
-          go-basic.obo {version}
-        </Badge>
-        <Text size="xs" c="dimmed">Loaded: {loadedAt}</Text>
-      </Group>
-
-      {/* Controls */}
-      <Group gap="xs" wrap="wrap" align="flex-end">
-        <SegmentedControl
-          size="xs"
-          data={[
-            { value: "ancestors", label: <Group gap={4}><IconArrowUp size={12} /><Text size="xs">Ancestors</Text></Group> },
-            { value: "descendants", label: <Group gap={4}><IconArrowDown size={12} /><Text size="xs">Descendants</Text></Group> },
-            { value: "both", label: <Group gap={4}><IconArrowsExchange size={12} /><Text size="xs">Both</Text></Group> },
-          ]}
-          value={direction}
-          onChange={(v) => v && setDirection(v as DagDirection)}
-        />
-        <NumberInput
-          label="Depth" size="xs" value={depth}
-          onChange={(v) => setDepth(Number(v) || 3)}
-          min={1} max={6} step={1} style={{ width: 65 }}
-        />
-        <Group gap={4} align="center" mt={4}>
-          <Switch size="xs" label="is_a" checked={includeIsA} onChange={(e) => setIncludeIsA(e.currentTarget.checked)} />
-          <Switch size="xs" label="part_of" checked={includePartOf} onChange={(e) => setIncludePartOf(e.currentTarget.checked)} />
+    <>
+      <Stack gap="xs">
+        {/* Metadata badge */}
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">GO DAG:</Text>
+          <Badge size="xs" variant="light" color="gray">
+            go-basic.obo {version}
+          </Badge>
+          <Text size="xs" c="dimmed">Loaded: {loadedAt}</Text>
         </Group>
-        <Group gap={2} align="flex-end" mt={4}>
-          <Tooltip label="Zoom in">
-            <ActionIcon variant="light" size="sm" onClick={() => doZoom(containerRef, 1.3)}>
-              <IconZoomIn size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Zoom out">
-            <ActionIcon variant="light" size="sm" onClick={() => doZoom(containerRef, 1 / 1.3)}>
-              <IconZoomOut size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Fit to view">
-            <ActionIcon variant="light" size="sm" onClick={() => doFit(containerRef, 30)}>
-              <IconFocusCentered size={14} />
-            </ActionIcon>
-          </Tooltip>
-          <Tooltip label="Fullscreen">
-            <ActionIcon variant="light" size="sm" onClick={handleOpenFullscreen}>
-              <IconMaximize size={14} />
-            </ActionIcon>
-          </Tooltip>
+
+        {/* Controls */}
+        <Group gap="xs" wrap="wrap" align="flex-end">
+          <SegmentedControl
+            size="xs"
+            data={[
+              { value: "ancestors", label: <Group gap={4}><IconArrowUp size={12} /><Text size="xs">Ancestors</Text></Group> },
+              { value: "descendants", label: <Group gap={4}><IconArrowDown size={12} /><Text size="xs">Descendants</Text></Group> },
+              { value: "both", label: <Group gap={4}><IconArrowsExchange size={12} /><Text size="xs">Both</Text></Group> },
+            ]}
+            value={direction}
+            onChange={(v) => v && setDirection(v as DagDirection)}
+          />
+          <NumberInput
+            label="Depth" size="xs" value={depth}
+            onChange={(v) => setDepth(Number(v) || 3)}
+            min={1} max={6} step={1} style={{ width: 65 }}
+          />
+          <Group gap={4} align="center" mt={4}>
+            <Switch size="xs" label="is_a" checked={includeIsA} onChange={(e) => setIncludeIsA(e.currentTarget.checked)} />
+            <Switch size="xs" label="part_of" checked={includePartOf} onChange={(e) => setIncludePartOf(e.currentTarget.checked)} />
+          </Group>
+          <Group gap={2} align="flex-end" mt={4}>
+            <Tooltip label="Zoom in">
+              <ActionIcon variant="light" size="sm" onClick={() => doZoom(1.3)}>
+                <IconZoomIn size={14} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Zoom out">
+              <ActionIcon variant="light" size="sm" onClick={() => doZoom(1 / 1.3)}>
+                <IconZoomOut size={14} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Fit to view">
+              <ActionIcon variant="light" size="sm" onClick={() => doFit(30)}>
+                <IconFocusCentered size={14} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Fullscreen">
+              <ActionIcon variant="light" size="sm" onClick={handleOpenFullscreen}>
+                <IconMaximize size={14} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Group>
-      </Group>
 
-      {/* Truncation warning */}
-      {dagData?.truncated && (
-        <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={14} />} py={4}>
-          Graph truncated to {dagData.node_count_returned} of {dagData.node_count_total} nodes.
-          Reduce depth or switch direction.
-        </Alert>
-      )}
-
-      {/* Error display */}
-      {errorMsg && (
-        <Alert color="red" variant="light" py={4}>{errorMsg}</Alert>
-      )}
-
-      {/* Legend */}
-      <Group gap="lg">
-        {Object.entries(NS_LABELS).map(([ns, label]) => (
-          <Group key={ns} gap={4}>
-            <Box w={12} h={12} style={{ borderRadius: 3, background: NS_COLORS[ns] }} />
-            <Text size="xs">{label}</Text>
-          </Group>
-        ))}
-        <Group gap={4}><Box w={20} h={2} style={{ background: "#666" }} /><Text size="xs">is_a</Text></Group>
-        <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #666" }} /><Text size="xs">part_of</Text></Group>
-      </Group>
-
-      {/* Main Cytoscape container */}
-      <Box
-        ref={containerRef}
-        style={{
-          height: 400,
-          borderRadius: 8,
-          border: "1px solid #e0e0e0",
-          background: "#fafafa",
-          position: "relative",
-        }}
-      >
-        {loading && (
-          <Box
-            style={{
-              position: "absolute", inset: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(250,250,250,0.9)", zIndex: 3,
-            }}
-          >
-            <Text c="dimmed" size="sm">Loading DAG...</Text>
-          </Box>
+        {/* Truncation warning */}
+        {dagData?.truncated && (
+          <Alert color="yellow" variant="light" icon={<IconAlertTriangle size={14} />} py={4}>
+            Graph truncated to {dagData.node_count_returned} of {dagData.node_count_total} nodes.
+            Reduce depth or switch direction.
+          </Alert>
         )}
-        {!loading && rendering && (
-          <Box
-            style={{
-              position: "absolute", inset: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: "rgba(250,250,250,0.85)", zIndex: 2,
-            }}
-          >
-            <Text c="dimmed" size="sm">Rendering graph...</Text>
-          </Box>
-        )}
-        {!loading && !rendering && dagData && dagData.nodes.length === 0 && (
-          <Box style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Text c="dimmed" size="sm">No DAG relationships found for this term with current filters.</Text>
-          </Box>
-        )}
-      </Box>
 
-      <Text size="xs" c="dimmed" ta="center">
-        Click nodes/edges for details. Scroll to zoom.
-      </Text>
+        {/* Error display */}
+        {errorMsg && (
+          <Alert color="red" variant="light" py={4}>{errorMsg}</Alert>
+        )}
 
-      {/* Fullscreen Modal */}
-      <Modal
-        opened={fullscreenOpen}
-        onClose={handleCloseFullscreen}
-        title={
-          <Group gap="xs">
-            <Text fw={700}>DAG View</Text>
-            <Badge size="xs" variant="light" color="gray">{dagData?.center}</Badge>
-          </Group>
-        }
-        size="100%"
-        styles={{
-          root: { top: 0, left: 0 },
-          content: { width: "100vw", height: "100vh", display: "flex", flexDirection: "column" },
-          body: { flex: 1, display: "flex", flexDirection: "column", padding: 0, minHeight: 0 },
-          header: { padding: "12px 16px", flexShrink: 0 },
-        }}
-      >
-        {/* Fullscreen graph container — explicit height so flex:1 always has a defined size */}
+        {/* Legend */}
+        <Group gap="lg">
+          {Object.entries(NS_LABELS).map(([ns, label]) => (
+            <Group key={ns} gap={4}>
+              <Box w={12} h={12} style={{ borderRadius: 3, background: NS_COLORS[ns] }} />
+              <Text size="xs">{label}</Text>
+            </Group>
+          ))}
+          <Group gap={4}><Box w={20} h={2} style={{ background: "#666" }} /><Text size="xs">is_a</Text></Group>
+          <Group gap={4}><Box w={20} h={2} style={{ borderTop: "2px dashed #666" }} /><Text size="xs">part_of</Text></Group>
+        </Group>
+
+        {/* Main Cytoscape container */}
         <Box
-          ref={fullscreenContainerRef}
+          ref={containerRef}
           style={{
-            flex: 1,
-            minHeight: 0,
-            height: "100%",
+            height: 400,
+            borderRadius: 8,
+            border: "1px solid #e0e0e0",
             background: "#fafafa",
             position: "relative",
+            overflow: "hidden",
           }}
-        />
-
-        {/* Floating controls */}
-        <Box style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10 }}>
-          <Box
+        >
+          <div
+            ref={graphHostRef}
             style={{
-              background: "#fff",
-              borderRadius: 8,
-              padding: "8px 10px",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.18)",
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
             }}
-          >
-            <Group gap={6}>
-              <Tooltip label="Zoom in">
-                <ActionIcon variant="light" size="md" onClick={() => doZoom(fullscreenContainerRef, 1.3)}>
-                  <IconZoomIn size={16} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Zoom out">
-                <ActionIcon variant="light" size="md" onClick={() => doZoom(fullscreenContainerRef, 1 / 1.3)}>
-                  <IconZoomOut size={16} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Fit">
-                <ActionIcon variant="light" size="md" onClick={() => doFit(fullscreenContainerRef, 50)}>
-                  <IconFocusCentered size={16} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          </Box>
+          />
+          {loading && (
+            <Box
+              style={{
+                position: "absolute", inset: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "rgba(250,250,250,0.9)", zIndex: 3,
+              }}
+            >
+              <Text c="dimmed" size="sm">Loading DAG...</Text>
+            </Box>
+          )}
+          {!loading && rendering && (
+            <Box
+              style={{
+                position: "absolute", inset: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                background: "rgba(250,250,250,0.85)", zIndex: 2,
+              }}
+            >
+              <Text c="dimmed" size="sm">Rendering graph...</Text>
+            </Box>
+          )}
+          {!loading && !rendering && dagData && dagData.nodes.length === 0 && (
+            <Box style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Text c="dimmed" size="sm">No DAG relationships found for this term with current filters.</Text>
+            </Box>
+          )}
         </Box>
-      </Modal>
-    </Stack>
+
+        <Text size="xs" c="dimmed" ta="center">
+          Click nodes/edges for details. Scroll to zoom.
+        </Text>
+      </Stack>
+
+      {/* Fullscreen overlay — rendered via portal into document.body, completely outside component tree */}
+      {fullscreenOpen && dagData && (
+        <FullscreenOverlay
+          dagData={dagData}
+          onClose={handleCloseFullscreen}
+        />
+      )}
+    </>
   );
 }
