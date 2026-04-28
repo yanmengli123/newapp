@@ -176,7 +176,7 @@ class GOBackgroundBuilder:
         return "", []
 
     @staticmethod
-    def get_background_and_terms(namespace: str, evidence_filter: str, pg_getconn, pg_putconn) -> tuple[set[str], dict[str, int], dict[str, tuple]]:
+    def get_background_and_terms(namespace: str, evidence_filter: str, annotation_mode: str, pg_getconn, pg_putconn) -> tuple[set[str], dict[str, int], dict[str, tuple]]:
         """
         返回:
         - background_gene_ids: 背景基因 ID 集合（有 GO 注释且有 ncbi_gene_id 的基因）
@@ -209,25 +209,93 @@ class GOBackgroundBuilder:
             background_gene_ids = {r[0] for r in cur.fetchall()}
 
             # 每个 GO term 在背景中的基因数 K — 必须与 N 的定义严格一致
-            if namespace == "all":
-                cur.execute(f"""
-                    SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
-                    FROM gene_go gg
-                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
-                    GROUP BY gg.go_id
-                """, ev_args)
+            if annotation_mode == "direct":
+                if namespace == "all":
+                    cur.execute(f"""
+                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
+                        GROUP BY gg.go_id
+                    """, ev_args)
+                else:
+                    cur.execute(f"""
+                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s {ev_where}
+                        GROUP BY gg.go_id
+                    """, (namespace,) + tuple(ev_args))
+                bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
             else:
-                cur.execute(f"""
-                    SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
-                    FROM gene_go gg
-                    JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    JOIN go_term gt ON gt.go_id = gg.go_id
-                    WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s {ev_where}
-                    GROUP BY gg.go_id
-                """, (namespace,) + tuple(ev_args))
-
-            bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
+                # propagated: genes annotated to a descendant GO term count for all ancestors
+                if namespace == "all":
+                    # alt_id branch: resolve go_id → primary_go_id → closure → ancestor
+                    cur.execute(f"""
+                        SELECT gc.ancestor_go_id AS go_id,
+                               COUNT(DISTINCT gg.gene_id) AS bg_count
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
+                        JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
+                        JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
+                        GROUP BY gc.ancestor_go_id
+                    """, ev_args)
+                    bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
+                    # direct (non-alt_id) branch
+                    cur.execute(f"""
+                        SELECT gc.ancestor_go_id AS go_id,
+                               COUNT(DISTINCT gg.gene_id) AS bg_count
+                        FROM gene_go gg
+                        JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        JOIN go_closure gc ON gc.descendant_go_id = gg.go_id
+                        JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                        WHERE gx.ncbi_gene_id IS NOT NULL
+                          AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
+                          {ev_where}
+                        GROUP BY gc.ancestor_go_id
+                    """, ev_args)
+                    for r in cur.fetchall():
+                        go_id = r[0]
+                        bg_count = r[1]
+                        bg_go_counts[go_id] = bg_go_counts.get(go_id, 0) + bg_count
+                else:
+                    # specific namespace: filter by ancestor's namespace AND annotation's namespace
+                    # Use UNION to avoid double-counting genes that appear in both alt_id and direct branches
+                    cur.execute(f"""
+                        SELECT ancestor_go_id AS go_id, COUNT(DISTINCT gene_id) AS bg_count
+                        FROM (
+                            SELECT DISTINCT gg.gene_id, gc.ancestor_go_id
+                            FROM gene_go gg
+                            JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                            JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
+                            JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
+                            JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                            JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                            WHERE gx.ncbi_gene_id IS NOT NULL
+                              AND gt.go_namespace = %s
+                              AND gt_ann.go_namespace = %s
+                              {ev_where}
+                            UNION
+                            SELECT DISTINCT gg.gene_id, gc.ancestor_go_id
+                            FROM gene_go gg
+                            JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                            JOIN go_closure gc ON gc.descendant_go_id = gg.go_id
+                            JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                            JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                            WHERE gx.ncbi_gene_id IS NOT NULL
+                              AND gt.go_namespace = %s
+                              AND gt_ann.go_namespace = %s
+                              AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
+                              {ev_where}
+                        ) AS combined
+                        GROUP BY ancestor_go_id
+                    """, (namespace, namespace, namespace, namespace) + tuple(ev_args))
+                    bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
 
             # GO term 名称
             cur.execute("SELECT go_id, go_name, go_namespace FROM go_term")
@@ -306,7 +374,7 @@ class GOEnrichmentAnalyzer:
         namespaces = ["biological_process", "cellular_component", "molecular_function"] if params.namespace == "all" else [params.namespace]
 
         for ns in namespaces:
-            bg_gene_ids, bg_go_counts, go_names = self.bg_builder.get_background_and_terms(ns, params.evidence_filter, pg_getconn, pg_putconn)
+            bg_gene_ids, bg_go_counts, go_names = self.bg_builder.get_background_and_terms(ns, params.evidence_filter, params.annotation_mode, pg_getconn, pg_putconn)
             N = len(bg_gene_ids)
             bg_gene_ids_set = bg_gene_ids  # 已经是 set
 
@@ -328,12 +396,60 @@ class GOEnrichmentAnalyzer:
             try:
                 cur = conn.cursor()
                 ev_where, ev_args = self._evidence_filter_sql(params.evidence_filter)
-                cur.execute(
-                    f"SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go gg "
-                    f"WHERE gene_id = ANY(%s) {ev_where} GROUP BY go_id",
-                    (annotated_gene_ids,) + tuple(ev_args)
-                )
-                query_go_hits = {r[0]: list(set(r[1])) for r in cur.fetchall()}
+
+                if params.annotation_mode == "direct":
+                    cur.execute(
+                        f"SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go gg "
+                        f"WHERE gene_id = ANY(%s) {ev_where} GROUP BY go_id",
+                        (annotated_gene_ids,) + tuple(ev_args)
+                    )
+                    query_go_hits = {r[0]: list(set(r[1])) for r in cur.fetchall()}
+                else:
+                    # propagated: propagate query gene annotations through closure
+                    cur.execute(
+                        f"""
+                        SELECT gc.ancestor_go_id AS go_id,
+                               ARRAY_AGG(DISTINCT gg.gene_id) AS hit_genes
+                        FROM gene_go gg
+                        JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
+                        JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
+                        JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                        WHERE gg.gene_id = ANY(%s)
+                          AND gt.go_namespace = %s
+                          AND gt_ann.go_namespace = %s
+                          {ev_where}
+                        GROUP BY gc.ancestor_go_id
+                        """,
+                        (annotated_gene_ids, ns, ns) + tuple(ev_args)
+                    )
+                    hits_alt = {r[0]: list(set(r[1])) for r in cur.fetchall()}
+
+                    cur.execute(
+                        f"""
+                        SELECT gc.ancestor_go_id AS go_id,
+                               ARRAY_AGG(DISTINCT gg.gene_id) AS hit_genes
+                        FROM gene_go gg
+                        JOIN go_closure gc ON gc.descendant_go_id = gg.go_id
+                        JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
+                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                        WHERE gg.gene_id = ANY(%s)
+                          AND gt.go_namespace = %s
+                          AND gt_ann.go_namespace = %s
+                          AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
+                          {ev_where}
+                        GROUP BY gc.ancestor_go_id
+                        """,
+                        (annotated_gene_ids, ns, ns) + tuple(ev_args)
+                    )
+                    hits_direct = {r[0]: list(set(r[1])) for r in cur.fetchall()}
+
+                    query_go_hits = dict(hits_alt)
+                    for go_id, genes in hits_direct.items():
+                        if go_id in query_go_hits:
+                            query_go_hits[go_id] = list(set(query_go_hits[go_id] + genes))
+                        else:
+                            query_go_hits[go_id] = genes
 
                 # 基因 ID → (ncbi_id, symbol)
                 cur.execute(

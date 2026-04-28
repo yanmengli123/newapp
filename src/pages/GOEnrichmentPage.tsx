@@ -62,6 +62,7 @@ export default function GOEnrichmentPage() {
   const [fdrCutoff, setFdrCutoff] = useState<number>(0.05);
   const [minOverlap, setMinOverlap] = useState<number>(2);
   const [namespace, setNamespace] = useState("all");
+  const [annotationMode, setAnnotationMode] = useState("direct");
   const [evidenceFilter, setEvidenceFilter] = useState("non_iea");
 
   const [pageState, setPageState] = useState<PageState>("idle");
@@ -99,7 +100,7 @@ export default function GOEnrichmentPage() {
         fdr_cutoff: fdrCutoff,
         min_overlap: minOverlap,
         namespace,
-        annotation_mode: "direct",
+        annotation_mode: annotationMode,
         evidence_filter: evidenceFilter,
       });
       setResult(res);
@@ -108,7 +109,7 @@ export default function GOEnrichmentPage() {
       setErrorMsg(err.message ?? "Analysis failed. Please try again.");
       setPageState("error");
     }
-  }, [geneInput, correction, fdrCutoff, minOverlap, namespace, evidenceFilter]);
+  }, [geneInput, correction, fdrCutoff, minOverlap, namespace, annotationMode, evidenceFilter]);
 
   const handleClear = () => {
     setGeneInput("");
@@ -173,8 +174,10 @@ export default function GOEnrichmentPage() {
         </Text>
         <Text c="dimmed" size="xs">
           This analysis uses the local GO annotations mapped to the NCBI GRCg6a gene set,
-          not the full agriGO background. Annotation mode: direct GO terms only (no GO DAG propagation).
-          FDR correction (BH) is applied within each ontology (BP/CC/MF corrected separately).
+          not the full agriGO background. <b>Direct</b>: only directly assigned GO terms are tested.
+          <b>Propagated</b>: direct annotations are propagated to all is_a/part_of ancestor terms
+          (GO DAG from go-basic.obo, January 2026 release).
+          FDR correction is applied within each ontology (BP/CC/MF corrected separately).
           Evidence filter excludes electronic IEA annotations by default.
         </Text>
       </Box>
@@ -214,12 +217,22 @@ export default function GOEnrichmentPage() {
           </Group>
 
           {/* Parameters */}
-          <SimpleGrid cols={{ base: 2, xs: 3, sm: 7 }} spacing="xs">
+          <SimpleGrid cols={{ base: 2, xs: 3, sm: 8 }} spacing="xs">
             <Select
               label="Ontology"
               data={NAMESPACE_OPTIONS}
               value={namespace}
               onChange={(v) => v && setNamespace(v)}
+              size="sm"
+            />
+            <Select
+              label="Annotation"
+              data={[
+                { value: "direct", label: "Direct only" },
+                { value: "propagated", label: "Propagated to ancestors" },
+              ]}
+              value={annotationMode}
+              onChange={(v) => v && setAnnotationMode(v)}
               size="sm"
             />
             <Select
