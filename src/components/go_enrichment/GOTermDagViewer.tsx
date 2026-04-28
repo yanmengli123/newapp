@@ -199,7 +199,8 @@ export default function GOTermDagViewer({ goId }: Props) {
           <span style="color:#888">${NS_LABELS[d.namespace] ?? d.namespace}</span>
           &nbsp;depth=${d.depth}<br/>
           Direct genes: <b>${d.geneCountDirect}</b><br/>
-          Propagated genes: <b>${d.geneCountPropagated}</b>
+          Propagated (all): <b>${d.geneCountPropagated}</b>
+          <span style="color:#aaa;font-size:10px">(via full closure)</span>
         `;
         document.body.appendChild(popup);
       });
@@ -265,7 +266,7 @@ export default function GOTermDagViewer({ goId }: Props) {
       <Group gap="xs">
         <Text size="xs" c="dimmed">GO DAG:</Text>
         <Badge size="xs" variant="light" color="gray">
-          go-basic.obo · {version}
+          go-basic.obo {version}
         </Badge>
         <Text size="xs" c="dimmed">Loaded: {loadedAt}</Text>
       </Group>
@@ -392,7 +393,7 @@ export default function GOTermDagViewer({ goId }: Props) {
               background: "rgba(250,250,250,0.85)", zIndex: 2,
             }}
           >
-            <Text c="dimmed" size="sm">Loading DAG…</Text>
+            <Text c="dimmed" size="sm">Loading DAG...</Text>
           </Box>
         )}
         {!loading && !errorMsg && dagData && dagData.nodes.length === 0 && (

@@ -540,7 +540,7 @@ async def get_go_term_dag(
 
         cur.close()
 
-        # Build nodes
+        # Build nodes (only terms that exist in go_term)
         nodes = [
             DagNode(
                 id=gid,
@@ -555,12 +555,13 @@ async def get_go_term_dag(
             if gid in term_info
         ]
 
-        # Build edges (both ends must be in node set)
-        node_ids = set(go_ids_list)
+        # Build edges — both endpoints must be in the returned node set (term_info).
+        # GO:0051716 has no go_term entry so its node is excluded; exclude its edges too.
+        valid_node_ids = set(term_info.keys())
         edges = [
             DagEdge(source=c, target=p, relation=r)
             for c, p, r in all_edges
-            if c in node_ids and p in node_ids
+            if c in valid_node_ids and p in valid_node_ids
         ]
 
         nodes.sort(key=lambda n: (0 if n.is_center else 1, n.depth, n.label))
