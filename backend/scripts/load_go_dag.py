@@ -49,6 +49,7 @@ def parse_obo(path: str) -> Tuple[dict, dict, dict]:
     terms: dict = {}
     alt_map: dict = {}
     header: dict = {}
+    all_terms_count = 0  # accurate total including obsolete
 
     current_term: Optional[dict] = None
     in_term = False
@@ -61,6 +62,7 @@ def parse_obo(path: str) -> Tuple[dict, dict, dict]:
             if line.startswith("[") and not line.startswith("[!]"):
                 # Process previous term
                 if current_term is not None:
+                    all_terms_count += 1
                     go_id = current_term.get("id")
                     if go_id:
                         if current_term.get("is_obsolete"):
@@ -237,6 +239,7 @@ def write_dag(
     header: dict,
     include_part_of: bool,
     replace: bool,
+    obo_path: str = "go-basic.obo",
 ) -> Tuple[int, int, int]:
     """
     Write DAG data to PostgreSQL.
@@ -301,7 +304,7 @@ def write_dag(
     import datetime
 
     metadata = {
-        "obo_path": str(Path(terms) if False else "go-basic.obo"),  # placeholder, overridden below
+        "obo_path": obo_path,
         "format_version": header.get("format-version", "unknown"),
         "data_version": header.get("data-version", "unknown"),
         "include_part_of": "true" if include_part_of else "false",
@@ -371,9 +374,9 @@ def main() -> None:
     terms, alt_map, header = parse_obo(str(obo_path))
     elapsed = time.time() - t0
 
-    term_count = len(terms)
-    obs_count = sum(1 for t in terms.values() if t["is_obsolete"])
-    active_count = term_count - obs_count
+    term_count = all_terms_count
+    obs_count = term_count - len(terms)
+    active_count = len(terms)
     print(f"  Parsed {term_count} terms ({obs_count} obsolete, {active_count} active) in {elapsed:.1f}s")
     print(f"  alt_id mappings: {len(alt_map)}")
     print(f"  Header: format-version={header.get('format-version')}, data-version={header.get('data-version')}")
@@ -399,11 +402,12 @@ def main() -> None:
             header,
             args.include_part_of,
             args.replace,
+            obo_path=str(obo_path),
         )
         conn.commit()
         elapsed = time.time() - t0
-        print(f"\nDone! Wrote {term_cnt} terms, {edge_cnt} edges, {closure_cnt} closure rows in {elapsed:.1f}s")
-        print(f"  GO DAG is ready for annotation_mode=propagated queries.")
+        print(f"\nDone! Wrote {term_cnt} terms, {edge_cnt} edges, {closure_cnt} closure rows in {elapsed:.1f}s", flush=True)
+        print(f"  GO DAG is ready for annotation_mode=propagated queries.", flush=True)
 
     except Exception as e:
         conn.rollback()

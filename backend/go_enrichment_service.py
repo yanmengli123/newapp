@@ -187,6 +187,16 @@ class GOBackgroundBuilder:
         conn = pg_getconn()
         try:
             cur = conn.cursor()
+
+            # Guard: propagated mode requires go_closure table
+            if annotation_mode == "propagated":
+                cur.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'go_closure'")
+                if not cur.fetchone():
+                    raise RuntimeError(
+                        "annotation_mode='propagated' requires the GO DAG closure table. "
+                        "Run: python -m backend.scripts.load_go_dag --obo <path-to-go-basic.obo> --dsn <dsn>"
+                    )
+
             ev_where, ev_args = GOBackgroundBuilder._evidence_filter_sql(evidence_filter)
 
             # 背景基因 N：有 GO 注释且有 ncbi_gene_id 的基因
@@ -471,6 +481,8 @@ class GOEnrichmentAnalyzer:
                     continue
 
                 p_value = hypergeom.sf(k - 1, N, K, n)
+                if not math.isfinite(p_value):
+                    p_value = 1.0
 
                 if go_id in go_names:
                     term_name, _ = go_names[go_id]
@@ -502,7 +514,7 @@ class GOEnrichmentAnalyzer:
                 _, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
 
             for r, fdr in zip(raw_results, fdr_values):
-                r["fdr"] = fdr
+                r["fdr"] = fdr if math.isfinite(fdr) else 1.0
 
             # min_overlap 和 fdr_cutoff 过滤 — 过滤后才算作 significant
             tested_results = [
@@ -652,6 +664,7 @@ class GOEnrichmentAnalyzer:
                 "fdr_cutoff": params.fdr_cutoff,
                 "min_overlap": params.min_overlap,
                 "namespace": params.namespace,
+                "annotation_mode": params.annotation_mode,
                 "evidence_filter": params.evidence_filter,
             },
             ontology_stats=ontology_stats,
