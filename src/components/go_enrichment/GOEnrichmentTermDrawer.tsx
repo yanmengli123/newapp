@@ -36,6 +36,7 @@ export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
   const [termDetail, setTermDetail] = useState<TermDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!term) {
       setTermDetail(null);
@@ -47,8 +48,8 @@ export default function GOEnrichmentTermDrawer({ term, onClose }: Props) {
       .then((d) => setTermDetail(d as unknown as TermDetail))
       .catch(() => setTermDetail(null))
       .finally(() => setLoadingDetail(false));
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [term]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!term) return null;
 

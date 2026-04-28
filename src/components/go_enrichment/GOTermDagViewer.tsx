@@ -277,6 +277,8 @@ function mountCytoscape(opts: {
   container: HTMLDivElement;
   data: GoDagResponse;
   isFullscreen: boolean;
+  onReady?: () => void;
+  onError?: () => void;
 }): () => void {
   let disposed = false;
   let resolvedCy: any = null;
@@ -323,11 +325,16 @@ function mountCytoscape(opts: {
 
     // Ensure graph fits after layout
     requestAnimationFrame(() => {
-      if (!disposed) { cy.resize(); cy.fit(undefined, opts.isFullscreen ? 50 : 30); }
+      if (!disposed) {
+        cy.resize();
+        cy.fit(undefined, opts.isFullscreen ? 50 : 30);
+        opts.onReady?.();
+      }
     });
   })
   .catch((err) => {
     console.error("[GOTermDagViewer] Cytoscape mount failed:", err);
+    opts.onError?.();
   });
 
   return function destroy() {
@@ -597,7 +604,13 @@ export default function GOTermDagViewer({ goId }: Props) {
         if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
         removeDagPopups();
 
-        const destroy = mountCytoscape({ container, data: dagData!, isFullscreen: false });
+        const destroy = mountCytoscape({
+          container,
+          data: dagData!,
+          isFullscreen: false,
+          onReady: () => setRendering(false),
+          onError: () => setRendering(false),
+        });
         mainDestroyRef.current = destroy;
       };
 
@@ -621,7 +634,13 @@ export default function GOTermDagViewer({ goId }: Props) {
     }
 
     removeDagPopups();
-    const destroy = mountCytoscape({ container: el, data: dagData, isFullscreen: false });
+    const destroy = mountCytoscape({
+      container: el,
+      data: dagData,
+      isFullscreen: false,
+      onReady: () => setRendering(false),
+      onError: () => setRendering(false),
+    });
     mainDestroyRef.current = destroy;
 
     return () => {

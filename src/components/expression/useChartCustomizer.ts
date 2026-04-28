@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ChartCustomizerConfig,
   ChartPreset,
@@ -49,17 +49,15 @@ export function useChartCustomizer(): UseChartCustomizerReturn {
   });
   const [scope, setScope] = useState<ScopeLevel>("theme");
   const [selectedChartType, setSelectedChartType] = useState<ChartType>("stage");
-  const [isLoaded, setIsLoaded] = useState(false);
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
-    setIsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (isLoaded) {
+    if (hasMountedRef.current) {
       saveToStorage(config);
+    } else {
+      hasMountedRef.current = true;
     }
-  }, [config, isLoaded]);
+  }, [config]);
 
   const updateTheme = useCallback((partial: Partial<SharedChartTheme>) => {
     setConfig((prev) => ({
@@ -114,6 +112,6 @@ export function useChartCustomizer(): UseChartCustomizerReturn {
     updatePreset,
     resetCurrent,
     resetAll,
-    isLoaded,
+    isLoaded: true,
   };
 }

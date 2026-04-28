@@ -31,7 +31,7 @@ import { useChartCustomizer } from "./useChartCustomizer";
 import ChartCustomizerDrawer from "./ChartCustomizerDrawer";
 import ChartFullscreenModal from "./ChartFullscreenModal";
 import { resolveChartStyle } from "./chartStyleResolver";
-import type { FullscreenState } from "./chartFullscreen.types";
+import type { FullscreenChartType, FullscreenState } from "./chartFullscreen.types";
 
 interface ExpressionSectionProps {
   geneId: string;
@@ -319,7 +319,7 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
         samples={effectiveSamples}
         dataset={selectedDataset}
         metric={selectedMetric}
-        resolveStyle={(chartType) => resolveChartStyle(chartType as any, customizerHook.config)}
+        resolveStyle={(chartType) => resolveChartStyle(chartType as FullscreenChartType, customizerHook.config)}
       />
     </Paper>
   );

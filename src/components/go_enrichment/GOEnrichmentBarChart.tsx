@@ -75,6 +75,9 @@ export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props
 
   const allEntries = [...(filtered.P ? data.P : []), ...(filtered.C ? data.C : []), ...(filtered.F ? data.F : [])];
   const totalEntries = allEntries.filter((e, i, arr) => arr.findIndex(a => a.go_id === e.go_id) === i).length;
+  const longestLabel = allEntries.reduce((max, entry) => Math.max(max, entry.term_name.length), 0);
+  const leftMargin = Math.min(520, Math.max(240, longestLabel * 7));
+  const chartHeight = Math.min(640, Math.max(280, totalEntries * 30 + 120));
 
   // Block native DOM events from Plotly SVG so they don't bubble and
   // trigger parent Paper collapse.
@@ -110,14 +113,14 @@ export default function GOEnrichmentBarChart({ data, filtered, onExpand }: Props
         </Tooltip>
       </Group>
 
-      <Box ref={containerRef} style={{ width: "100%", height: Math.min(420, totalEntries * 28 + 80) }}>
+      <Box ref={containerRef} style={{ width: "100%", height: chartHeight }}>
         <Plot
           data={traces}
           layout={{
             barmode: "group",
-            margin: { l: 350, r: 50, t: 20, b: 60 },
+            margin: { l: leftMargin, r: 50, t: 20, b: 70 },
             xaxis: { title: "-log10(FDR)", tickangle: -30 },
-            yaxis: { title: "", automargin: true, tickangle: -30, tickfont: { size: 11 } },
+            yaxis: { title: "", automargin: true, tickangle: 0, tickfont: { size: 11, color: "#1f2937" } },
             font: { size: 11 },
             showlegend: true,
             legend: { orientation: "h", x: 0, y: -0.15 },

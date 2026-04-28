@@ -138,7 +138,7 @@ export default function PictureMakerPage() {
       setErrorMsg("Gene not found or expression data unavailable for the selected dataset.");
       setPageState("error");
     }
-  }, [geneQuery, selectedDataset, selectedMetric, availableDatasets]);
+  }, [geneQuery, selectedDataset, selectedMetric]);
 
   const metricOptions = (() => {
     const ds = availableDatasets.find((d) => d.dataset_code === selectedDataset);

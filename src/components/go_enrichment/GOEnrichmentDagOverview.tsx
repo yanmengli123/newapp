@@ -11,7 +11,6 @@ import {
   ActionIcon,
   Tooltip,
   Stack,
-  Switch,
   Alert,
   Button,
 } from "@mantine/core";
@@ -29,7 +28,6 @@ import {
   getEnrichmentDagOverview,
   type EnrichmentDagOverviewResponse,
   type EnrichmentTermItem,
-  type EnrichmentDagOverviewNode,
 } from "../../lib/goDagApi";
 import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
 
@@ -79,9 +77,6 @@ function removeDagPopups() {
 function showNodePopup(node: any, clientX: number, clientY: number, onDetail?: () => void) {
   removeDagPopups();
   const d = node.data();
-  const sigLevel = d.significanceLevel ?? 0;
-  const bgColor = SIG_COLORS[sigLevel] ?? "#ffffff";
-
   const popup = document.createElement("div");
   popup.className = "cy-popup";
   popup.style.cssText = [
@@ -106,14 +101,14 @@ function showNodePopup(node: any, clientX: number, clientY: number, onDetail?: (
     return e;
   };
 
-  popup.appendChild(mk(d.id, { fontWeight: "700", fontSize: "13px", display: "block", marginBottom: 4 }));
+  popup.appendChild(mk(d.id, { fontWeight: "700", fontSize: "13px", display: "block", marginBottom: "4px" }));
 
   if (d.isEnriched && d.fdr != null) {
     const pval = d.pValue != null ? `p=${d.pValue.toExponential(2)}` : "";
     const fdr = `FDR=${d.fdr.toExponential(2)}`;
-    popup.appendChild(mk(`${pval} ${fdr}`, { color: "#666", display: "block", fontSize: "11px", marginBottom: 4 }));
+    popup.appendChild(mk(`${pval} ${fdr}`, { color: "#666", display: "block", fontSize: "11px", marginBottom: "4px" }));
     if (d.queryCount != null && d.queryTotal != null) {
-      popup.appendChild(mk(`Hits: ${d.queryCount}/${d.queryTotal}`, { color: "#333", display: "block", fontSize: "11px", marginBottom: 4 }));
+      popup.appendChild(mk(`Hits: ${d.queryCount}/${d.queryTotal}`, { color: "#333", display: "block", fontSize: "11px", marginBottom: "4px" }));
     }
   }
 
@@ -121,7 +116,7 @@ function showNodePopup(node: any, clientX: number, clientY: number, onDetail?: (
 
   if (d.isEnriched && onDetail) {
     const btn = document.createElement("button");
-    btn.textContent = "View Detail →";
+    btn.textContent = "View Detail";
     btn.style.cssText = [
       "margin-top:8px",
       "padding:4px 10px",
@@ -142,8 +137,6 @@ function showNodePopup(node: any, clientX: number, clientY: number, onDetail?: (
 // ─── Build Cytoscape elements ────────────────────────────────────────────────
 
 function buildCyElements(data: EnrichmentDagOverviewResponse): any[] {
-  const sigGoIds = new Set(data.nodes.filter(n => n.is_enriched).map(n => n.id));
-
   const nodes = data.nodes.map((n) => ({
     data: {
       id: n.id,
@@ -530,10 +523,22 @@ function renderFullscreenOverlay(
   onClose: () => void,
   onNodeClick?: (goId: string) => void
 ) {
+  if (!document.body) {
+    return (
+      <FullscreenOverlay
+        dagData={dagData}
+        rankDir={rankDir}
+        onClose={onClose}
+        onNodeClick={onNodeClick}
+      />
+    );
+  }
+
   function FullscreenContent() {
     const innerRef = useRef<HTMLDivElement>(null);
     const fsDestroyRef = useRef<(() => void) | null>(null);
 
+    /* eslint-disable react-hooks/exhaustive-deps */
     useEffect(() => {
       const el = innerRef.current;
       if (!el) return;
@@ -543,6 +548,7 @@ function renderFullscreenOverlay(
       fsDestroyRef.current = destroy;
       return () => { if (fsDestroyRef.current) { fsDestroyRef.current(); fsDestroyRef.current = null; } };
     }, [dagData, rankDir, onNodeClick]);
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const doZoom = (factor: number) => {
       const el = innerRef.current;
@@ -739,7 +745,6 @@ export default function GOEnrichmentDagOverview({ results, fdrCutoff, onTermClic
   const [activeOntology, setActiveOntology] = useState<"P" | "C" | "F">("P");
   const [rankDir, setRankDir] = useState<"TB" | "BT">("TB");
   const [maxNodes, setMaxNodes] = useState<number>(150);
-  const [showAncestors, setShowAncestors] = useState(true);
 
   const [dagData, setDagData] = useState<EnrichmentDagOverviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -783,7 +788,7 @@ export default function GOEnrichmentDagOverview({ results, fdrCutoff, onTermClic
         fdr_cutoff: fdrCutoff,
         include_is_a: true,
         include_part_of: true,
-        max_nodes: showAncestors ? maxNodes : maxNodes,
+        max_nodes: maxNodes,
       })
         .then((data) => {
           if (fetchId !== fetchCountRef.current) return;
@@ -796,7 +801,7 @@ export default function GOEnrichmentDagOverview({ results, fdrCutoff, onTermClic
           setLoading(false);
         });
     },
-    [results, fdrCutoff, maxNodes, showAncestors]
+    [results, fdrCutoff, maxNodes]
   );
 
   // Fetch when ontology or params change
@@ -805,7 +810,7 @@ export default function GOEnrichmentDagOverview({ results, fdrCutoff, onTermClic
     queueMicrotask(() => {
       fetchDag(activeOntology);
     });
-  }, [fetchDag, activeOntology]);
+  }, [fetchDag, activeOntology, results.length]);
 
   // Mount Cytoscape when data arrives
   useEffect(() => {
@@ -871,7 +876,7 @@ export default function GOEnrichmentDagOverview({ results, fdrCutoff, onTermClic
     return () => {
       if (mainDestroyRef.current) { mainDestroyRef.current(); mainDestroyRef.current = null; }
     };
-  }, [dagData, rankDir, onTermClick]);
+  }, [dagData, rankDir, onTermClick, results]);
 
   const doZoom = (factor: number) => {
     const el = graphHostRef.current;

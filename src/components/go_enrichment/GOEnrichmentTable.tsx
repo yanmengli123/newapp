@@ -15,6 +15,9 @@ const ONTOLOGY_COLORS = {
   F: { color: "green", label: "F" },
 };
 
+type SortField = "fdr" | "p_value" | "query_count" | "background_count";
+type SortDirection = "asc" | "desc";
+
 function formatPValue(p: number): string {
   if (p < 0.0001) return p.toExponential(2);
   return p.toFixed(4);
@@ -27,15 +30,18 @@ function formatFDR(f: number): string {
 
 export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   const [page, setPage] = useState(1);
-  const [sortField, setSortField] = useState<"fdr" | "query_count">("fdr");
+  const [sortField, setSortField] = useState<SortField>("fdr");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   // Reset to page 1 whenever the terms prop changes (e.g. filter toggle)
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [terms]);
 
   const sorted = [...terms].sort((a, b) => {
-    if (sortField === "query_count") return b.query_count - a.query_count;
-    return a.fdr - b.fdr;
+    const av = a[sortField];
+    const bv = b[sortField];
+    const delta = av - bv;
+    return sortDirection === "asc" ? delta : -delta;
   });
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
@@ -53,6 +59,22 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
     );
   }
 
+  const handleSort = (field: SortField) => {
+    setPage(1);
+    if (sortField === field) {
+      setSortDirection((dir) => (dir === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortField(field);
+    setSortDirection(field === "query_count" || field === "background_count" ? "desc" : "asc");
+  };
+
+  const sortLabel = (field: SortField, label: string) => (
+    <Text span fw={600}>
+      {label}{sortField === field ? (sortDirection === "asc" ? " ↑" : " ↓") : ""}
+    </Text>
+  );
+
   return (
     <Box>
       <Table striped highlightOnHover withTableBorder withColumnBorders>
@@ -63,13 +85,28 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
             <Table.Th>Description</Table.Th>
             <Table.Th
               style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); setSortField("query_count"); }}
+              onClick={(e) => { e.stopPropagation(); handleSort("query_count"); }}
             >
-              Gene Ratio
+              {sortLabel("query_count", "Gene Ratio")}
             </Table.Th>
-            <Table.Th>BG Ratio</Table.Th>
-            <Table.Th>p-value</Table.Th>
-            <Table.Th>FDR</Table.Th>
+            <Table.Th
+              style={{ cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("background_count"); }}
+            >
+              {sortLabel("background_count", "BG Ratio")}
+            </Table.Th>
+            <Table.Th
+              style={{ cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("p_value"); }}
+            >
+              {sortLabel("p_value", "p-value")}
+            </Table.Th>
+            <Table.Th
+              style={{ cursor: "pointer" }}
+              onClick={(e) => { e.stopPropagation(); handleSort("fdr"); }}
+            >
+              {sortLabel("fdr", "FDR")}
+            </Table.Th>
             <Table.Th>Sig</Table.Th>
             <Table.Th>Hit Genes</Table.Th>
           </Table.Tr>

@@ -177,6 +177,9 @@ export default function GOEnrichmentBarChartFullscreen({ data, filtered, onClose
   }
 
   const chartHeight = "calc(100vh - 220px)";
+  const allEntries = [...(filtered.P ? data.P : []), ...(filtered.C ? data.C : []), ...(filtered.F ? data.F : [])];
+  const longestLabel = allEntries.reduce((max, entry) => Math.max(max, entry.term_name.length), 0);
+  const leftMargin = Math.min(640, Math.max(320, longestLabel * 8));
 
   return (
     <Modal
@@ -270,9 +273,9 @@ export default function GOEnrichmentBarChartFullscreen({ data, filtered, onClose
             data={traces}
             layout={{
               barmode: "group",
-              margin: { l: 350, r: 80, t: 20, b: 80 },
+              margin: { l: leftMargin, r: 80, t: 20, b: 80 },
               xaxis: { title: { text: "-log10(FDR)", font: { size: 13 } }, tickangle: -30 },
-              yaxis: { title: "", automargin: true, tickangle: -30, tickfont: { size: 12 } },
+              yaxis: { title: "", automargin: true, tickangle: 0, tickfont: { size: 12, color: "#1f2937" } },
               font: { size: 12 },
               showlegend: true,
               legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.08 },

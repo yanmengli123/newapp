@@ -410,7 +410,7 @@ const PAPER_STYLE_FULLSCREEN = {
 // ─── Chart components ────────────────────────────────────────────────────────
 
 // Stage Chart
-function StageChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function StageChart({ summary, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const { stages, maleValues, femaleValues, meanValues } = resolveStageMeans(summary?.stage_means ?? null);
   const fontSize = styleConfig?.fontSize ?? 13;
   const showMeanLine = styleConfig?.chartSpecific?.showMeanLine ?? true;
@@ -431,7 +431,7 @@ function StageChart({ summary, dataset, metric, styleConfig, ...plotProps }: { s
 }
 
 // Line Chart
-function LineChart({ samples, dataset, metric, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function LineChart({ samples, metric, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showReplicates = styleConfig?.chartSpecific?.showReplicates ?? true;
@@ -468,7 +468,7 @@ function LineChart({ samples, dataset, metric, styleConfig, ...plotProps }: { sa
 }
 
 // Violin Chart
-function ViolinChart({ samples, dataset, metric, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function ViolinChart({ samples, metric, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showPoints = styleConfig?.chartSpecific?.showPoints ?? true;
@@ -496,7 +496,7 @@ function ViolinChart({ samples, dataset, metric, styleConfig, ...plotProps }: { 
 }
 
 // Area Chart
-function AreaChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function AreaChart({ summary, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const showMeanLine = styleConfig?.chartSpecific?.showMeanLine ?? true;
@@ -517,7 +517,7 @@ function AreaChart({ summary, dataset, metric, styleConfig, ...plotProps }: { su
 }
 
 // Radar Chart
-function RadarChart({ summary, dataset, styleConfig, ...plotProps }: { summary: any; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function RadarChart({ summary, styleConfig, ...plotProps }: { summary: any; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showLegend = styleConfig?.showLegend ?? true;
   const fillOpacity = styleConfig?.chartSpecific?.fillOpacity ?? 0.25;
@@ -539,7 +539,7 @@ function RadarChart({ summary, dataset, styleConfig, ...plotProps }: { summary: 
 }
 
 // Heatmap Chart
-function HeatmapChart({ summary, dataset, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function HeatmapChart({ summary, metric, styleConfig, ...plotProps }: { summary: any; dataset: string; metric: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showValues = styleConfig?.chartSpecific?.showValues ?? true;
   const labelFontSize = styleConfig?.chartSpecific?.labelFontSize ?? 11;
@@ -568,7 +568,7 @@ function HeatmapChart({ summary, dataset, metric, styleConfig, ...plotProps }: {
 }
 
 // ZScore Chart
-function ZScoreChart({ samples, dataset, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function ZScoreChart({ samples, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showGrid = styleConfig?.showGrid ?? true;
   const lineWidth = styleConfig?.chartSpecific?.lineWidth ?? 2;
@@ -612,7 +612,7 @@ function FCBarChart({ summary, styleConfig, ...plotProps }: { summary: any; styl
 }
 
 // FCTrajectory Chart
-function FCTrajectoryChart({ samples, dataset, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function FCTrajectoryChart({ samples, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showLegend = styleConfig?.showLegend ?? true;
   const showGrid = styleConfig?.showGrid ?? true;
@@ -638,7 +638,7 @@ function FCTrajectoryChart({ samples, dataset, styleConfig, ...plotProps }: { sa
 }
 
 // Dendrogram Chart
-function DendrogramChart({ samples, dataset, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
+function DendrogramChart({ samples, styleConfig, ...plotProps }: { samples: ExpressionSample[]; dataset: string; styleConfig: any; style: any; useResizeHandler: boolean; config: any }) {
   const fontSize = styleConfig?.fontSize ?? 13;
   const showLegend = styleConfig?.showLegend ?? true;
   const showGrid = styleConfig?.showGrid ?? true;
