@@ -301,3 +301,285 @@ async def get_go_term(go_id: str, request: Request):
 
     finally:
         pg_putconn(conn)
+
+
+# ---------------------------------------------------------------------------
+# DAG sub-graph endpoints
+# ---------------------------------------------------------------------------
+
+from typing import Annotated
+
+
+@router.get("/dag/metadata")
+async def get_dag_metadata(request: Request):
+    """返回 GO DAG 元信息：表是否已加载、行数、版本等"""
+    pg_getconn = request.app.state.pg_getconn
+    pg_putconn = request.app.state.pg_putconn
+    conn = pg_getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT EXISTS (
+                SELECT 1 FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'go_closure'
+            )
+        """)
+        exists = cur.fetchone()[0]
+        if not exists:
+            return {
+                "ready": False, "term_count": 0, "edge_count": 0,
+                "closure_count": 0, "data_version": None,
+                "loaded_at": None, "include_part_of": None, "obo_path": None,
+            }
+
+        cur.execute("""
+            SELECT key, value FROM go_dag_metadata
+            WHERE key IN ('term_count','edge_count','closure_count',
+                          'data_version','loaded_at','include_part_of','obo_path')
+        """)
+        meta = dict(cur.fetchall())
+
+        cur.execute("SELECT COUNT(*) FROM go_closure LIMIT 1")
+        closure_count = cur.fetchone()[0]
+
+        return {
+            "ready": closure_count > 0,
+            "term_count": int(meta.get("term_count", 0)),
+            "edge_count": int(meta.get("edge_count", 0)),
+            "closure_count": closure_count,
+            "data_version": meta.get("data_version"),
+            "loaded_at": meta.get("loaded_at"),
+            "include_part_of": meta.get("include_part_of"),
+            "obo_path": meta.get("obo_path"),
+        }
+    finally:
+        pg_putconn(conn)
+
+
+class DagNode(BaseModel):
+    id: str
+    label: str
+    namespace: str
+    depth: int
+    is_center: bool
+    gene_count_direct: Optional[int] = None
+    gene_count_propagated: Optional[int] = None
+
+
+class DagEdge(BaseModel):
+    source: str
+    target: str
+    relation: Literal["is_a", "part_of"]
+
+
+class DagResponse(BaseModel):
+    center: str
+    resolved_center: str
+    direction: str
+    depth: int
+    relations: list[str]
+    nodes: list[DagNode]
+    edges: list[DagEdge]
+    truncated: bool
+    node_count_total: int
+    node_count_returned: int
+    metadata: dict
+
+
+@router.get("/term/{go_id}/dag", response_model=DagResponse)
+async def get_go_term_dag(
+    go_id: str,
+    request: Request,
+    direction: Annotated[Literal["ancestors", "descendants", "both"], ...] = "ancestors",
+    depth: Annotated[int, "Maximum distance from center term"] = 3,
+    include_is_a: bool = True,
+    include_part_of: bool = True,
+    max_nodes: Annotated[int, "Maximum nodes returned"] = 80,
+):
+    """
+    返回 GO DAG 子图（基于 go_edge BFS）。
+
+    使用 go_edge 而非 go_closure 来收集节点和边，
+    这样 include_is_a / include_part_of 过滤器能真正控制哪些路径被展开。
+    gene_count_propagated 仍然通过 go_closure 计算（与 relation 无关）。
+    """
+    depth = max(1, min(6, depth))
+    max_nodes = max(10, min(200, max_nodes))
+
+    pg_getconn = request.app.state.pg_getconn
+    pg_putconn = request.app.state.pg_putconn
+    conn = pg_getconn()
+    try:
+        cur = conn.cursor()
+
+        # Resolve alt_id → primary
+        cur.execute(
+            "SELECT primary_go_id FROM go_alt_id WHERE alt_go_id = %s",
+            (go_id,),
+        )
+        row = cur.fetchone()
+        resolved_center = row[0] if row else go_id
+
+        # Verify term exists
+        cur.execute(
+            "SELECT go_name, go_namespace FROM go_term WHERE go_id = %s",
+            (resolved_center,),
+        )
+        term_row = cur.fetchone()
+        if not term_row:
+            raise HTTPException(
+                status_code=404,
+                detail=f"GO term {go_id} not found in go_term table",
+            )
+
+        # Build enabled-relations list
+        relations: list[str] = []
+        if include_is_a:
+            relations.append("is_a")
+        if include_part_of:
+            relations.append("part_of")
+
+        # BFS using go_edge (respects relation filter)
+        all_nodes: dict[str, int] = {resolved_center: 0}  # go_id → min distance
+        all_edges: list[tuple[str, str, str]] = []  # (child, parent, relation)
+
+        if relations:
+            # Ancestors BFS: from frontier, find rows where child is in frontier → those are edges
+            # pointing from child (in frontier) to parent (new node = ancestor).
+            # go_edge: child=more-specific, parent=more-general.
+            # For GO:0007189, we want edge (GO:0007189 → GO:0007188) where GO:0007188 is its parent.
+            if direction in ("ancestors", "both"):
+                frontier = {resolved_center}
+                for _level in range(depth):
+                    if not frontier:
+                        break
+                    cur.execute(
+                        """
+                        SELECT child_go_id, parent_go_id, relation
+                        FROM go_edge
+                        WHERE child_go_id IN %s
+                          AND relation = ANY(%s)
+                        """,
+                        (tuple(frontier), relations),
+                    )
+                    next_frontier: set[str] = set()
+                    for child_id, parent_id, rel in cur.fetchall():
+                        edge_key = (child_id, parent_id, rel)
+                        if edge_key not in {(e[0], e[1], e[2]) for e in all_edges}:
+                            all_edges.append(edge_key)
+                        if parent_id not in all_nodes:
+                            all_nodes[parent_id] = all_nodes[child_id] + 1
+                            next_frontier.add(parent_id)
+                        elif all_nodes[child_id] + 1 < all_nodes[parent_id]:
+                            all_nodes[parent_id] = all_nodes[child_id] + 1
+                            next_frontier.add(parent_id)
+                    frontier = next_frontier
+
+            # Descendants BFS: from frontier, find rows where parent is in frontier → those are edges
+            # pointing from child (new node = descendant) to parent (in frontier).
+            if direction in ("descendants", "both"):
+                frontier = {resolved_center}
+                for _level in range(depth):
+                    if not frontier:
+                        break
+                    cur.execute(
+                        """
+                        SELECT child_go_id, parent_go_id, relation
+                        FROM go_edge
+                        WHERE parent_go_id IN %s
+                          AND relation = ANY(%s)
+                        """,
+                        (tuple(frontier), relations),
+                    )
+                    next_frontier: set[str] = set()
+                    for child_id, parent_id, rel in cur.fetchall():
+                        edge_key = (child_id, parent_id, rel)
+                        if edge_key not in {(e[0], e[1], e[2]) for e in all_edges}:
+                            all_edges.append(edge_key)
+                        if child_id not in all_nodes:
+                            all_nodes[child_id] = all_nodes[parent_id] + 1
+                            next_frontier.add(child_id)
+                        elif all_nodes[parent_id] + 1 < all_nodes[child_id]:
+                            all_nodes[child_id] = all_nodes[parent_id] + 1
+                            next_frontier.add(child_id)
+                    frontier = next_frontier
+
+        total_found = len(all_nodes)
+        truncated = total_found > max_nodes
+        if truncated:
+            sorted_ids = sorted(all_nodes, key=lambda g: (all_nodes[g], g))
+            all_nodes = {gid: all_nodes[gid] for gid in sorted_ids[:max_nodes]}
+
+        go_ids_list = list(all_nodes)
+
+        # Fetch term details
+        cur.execute(
+            "SELECT go_id, go_name, go_namespace FROM go_term WHERE go_id = ANY(%s)",
+            (go_ids_list,),
+        )
+        term_info = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
+
+        # Direct gene counts per node
+        cur.execute(
+            "SELECT go_id, COUNT(DISTINCT gene_id) FROM gene_go "
+            "WHERE go_id = ANY(%s) GROUP BY go_id",
+            (go_ids_list,),
+        )
+        direct_counts = dict(cur.fetchall())
+
+        # Propagated gene counts (via go_closure — relation-agnostic)
+        cur.execute(
+            "SELECT gc.ancestor_go_id, COUNT(DISTINCT gg.gene_id) "
+            "FROM gene_go gg "
+            "JOIN go_closure gc ON gc.descendant_go_id = gg.go_id "
+            "WHERE gc.ancestor_go_id = ANY(%s) "
+            "GROUP BY gc.ancestor_go_id",
+            (go_ids_list,),
+        )
+        propagated_counts = dict(cur.fetchall())
+
+        cur.close()
+
+        # Build nodes
+        nodes = [
+            DagNode(
+                id=gid,
+                label=term_info[gid][0],
+                namespace=term_info[gid][1],
+                depth=all_nodes[gid],
+                is_center=(gid == resolved_center),
+                gene_count_direct=direct_counts.get(gid),
+                gene_count_propagated=propagated_counts.get(gid),
+            )
+            for gid in go_ids_list
+            if gid in term_info
+        ]
+
+        # Build edges (both ends must be in node set)
+        node_ids = set(go_ids_list)
+        edges = [
+            DagEdge(source=c, target=p, relation=r)
+            for c, p, r in all_edges
+            if c in node_ids and p in node_ids
+        ]
+
+        nodes.sort(key=lambda n: (0 if n.is_center else 1, n.depth, n.label))
+
+        return DagResponse(
+            center=go_id,
+            resolved_center=resolved_center,
+            direction=direction,
+            depth=depth,
+            relations=relations,
+            nodes=nodes,
+            edges=edges,
+            truncated=truncated,
+            node_count_total=total_found,
+            node_count_returned=len(nodes),
+            metadata={
+                "include_is_a": include_is_a,
+                "include_part_of": include_part_of,
+            },
+        )
+    finally:
+        pg_putconn(conn)
