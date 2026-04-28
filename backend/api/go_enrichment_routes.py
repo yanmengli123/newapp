@@ -458,10 +458,10 @@ async def get_go_term_dag(
                         """
                         SELECT child_go_id, parent_go_id, relation
                         FROM go_edge
-                        WHERE child_go_id IN %s
+                        WHERE child_go_id = ANY(%s)
                           AND relation = ANY(%s)
                         """,
-                        (tuple(frontier), relations),
+                        (list(frontier), relations),
                     )
                     next_frontier: set[str] = set()
                     for child_id, parent_id, rel in cur.fetchall():
@@ -488,10 +488,10 @@ async def get_go_term_dag(
                         """
                         SELECT child_go_id, parent_go_id, relation
                         FROM go_edge
-                        WHERE parent_go_id IN %s
+                        WHERE parent_go_id = ANY(%s)
                           AND relation = ANY(%s)
                         """,
-                        (tuple(frontier), relations),
+                        (list(frontier), relations),
                     )
                     next_frontier: set[str] = set()
                     for child_id, parent_id, rel in cur.fetchall():
@@ -718,6 +718,7 @@ async def get_enrichment_dag_overview(
         max_nodes = max(20, min(request_data.max_nodes, 500))
 
         # Step 1: Get all ancestors via go_closure for significant terms
+        # Use list() not tuple() — psycopg2 interprets single-element tuple as scalar
         cur.execute(
             """
             SELECT DISTINCT ancestor_go_id
@@ -725,7 +726,7 @@ async def get_enrichment_dag_overview(
             WHERE descendant_go_id = ANY(%s)
             LIMIT %s
             """,
-            (tuple(sig_go_ids), max_nodes * 2),
+            (list(sig_go_ids), max_nodes * 2),
         )
         ancestor_ids = {row[0] for row in cur.fetchall()}
 
@@ -751,7 +752,7 @@ async def get_enrichment_dag_overview(
         # Step 2: Fetch term details
         cur.execute(
             "SELECT go_id, go_name, go_namespace FROM go_term WHERE go_id = ANY(%s)",
-            (tuple(node_id_list[:max_nodes]),),
+            (list(node_id_list[:max_nodes]),),
         )
         term_info: dict[str, tuple[str, str]] = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
 
@@ -770,7 +771,7 @@ async def get_enrichment_dag_overview(
                   AND parent_go_id = ANY(%s)
                   AND relation = ANY(%s)
                 """,
-                (tuple(valid_ids), tuple(valid_ids), tuple(relations)),
+                (list(valid_ids), list(valid_ids), list(relations)),
             )
             raw_edges = cur.fetchall()
         else:
@@ -790,7 +791,7 @@ async def get_enrichment_dag_overview(
             WHERE descendant_go_id = ANY(%s)
               AND ancestor_go_id = ANY(%s)
             """,
-            (tuple(sig_go_ids), tuple(valid_ids)),
+            (list(sig_go_ids), list(valid_ids)),
         )
         depth_map: dict[tuple[str, str], int] = {}
         for desc, anc, dist in cur.fetchall():

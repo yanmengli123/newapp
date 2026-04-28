@@ -126,10 +126,10 @@ function showNodePopup(node: any, clientX: number, clientY: number, onDetail?: (
       "padding:4px 10px",
       "background:#1d4ed8",
       "color:#fff",
-      "border":"none",
+      "border:none",
       "border-radius:4px",
       "font-size:11px",
-      "cursor":"pointer",
+      "cursor:pointer",
     ].join(";");
     btn.onclick = () => { removeDagPopups(); onDetail(); };
     popup.appendChild(btn);
