@@ -40,13 +40,15 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
 │   │   │   ├── GOEnrichmentBarChart.tsx
 │   │   │   ├── GOEnrichmentBarChartFullscreen.tsx
 │   │   │   ├── GOEnrichmentTable.tsx
-│   │   │   └── GOEnrichmentTermDrawer.tsx
+│   │   │   ├── GOEnrichmentTermDrawer.tsx
+│   │   │   └── GOTermDagViewer.tsx   # Cytoscape+dagre DAG viewer (fullscreen via createPortal)
 │   │   ├── gene/                 # Gene structure & transcript components
 │   │   └── chat/                 # ChatWidget
 │   └── lib/                      # API clients
 │       ├── apiClient.ts           # Mandatory centralized fetch wrapper
 │       ├── geneApi.ts            # Gene/GO/KEGG API
 │       ├── goEnrichmentApi.ts    # GO Enrichment SEA API
+│       ├── goDagApi.ts           # GO DAG viewer API (dag/metadata, term/{go_id}/dag)
 │       ├── genomeApi.ts           # Genome analysis API (ALL /genome-api/*)
 │       └── overviewApi.ts         # ESC Atlas overview API
 │
@@ -199,10 +201,12 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - `POST /annotations/kegg/kgml-cache/refresh/{pathway_id}` — 刷新单通路 KGML
 - `POST /annotations/kegg/kgml-cache/refresh` — 批量刷新 KGML
 
-### GO Enrichment — SEA (3, prefix `/go-enrichment`)
+### GO Enrichment — SEA (5, prefix `/go-enrichment`)
 - `POST /go-enrichment/analyze` — Singular Enrichment Analysis for Gallus gallus GRCg6a genes. Params: `gene_list`, `correction` (bh/by/bonferroni/none), `fdr_cutoff` (0–1), `min_overlap` (≥1), `namespace` (all/biological_process/cellular_component/molecular_function), `annotation_mode` (direct/propagated), `evidence_filter` (all/non_iea/experimental). FDR correction applied per ontology (BP/CC/MF corrected separately within each namespace). Returns `results[]` (enriched GO terms with hit genes/symbols/ncbi_ids), `bar_chart_data`, `mapping[]`, `ontology_stats`.
 - `GET /go-enrichment/example-sets` — Dynamically generated example gene sets (stable within same day via PostgreSQL `setseed`). Returns 4 sets × 20 genes each, drawn from real shared GO terms in the database.
 - `GET /go-enrichment/term/{go_id}` — GO term detail: name, namespace, definition, total_genes, genes[] (gene_id/ncbi_id/symbol).
+- `GET /go-enrichment/dag/metadata` — GO DAG metadata: ready status, term/edge/closure counts, data version, loaded timestamp.
+- `GET /go-enrichment/term/{go_id}/dag` — GO DAG sub-graph via BFS on `go_edge` table. Params: `direction` (ancestors/descendants/both), `depth` (1–6), `include_is_a` (bool), `include_part_of` (bool), `max_nodes` (default 80). Returns `{center, resolved_center, direction, depth, nodes[], edges[], truncated, node_count_total, node_count_returned}`.
 
 ### KEGG Images (2, prefix `/kegg-images`)
 - `GET /kegg-images/{pathway_id}.png` — KEGG 通路图片
@@ -501,6 +505,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **Interactive charts**: Load HTML via `fetch` + `srcDoc` in iframe. Show Loader in Modal while fetching; never show blank iframe.
 - **Expression Status**: Three states only — `'available'`, `'no_data'`, `'unavailable'`. Check `status === 'available'` before rendering charts/tables. Never check for `'pg_unavailable'`.
 - **KEGG Interactive Viewer**：`KeggInteractiveViewer` 使用 Drawer + CSS fullscreen（`size="100%"` 切换）实现全屏。PNG + SVG overlay，`getKEGGPathwayMapdata(pathwayId, geneId)` 高亮基因。`viewBox="0 0 ${pngW} ${pngH}"` 使用后端原始像素坐标，`ResizeObserver` 监听 img 尺寸变化。点击节点 `window.open(node.url)` 跳转 KEGG。highlighted 判断：kegg_gene_id 精确匹配。CSS: `.kegg-pulse-ring { animation: kegg-pulse 1.8s ease-in-out infinite }`（`App.css`）。
+- **GO DAG Viewer (`GOTermDagViewer.tsx`)**: Cytoscape.js + cytoscape-dagre rendering via dynamic `import("cytoscape")` / `import("cytoscape-dagre")`. Type declarations at `src/types/cytoscape-dagre.d.ts`. Uses `createPortal` for fullscreen overlay (not Mantine Modal) to avoid React/Cytoscape DOM unmount race conditions. Live cy instance stored on container as `container._cy` for toolbar access. DAG data fetched via `getGOTermDag()` from `goDagApi.ts`. Selector-based tap events (`cy.on("tap", "node", ...)`) for popup display.
 - **KEGG image paths**: `_get_asset_path()` in `kegg_image_router.py` resolves `png_relpath` using `GRCG6A_STATIC_ROOT.parent` (project root), not filesystem root.
 - **Plotly charts**: `plotly.js-dist-min` + `react-plotly.js`; types declared in `src/plotly.d.ts` (required because `@types/plotly.js` does not cover the dist bundle). Expression chart components use `any[]` for trace/layout/config to avoid type conflicts; keep eslint-disable annotations nearby if adding new traces.
 - **Plotly image export** (ChartFullscreenModal): Use `react-plotly`'s `onInitialized`/`onUpdate` callbacks to capture the real Plotly `graphDiv` DOM node into a `useRef`. Download sequence: save original `paper_bgcolor`/`plot_bgcolor` → `window.Plotly.relayout(gd, {paper_bgcolor:"rgba(0,0,0,0)", plot_bgcolor:"rgba(0,0,0,0)"})` → `PlotlyModule.downloadImage(gd, {format:"png", width, height, scale:2})` → restore original bg. `PlotlyModule.downloadImage` is the primary API (direct import); `window.Plotly.downloadImage` is the fallback. `PlotlyModule.relayout` does not exist on the module type — always use `window.Plotly.relayout` for the relayout calls.
