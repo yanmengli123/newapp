@@ -403,7 +403,7 @@ interface GeneExpressionExpandResponse {
 | 路由文件 | 前缀 | 接口数 |
 |---|---|---|
 | main.py (inline) | `/` | 11 |
-| go_enrichment_routes.py | `/go-enrichment` | 3 |
+| go_enrichment_routes.py | `/go-enrichment` | 5 |
 | go_kegg_routes.py | `/annotations` | 11 |
 | kegg_image_router.py | `/kegg-images` | 2 |
 | tool_routes.py | `/tools` | 2 |
