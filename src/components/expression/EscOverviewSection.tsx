@@ -12,7 +12,7 @@ import {
 } from "@mantine/core";
 import { useDisclosure, useHotkeys } from "@mantine/hooks";
 import { IconMaximize } from "@tabler/icons-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as PlotlyModule from "plotly.js-dist-min";
 import createPlotlyComponent from "react-plotly.js/factory";
 import { getOverviewSummary, type OverviewSummary } from "../../lib/overviewApi";
@@ -67,8 +67,11 @@ function ChartCard({ title, subtitle, thumbnail, fullscreenChart, badge }: Chart
         withBorder
         p="sm"
         radius="md"
+        role="button"
+        tabIndex={0}
         style={{ cursor: "zoom-in", position: "relative", overflow: "hidden" }}
         onClick={open}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}
       >
         <ActionIcon
           variant="subtle"
@@ -341,8 +344,7 @@ function Top50HeatmapChart({ data, fullscreen }: { data: any; fullscreen?: boole
   const zmatrix = (data.zmatrix || []) as number[][];
 
   // Hierarchical cluster genes so similar expression patterns are adjacent
-  // (50 genes × 36 samples is fast enough to compute inline)
-  const geneOrder = cluster_hierarchy(zmatrix, 8);
+  const geneOrder = useMemo(() => cluster_hierarchy(zmatrix, 8), [zmatrix]);
 
   if (!zmatrix.length) return <Text size="xs" c="dimmed">No data</Text>;
 
@@ -483,10 +485,12 @@ export default function EscOverviewSection() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     getOverviewSummary()
-      .then(setData)
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .then((d) => { if (!controller.signal.aborted) setData(d); })
+      .catch((e) => { if (!controller.signal.aborted) console.error(e); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, []);
 
   if (loading) {

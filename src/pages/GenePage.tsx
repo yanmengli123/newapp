@@ -16,7 +16,7 @@ import {
   Alert,
 } from "@mantine/core";
 import { useParams, Link } from "react-router-dom";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   IconArrowLeft,
   IconDna,
@@ -534,7 +534,7 @@ export default function GenePage() {
   if (pageError || !data) {
     return (
       <Paper withBorder radius="xl" p="xl">
-        <Text c="red">Error: {pageError || "Gene not found"}</Text>
+        <Text c="red" role="alert">Error: {pageError || "Gene not found"}</Text>
         <Link to="/">
           <Text c="cyan" mt="md">
             ← Back to Home
@@ -545,6 +545,11 @@ export default function GenePage() {
   }
 
   const { gene, chromosome, transcript_count, transcripts } = data;
+
+  const goItems = data.annotations?.go?.items;
+  const goBP = useMemo(() => goItems?.filter(i => i.go_namespace === "biological_process") ?? [], [goItems]);
+  const goMF = useMemo(() => goItems?.filter(i => i.go_namespace === "molecular_function") ?? [], [goItems]);
+  const goCC = useMemo(() => goItems?.filter(i => i.go_namespace === "cellular_component") ?? [], [goItems]);
 
   return (
     <Stack gap="lg">
@@ -735,7 +740,7 @@ export default function GenePage() {
         ) : (
           <Accordion variant="separated" radius="md" defaultValue="biological_process">
             {/* Biological Process */}
-            {data.annotations.go.items.filter(i => i.go_namespace === "biological_process").length > 0 && (
+            {goBP.length > 0 && (
               <Accordion.Item value="biological_process">
                 <Accordion.Control
                   bg="var(--mantine-color-blue-0)"
@@ -743,25 +748,19 @@ export default function GenePage() {
                 >
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="blue">Biological Process</Text>
-                    <Badge color="blue" variant="light" size="xs">
-                      {data.annotations.go.items.filter(i => i.go_namespace === "biological_process").length}
-                    </Badge>
+                    <Badge color="blue" variant="light" size="xs">{goBP.length}</Badge>
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {data.annotations.go.items
-                      .filter(i => i.go_namespace === "biological_process")
-                      .map(item => (
-                        <GOTermCard key={item.go_id} item={item} />
-                      ))}
+                    {goBP.map(item => <GOTermCard key={item.go_id} item={item} />)}
                   </Stack>
                 </Accordion.Panel>
               </Accordion.Item>
             )}
 
             {/* Molecular Function */}
-            {data.annotations.go.items.filter(i => i.go_namespace === "molecular_function").length > 0 && (
+            {goMF.length > 0 && (
               <Accordion.Item value="molecular_function">
                 <Accordion.Control
                   bg="var(--mantine-color-green-0)"
@@ -769,25 +768,19 @@ export default function GenePage() {
                 >
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="green">Molecular Function</Text>
-                    <Badge color="green" variant="light" size="xs">
-                      {data.annotations.go.items.filter(i => i.go_namespace === "molecular_function").length}
-                    </Badge>
+                    <Badge color="green" variant="light" size="xs">{goMF.length}</Badge>
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {data.annotations.go.items
-                      .filter(i => i.go_namespace === "molecular_function")
-                      .map(item => (
-                        <GOTermCard key={item.go_id} item={item} />
-                      ))}
+                    {goMF.map(item => <GOTermCard key={item.go_id} item={item} />)}
                   </Stack>
                 </Accordion.Panel>
               </Accordion.Item>
             )}
 
             {/* Cellular Component */}
-            {data.annotations.go.items.filter(i => i.go_namespace === "cellular_component").length > 0 && (
+            {goCC.length > 0 && (
               <Accordion.Item value="cellular_component">
                 <Accordion.Control
                   bg="var(--mantine-color-orange-0)"
@@ -795,18 +788,12 @@ export default function GenePage() {
                 >
                   <Group gap="xs">
                     <Text size="sm" fw={600} c="orange">Cellular Component</Text>
-                    <Badge color="orange" variant="light" size="xs">
-                      {data.annotations.go.items.filter(i => i.go_namespace === "cellular_component").length}
-                    </Badge>
+                    <Badge color="orange" variant="light" size="xs">{goCC.length}</Badge>
                   </Group>
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {data.annotations.go.items
-                      .filter(i => i.go_namespace === "cellular_component")
-                      .map(item => (
-                        <GOTermCard key={item.go_id} item={item} />
-                      ))}
+                    {goCC.map(item => <GOTermCard key={item.go_id} item={item} />)}
                   </Stack>
                 </Accordion.Panel>
               </Accordion.Item>

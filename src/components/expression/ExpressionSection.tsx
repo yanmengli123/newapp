@@ -69,7 +69,7 @@ export default function ExpressionSection({ geneId, initialExpression }: Express
   useEffect(() => {
     getDatasets()
       .then(ds => setAvailableDatasets(ds.datasets || []))
-      .catch(() => {/* ignore */});
+      .catch((e) => console.warn("Failed to load datasets:", e));
   }, []);
 
   const fetchExpression = useCallback(async (ds: string, metric: string) => {

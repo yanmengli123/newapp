@@ -1,5 +1,5 @@
 import { Box, Pagination, Table, Text, Badge, Group, Tooltip } from "@mantine/core";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
 
 interface Props {
@@ -37,12 +37,12 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [terms]);
 
-  const sorted = [...terms].sort((a, b) => {
+  const sorted = useMemo(() => [...terms].sort((a, b) => {
     const av = a[sortField];
     const bv = b[sortField];
     const delta = av - bv;
     return sortDirection === "asc" ? delta : -delta;
-  });
+  }), [terms, sortField, sortDirection]);
 
   const totalPages = Math.ceil(sorted.length / PAGE_SIZE);
   const paged = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -77,26 +77,42 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
 
   return (
     <Box style={{ overflowX: "auto", maxHeight: 520, overflowY: "auto" }}>
-      <Table striped highlightOnHover withTableBorder withColumnBorders>
+      <Table striped highlightOnHover withTableBorder withColumnBorders aria-label="GO enrichment results">
         <Table.Thead>
           <Table.Tr>
             <Table.Th style={{ whiteSpace: "nowrap" }}>GO ID</Table.Th>
             <Table.Th style={{ whiteSpace: "nowrap" }}>ON</Table.Th>
             <Table.Th>Description</Table.Th>
-            <Table.Th style={{ cursor: "pointer", whiteSpace: "nowrap" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("query_count"); }}>
+            <Table.Th
+              style={{ cursor: "pointer", whiteSpace: "nowrap" }}
+              aria-sort={sortField === "query_count" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
+              onClick={(e) => { e.stopPropagation(); handleSort("query_count"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSort("query_count"); }}
+            >
               {sortLabel("query_count", "Gene Ratio")}
             </Table.Th>
-            <Table.Th style={{ cursor: "pointer", whiteSpace: "nowrap" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("background_count"); }}>
+            <Table.Th
+              style={{ cursor: "pointer", whiteSpace: "nowrap" }}
+              aria-sort={sortField === "background_count" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
+              onClick={(e) => { e.stopPropagation(); handleSort("background_count"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSort("background_count"); }}
+            >
               {sortLabel("background_count", "BG Ratio")}
             </Table.Th>
-            <Table.Th style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("p_value"); }}>
+            <Table.Th
+              style={{ cursor: "pointer" }}
+              aria-sort={sortField === "p_value" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
+              onClick={(e) => { e.stopPropagation(); handleSort("p_value"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSort("p_value"); }}
+            >
               {sortLabel("p_value", "p-value")}
             </Table.Th>
-            <Table.Th style={{ cursor: "pointer" }}
-              onClick={(e) => { e.stopPropagation(); handleSort("fdr"); }}>
+            <Table.Th
+              style={{ cursor: "pointer" }}
+              aria-sort={sortField === "fdr" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
+              onClick={(e) => { e.stopPropagation(); handleSort("fdr"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSort("fdr"); }}
+            >
               {sortLabel("fdr", "FDR")}
             </Table.Th>
             <Table.Th style={{ whiteSpace: "nowrap" }}>Sig</Table.Th>

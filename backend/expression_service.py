@@ -165,6 +165,7 @@ class ExpressionService:
 
     def __init__(self, pg_conn):
         self._conn = pg_conn
+        self._registry = DatasetRegistry(pg_conn)
 
     # ── Public ─────────────────────────────────────────────────────────────────
 
@@ -189,8 +190,7 @@ class ExpressionService:
         ------
         ValueError : if (dataset, metric) is not available for this gene
         """
-        registry = DatasetRegistry(self._conn)
-        resolved_ds, resolved_metric = registry.validate(dataset, metric)
+        resolved_ds, resolved_metric = self._registry.validate(dataset, metric)
 
         # Fetch summary from pre-computed table
         summary = self._load_summary(gene_id, resolved_ds, resolved_metric)
@@ -257,8 +257,7 @@ class ExpressionService:
           ]
         }
         """
-        registry = DatasetRegistry(self._conn)
-        registry._ensure_loaded()
+        self._registry._ensure_loaded()
 
         # Build per-dataset summary lookup
         all_summaries = self._load_all_summaries(gene_id)
@@ -270,7 +269,7 @@ class ExpressionService:
         available = []
         dataset_blocks = []
 
-        for ds_code, ds_info in registry._cache.items():
+        for ds_code, ds_info in self._registry._cache.items():
             metrics = ds_info.get("metrics", {})
             if not metrics:
                 continue

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
@@ -85,6 +85,8 @@ export default function GOEnrichmentPage() {
     }).catch(() => {});
   }, []);
 
+  const requestIdRef = useRef(0);
+
   const handleRun = useCallback(async () => {
     const geneList = geneInput.split(/[\n,;\s]+/).map((g) => g.trim()).filter(Boolean);
     if (geneList.length === 0) {
@@ -97,6 +99,7 @@ export default function GOEnrichmentPage() {
     const safeFdrCutoff = Math.min(0.5, Math.max(0.001, fdrCutoff));
     const safeMinOverlap = Math.round(Math.min(100, Math.max(1, minOverlap)));
 
+    const reqId = ++requestIdRef.current;
     setPageState("loading");
     setErrorMsg(null);
 
@@ -110,9 +113,12 @@ export default function GOEnrichmentPage() {
         annotation_mode: annotationMode,
         evidence_filter: evidenceFilter,
       });
+      // Ignore stale responses
+      if (reqId !== requestIdRef.current) return;
       setResult(res);
       setPageState("success");
     } catch (err: any) {
+      if (reqId !== requestIdRef.current) return;
       setErrorMsg(err.message ?? "Analysis failed. Please try again.");
       setPageState("error");
     }
@@ -130,11 +136,23 @@ export default function GOEnrichmentPage() {
     setGeneInput(genes.join("\n"));
   };
 
-  const filteredResults = result?.results.filter((term) => {
-    if (!showAllTerms && !term.significant) return false;
-    const code = term.ontology;
-    return ontologyFilter[code as "P" | "C" | "F"];
-  }) ?? [];
+  const filteredResults = useMemo(() =>
+    result?.results.filter((term) => {
+      if (!showAllTerms && !term.significant) return false;
+      const code = term.ontology;
+      return ontologyFilter[code as "P" | "C" | "F"];
+    }) ?? [],
+    [result, showAllTerms, ontologyFilter]
+  );
+
+  const mappingStats = useMemo(() => {
+    if (!result?.mapping) return null;
+    const analyzed = result.mapping.filter(m => m.status === "mapped").length;
+    const noAnnotation = result.mapping.filter(m => m.status === "no_go_annotation").length;
+    const notFound = result.mapping.filter(m => m.status === "not_found").length;
+    const duplicated = result.mapping.filter(m => m.status === "duplicated").length;
+    return { analyzed, noAnnotation, resolved: analyzed + noAnnotation, notFound, duplicated, unresolved: notFound + duplicated };
+  }, [result?.mapping]);
 
   const handleDownloadCSV = () => {
     if (!result) return;
@@ -396,19 +414,11 @@ export default function GOEnrichmentPage() {
               <Group justify="space-between" mb="sm">
                 <Title order={4}>Mapping Report</Title>
                 <Group gap="xs">
-                  {(() => {
-                    const analyzed = result.mapping.filter(m => m.status === "mapped").length;
-                    const noAnnotation = result.mapping.filter(m => m.status === "no_go_annotation").length;
-                    const resolved = analyzed + noAnnotation;
-                    const notFound = result.mapping.filter(m => m.status === "not_found").length;
-                    const duplicated = result.mapping.filter(m => m.status === "duplicated").length;
-                    const unresolved = notFound + duplicated;
-                    return (
-                      <Text size="xs" c="dimmed">
-                        {resolved} resolved, {analyzed} analyzed, {noAnnotation} no annotation, {unresolved} unresolved
-                      </Text>
-                    );
-                  })()}
+                  {mappingStats && (
+                    <Text size="xs" c="dimmed">
+                      {mappingStats.resolved} resolved, {mappingStats.analyzed} analyzed, {mappingStats.noAnnotation} no annotation, {mappingStats.unresolved} unresolved
+                    </Text>
+                  )}
                   <Switch
                     size="xs"
                     label="Show all"

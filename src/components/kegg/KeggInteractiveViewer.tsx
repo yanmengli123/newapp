@@ -59,10 +59,12 @@ export default function KeggInteractiveViewer({
   useEffect(() => {
     if (!opened) return;
     if (mapdata !== null) return; // only load when reset
+    const controller = new AbortController();
     getKEGGPathwayMapdata(pathwayId, geneId)
-      .then((data) => setMapdata(data))
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mapdata"))
-      .finally(() => setLoading(false));
+      .then((data) => { if (!controller.signal.aborted) setMapdata(data); })
+      .catch((e) => { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : "Failed to load mapdata"); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [opened, mapdata, pathwayId, geneId]);
 
   // Track img size via ResizeObserver
@@ -90,6 +92,14 @@ export default function KeggInteractiveViewer({
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen((prev) => !prev);
   }, []);
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === "Escape") setIsFullscreen(false); };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isFullscreen]);
 
   const highlightedCount = mapdata?.nodes.filter((n) => n.highlighted).length || 0;
 
@@ -297,9 +307,13 @@ export default function KeggInteractiveViewer({
                   return (
                     <g
                       key={key}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${node.label || key} — click to open in KEGG`}
                       onMouseEnter={() => setHoveredNode(key)}
                       onMouseLeave={() => setHoveredNode(null)}
                       onClick={() => window.open(node.url, "_blank")}
+                      onKeyDown={(e) => { if (e.key === "Enter") window.open(node.url, "_blank"); }}
                       style={{ cursor: "pointer" }}
                     >
                       {pulseRect}

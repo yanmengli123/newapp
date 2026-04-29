@@ -293,16 +293,16 @@ class Top50HeatmapService:
         # 5. Z-score normalize per gene (across samples)
         zmatrix: list[list[float]] = []
         for row in matrix:
-            vals = [v for v in row if v != 0]
-            if not vals:
-                zmatrix.append([0.0] * len(row))
+            n = len(row)
+            if n < 2:
+                zmatrix.append([0.0] * n)
                 continue
-            mean = sum(vals) / len(vals)
-            std  = math.sqrt(sum((v - mean) ** 2 for v in vals) / max(len(vals) - 1, 1))
+            mean = sum(row) / n
+            std = math.sqrt(sum((v - mean) ** 2 for v in row) / (n - 1))
             if std > 0:
-                zmatrix.append([(v - mean) / std if v != 0 else 0.0 for v in row])
+                zmatrix.append([(v - mean) / std for v in row])
             else:
-                zmatrix.append([0.0] * len(row))
+                zmatrix.append([0.0] * n)
 
         return {
             "genes": top_genes,
@@ -394,11 +394,15 @@ class PCAService:
         # U: (n_genes, n_samples), s: (n_samples,), Vt: (n_samples, n_samples)
         U, s, Vt = np.linalg.svd(M_centered, full_matrices=False)
 
-        # PC scores: each column of Vt.T is a PC direction in sample space
-        # Scale by singular values / sqrt(n_samples - 1)
-        scale = s / np.sqrt(n_samples - 1)
-        pc1_coords = (Vt.T[:, 0] * scale[0]).tolist()
-        pc2_coords = (Vt.T[:, 1] * scale[1]).tolist()
+        # PC scores = U * s  (standard SVD-based PCA projection)
+        pc_scores = U * s  # (n_genes, n_samples)
+        # Transpose to get samples as rows, then take PC1/PC2
+        scores_T = pc_scores.T  # (n_samples, n_genes) → but we want (n_samples, 2)
+        # Actually scores_T[i] = row i of U*s.T, but we need sample projections
+        # Correct: sample scores = M_centered.T @ U[:, :2]  (samples × genes @ genes × 2)
+        # Equivalently from SVD: sample_scores = Vt[:2].T * s[:2]
+        pc1_coords = (Vt[0, :] * s[0]).tolist()
+        pc2_coords = (Vt[1, :] * s[1]).tolist()
 
         # Explained variance ratio
         total_var = float(np.sum(s**2))
@@ -506,10 +510,16 @@ class ExpressionDistributionService:
                 return 0.0, 0.0, 0.0
             s = sorted(vals)
             n = len(s)
-            q1 = s[int(n * 0.25)]
-            q2 = s[int(n * 0.50)]
-            q3 = s[int(n * 0.75)]
-            return q1, q2, q3
+            if n == 1:
+                return s[0], s[0], s[0]
+            # Linear interpolation (matching numpy.percentile default)
+            def _percentile(p: float) -> float:
+                idx = p * (n - 1)
+                lo = int(idx)
+                hi = min(lo + 1, n - 1)
+                frac = idx - lo
+                return s[lo] * (1 - frac) + s[hi] * frac
+            return _percentile(0.25), _percentile(0.50), _percentile(0.75)
 
         stage_order = self._get_stage_order()
         ordered = sorted(stage_values.keys(), key=lambda s: stage_order.get(s, 99))
@@ -639,7 +649,12 @@ class TrajectoryClustersService:
                 n = len(group)
                 new_centroid = [sum(vectors[g][d] for g in group) / n for d in range(len(vectors[0]))]
                 new_centroids.append(new_centroid)
-            if centroids == new_centroids:
+            # Check convergence: max centroid displacement < threshold
+            max_shift = max(
+                math.sqrt(sum((a - b) ** 2 for a, b in zip(old_c, new_c)))
+                for old_c, new_c in zip(centroids, new_centroids)
+            )
+            if max_shift < 1e-6:
                 break
             centroids = new_centroids
         return centroids

@@ -533,30 +533,30 @@ export default function ExpressionTable({ samples, summary, dataset }: Expressio
 
         {/* Table */}
         <Box style={{ overflowX: "auto" }}>
-          <Table striped highlightOnHover withTableBorder withColumnBorders>
+          <Table striped highlightOnHover withTableBorder withColumnBorders aria-label="Expression data">
             <Table.Thead>
               <Table.Tr>
-                <Table.Th style={{ minWidth: 160, cursor: "pointer" }} onClick={() => toggleSort("sample_name")}>
+                <Table.Th style={{ minWidth: 160, cursor: "pointer" }} onClick={() => toggleSort("sample_name")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("sample_name"); }} aria-sort={sortKey === "sample_name" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4}><SortIcon k="sample_name" sortKey={sortKey} sortDir={sortDir} />Sample</Group>
                 </Table.Th>
-                <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("stage")}>
+                <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("stage")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("stage"); }} aria-sort={sortKey === "stage" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4}><SortIcon k="stage" sortKey={sortKey} sortDir={sortDir} />Stage</Group>
                 </Table.Th>
                 <Table.Th>SRR Run</Table.Th>
-                <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("sex")}>
+                <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("sex")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("sex"); }} aria-sort={sortKey === "sex" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4}><SortIcon k="sex" sortKey={sortKey} sortDir={sortDir} />Sex</Group>
                 </Table.Th>
-                <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("replicate")}>
+                <Table.Th style={{ cursor: "pointer" }} onClick={() => toggleSort("replicate")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("replicate"); }} aria-sort={sortKey === "replicate" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4}><SortIcon k="replicate" sortKey={sortKey} sortDir={sortDir} />Rep</Group>
                 </Table.Th>
-                <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("value")}>
+                <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("value")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("value"); }} aria-sort={sortKey === "value" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4} justify="flex-end"><SortIcon k="value" sortKey={sortKey} sortDir={sortDir} />Value</Group>
                 </Table.Th>
                 <Table.Th style={{ minWidth: 120 }}>Relative Level</Table.Th>
-                <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("z_score")}>
+                <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("z_score")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("z_score"); }} aria-sort={sortKey === "z_score" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4} justify="flex-end"><SortIcon k="z_score" sortKey={sortKey} sortDir={sortDir} />Z-Score</Group>
                 </Table.Th>
-                <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("log2fc")}>
+                <Table.Th style={{ cursor: "pointer", textAlign: "right" }} onClick={() => toggleSort("log2fc")} onKeyDown={(e) => { if (e.key === "Enter") toggleSort("log2fc"); }} aria-sort={sortKey === "log2fc" ? sortDir === "asc" ? "ascending" : "descending" : "none"}>
                   <Group gap={4} justify="flex-end">
                     <SortIcon k="log2fc" sortKey={sortKey} sortDir={sortDir} />
                     <Tooltip label={`Baseline: ${baselineLabel}`} multiline w={200}>
