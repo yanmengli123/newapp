@@ -68,63 +68,89 @@ def test_fdr_cutoff_boundary():
 
 
 def test_compute_enrichment_pure():
-    """Test _compute_enrichment_for_namespace as a pure function."""
-    from backend.go_enrichment_service import EnrichmentParams
-    from scipy.stats import hypergeom
-    from statsmodels.stats.multitest import multipletests
-    import math
+    """Test _compute_enrichment_for_namespace calls production function directly."""
+    from backend.go_enrichment_service import (
+        EnrichmentParams,
+        _compute_enrichment_for_namespace,
+    )
 
     params = EnrichmentParams(correction="bh", fdr_cutoff=0.05, min_overlap=2)
 
-    # Simulated input data
     query_go_hits = {
         "GO:A": ["g1", "g2", "g3"],
         "GO:B": ["g1"],
         "GO:C": ["g1", "g2", "g3", "g4", "g5"],
+        "GO:ZERO": ["g1", "g2"],
+        "GO:MISSING": ["g1", "g2"],
     }
-    bg_go_counts = {"GO:A": 10, "GO:B": 5, "GO:C": 100}
-    go_names = {"GO:A": ("Term A", "biological_process"), "GO:B": ("Term B", "biological_process"), "GO:C": ("Term C", "biological_process")}
-    gene_info = {"g1": ("NCBI1", "SYM1"), "g2": ("NCBI2", "SYM2"), "g3": ("NCBI3", "SYM3"), "g4": ("NCBI4", "SYM4"), "g5": ("NCBI5", "SYM5")}
-    N, n = 200, 5
+    bg_go_counts = {
+        "GO:A": 10,
+        "GO:B": 5,
+        "GO:C": 100,
+        "GO:ZERO": 0,
+        "GO:MISSING": 10,
+    }
+    go_names = {
+        "GO:A": ("Term A", "biological_process"),
+        "GO:B": ("Term B", "biological_process"),
+        "GO:C": ("Term C", "biological_process"),
+        "GO:ZERO": ("Zero K", "biological_process"),
+        # GO:MISSING intentionally absent
+    }
+    gene_info = {
+        "g1": ("NCBI1", "SYM1"),
+        "g2": ("NCBI2", "SYM2"),
+        "g3": ("NCBI3", "SYM3"),
+        "g4": ("NCBI4", "SYM4"),
+        "g5": ("NCBI5", "SYM5"),
+    }
 
-    CORRECTION_MAP = {"bh": "fdr_bh", "none": "none"}
+    tested, significant = _compute_enrichment_for_namespace(
+        query_go_hits=query_go_hits,
+        bg_go_counts=bg_go_counts,
+        go_names=go_names,
+        gene_info=gene_info,
+        N=200,
+        n=5,
+        params=params,
+    )
 
-    # Step 1: min_overlap filter first
-    raw_results = []
-    for go_id, hit_gene_ids in query_go_hits.items():
-        k = len(hit_gene_ids)
-        K = bg_go_counts.get(go_id, 0)
-        if K == 0:
-            continue
-        p_value = hypergeom.sf(k - 1, N, K, n)
-        if not math.isfinite(p_value):
-            p_value = 1.0
-        if go_id in go_names:
-            term_name, _ = go_names[go_id]
-            hit_ncbi = [gene_info[g][0] for g in hit_gene_ids if g in gene_info and gene_info[g][0]]
-            hit_syms = [gene_info[g][1] for g in hit_gene_ids if g in gene_info and gene_info[g][1]]
-            raw_results.append({"go_id": go_id, "term_name": term_name, "query_count": k, "p_value": p_value, "hit_genes": hit_gene_ids, "hit_ncbi_ids": hit_ncbi, "hit_symbols": hit_syms})
+    tested_ids = {r["go_id"] for r in tested}
 
-    tested_results = [r for r in raw_results if r["query_count"] >= params.min_overlap]
-    assert len(tested_results) == 2  # GO:B excluded (k=1 < min_overlap=2)
+    assert "GO:B" not in tested_ids        # k=1 below min_overlap
+    assert "GO:ZERO" not in tested_ids     # K=0 skipped
+    assert "GO:MISSING" not in tested_ids  # missing go_names skipped
+    assert tested_ids == {"GO:A", "GO:C"}
 
-    # Step 2: FDR correction over tested terms only
-    p_values = [r["p_value"] for r in tested_results]
-    if params.correction == "none":
-        fdr_values = p_values
-    else:
-        method = CORRECTION_MAP.get(params.correction, "fdr_bh")
-        _, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
+    assert all("fdr" in r for r in tested)
+    assert all("significant" in r for r in tested)
+    assert all(r["query_count"] >= 2 for r in tested)
+    assert all(0 <= r["p_value"] <= 1 for r in tested)
+    assert all(0 <= r["fdr"] <= 1 for r in tested)
+    assert significant == sorted(significant, key=lambda r: r["fdr"])
 
-    for r, fdr in zip(tested_results, fdr_values):
-        r["fdr"] = fdr if math.isfinite(fdr) else 1.0
 
-    # Step 3: significant = FDR <= cutoff
-    for r in tested_results:
-        r["significant"] = r["fdr"] <= params.fdr_cutoff
+def test_compute_enrichment_correction_none():
+    """Test correction=none returns p-values as-is (no FDR transformation)."""
+    from backend.go_enrichment_service import (
+        EnrichmentParams,
+        _compute_enrichment_for_namespace,
+    )
 
-    assert all(r["fdr"] <= 1.0 for r in tested_results)
-    assert all(bool(r["significant"]) in (True, False) for r in tested_results)
+    params = EnrichmentParams(correction="none", fdr_cutoff=1.0, min_overlap=1)
+
+    tested, _ = _compute_enrichment_for_namespace(
+        query_go_hits={"GO:A": ["g1", "g2"]},
+        bg_go_counts={"GO:A": 10},
+        go_names={"GO:A": ("Term A", "biological_process")},
+        gene_info={"g1": ("1", "A"), "g2": ("2", "B")},
+        N=100,
+        n=2,
+        params=params,
+    )
+
+    assert len(tested) == 1
+    assert tested[0]["fdr"] == tested[0]["p_value"]
 
 
 def test_fdr_per_ontology():
@@ -168,20 +194,26 @@ def test_go_alt_sql_parts():
     from backend.go_enrichment_service import _go_alt_sql_parts
     # Mock cursor that returns True for has_alt_table=True
     class MockCurTrue:
-        def execute(self, q, args): pass
+        def execute(self, q, args):
+            self.args = args
         def fetchone(self):
             return (True,)  # go_alt_id exists
     class MockCurFalse:
-        def execute(self, q, args): pass
+        def execute(self, q, args):
+            self.args = args
         def fetchone(self):
             return (False,)  # go_alt_id missing
 
-    go_id_expr, alt_join, has_alt = _go_alt_sql_parts(MockCurTrue())
+    cur = MockCurTrue()
+    go_id_expr, alt_join, has_alt = _go_alt_sql_parts(cur)
+    assert cur.args == ("go_alt_id",), f"Expected query for 'go_alt_id', got {cur.args}"
     assert has_alt is True
     assert go_id_expr == "COALESCE(galt.primary_go_id, gg.go_id)"
     assert alt_join == "LEFT JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id"
 
-    go_id_expr, alt_join, has_alt = _go_alt_sql_parts(MockCurFalse())
+    cur = MockCurFalse()
+    go_id_expr, alt_join, has_alt = _go_alt_sql_parts(cur)
+    assert cur.args == ("go_alt_id",), f"Expected query for 'go_alt_id', got {cur.args}"
     assert has_alt is False
     assert go_id_expr == "gg.go_id"
     assert alt_join == ""
@@ -218,10 +250,10 @@ if __name__ == "__main__":
     test_bh_correction_basic()
     test_fdr_cutoff_boundary()
     test_compute_enrichment_pure()
+    test_compute_enrichment_correction_none()
     test_fdr_per_ontology()
     test_alt_id_normalization()
     test_go_id_expr_logic()
     test_go_alt_sql_parts()
     test_sig_term_overflow_handling()
-    print("All tests passed.")
     print("All tests passed.")

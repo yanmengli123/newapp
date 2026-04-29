@@ -167,7 +167,7 @@ class EnrichmentResponse:
 
 
 class GeneIDResolver:
-    """将用户输入的多种 ID 格式解析为 gene_id"""
+    """Resolve diverse input ID formats to canonical gene_id."""
 
     def resolve(self, raw_ids: list[str], pg_getconn, pg_putconn) -> list[MappingRecord]:
         conn = pg_getconn()
@@ -184,7 +184,7 @@ class GeneIDResolver:
                 ncbi_id = None
                 symbol = None
 
-                # 1. gene_id 精确匹配
+                # 1. gene_id exact match
                 cur.execute(
                     "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref WHERE gene_id = %s",
                     (raw,)
@@ -193,7 +193,7 @@ class GeneIDResolver:
                 if row:
                     gene_id, ncbi_id, symbol = row
 
-                # 2. ncbi_gene_id 匹配
+                # 2. ncbi_gene_id match
                 if not gene_id:
                     cur.execute(
                         "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref WHERE ncbi_gene_id::text = %s",
@@ -203,7 +203,7 @@ class GeneIDResolver:
                     if row:
                         gene_id, ncbi_id, symbol = row
 
-                # 3. gene_symbol / display_symbol 匹配
+                # 3. gene_symbol / display_symbol match
                 if not gene_id:
                     cur.execute(
                         "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref "
@@ -221,7 +221,7 @@ class GeneIDResolver:
                         ))
                         continue
 
-                # 4. ensembl_gene_id 匹配
+                # 4. ensembl_gene_id match
                 if not gene_id:
                     cur.execute(
                         "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref WHERE ensembl_gene_id = %s",
@@ -463,7 +463,7 @@ class GOBackgroundBuilder:
                     """, (namespace, namespace, namespace, namespace) + tuple(ev_args))
                     bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
 
-            # GO term 名称
+            # GO term names
             cur.execute("SELECT go_id, go_name, go_namespace FROM go_term")
             go_names = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
 
@@ -475,7 +475,7 @@ class GOBackgroundBuilder:
 
 
 class GOEnrichmentAnalyzer:
-    """SEA 富集分析器"""
+    """SEA Enrichment Analyzer."""
 
     def __init__(self):
         self.resolver = GeneIDResolver()
@@ -503,23 +503,23 @@ class GOEnrichmentAnalyzer:
         pg_getconn,
         pg_putconn,
     ) -> EnrichmentResponse:
-        # 1. 解析基因 ID
+        # 1. Resolve input gene IDs
         mapping = self.resolver.resolve(raw_gene_list, pg_getconn, pg_putconn)
 
-        # 去重：用 set 确保每个基因只出现一次，避免 n 被放大
+        # Deduplicate: each gene appears once to avoid inflating n
         mapped_gene_ids_raw = [
             r.resolved_gene_id for r in mapping
             if r.status == "mapped"
         ]
-        mapped_gene_ids_unique = list(dict.fromkeys(mapped_gene_ids_raw))  # 保留顺序去重
+        mapped_gene_ids_unique = list(dict.fromkeys(mapped_gene_ids_raw))
 
         if not mapped_gene_ids_unique:
             raise ValueError("No valid gene IDs found in the input list")
 
-        # query_count = 原始输入数（不去重，显示给用户看原始输入量）
+        # query_count = raw input size (not deduplicated; shown to user)
         query_count_total = len(raw_gene_list)
 
-        # 2. 按 namespace 分开处理
+        # 2. Process per namespace
         ns_map = {
             "biological_process": "P",
             "cellular_component": "C",
@@ -535,13 +535,13 @@ class GOEnrichmentAnalyzer:
         for ns in namespaces:
             bg_gene_ids, bg_go_counts, go_names = self.bg_builder.get_background_and_terms(ns, params.evidence_filter, params.annotation_mode, pg_getconn, pg_putconn)
             N = len(bg_gene_ids)
-            bg_gene_ids_set = bg_gene_ids  # 已经是 set
+            bg_gene_ids_set = bg_gene_ids  # already a set
 
             if N == 0:
                 ontology_stats[ns_map[ns]] = {"background_count": 0, "tested_term_count": 0, "significant_count": 0}
                 continue
 
-            # n = 查询基因中唯一且在当前 namespace 背景中的基因数（去重后）
+            # n = query genes in background for current namespace (deduplicated)
             annotated_gene_ids = [g for g in mapped_gene_ids_unique if g in bg_gene_ids_set]
             n = len(annotated_gene_ids)
 
@@ -549,7 +549,7 @@ class GOEnrichmentAnalyzer:
                 ontology_stats[ns_map[ns]] = {"background_count": N, "tested_term_count": 0, "significant_count": 0}
                 continue
 
-            # 命中的 GO terms（只统计去重后的基因）
+            # Hit GO terms (deduplicated gene set only)
             # evidence_filter applied here
             conn = pg_getconn()
             try:
@@ -617,7 +617,7 @@ class GOEnrichmentAnalyzer:
                         else:
                             query_go_hits[go_id] = genes
 
-                # 基因 ID → (ncbi_id, symbol)
+                # gene_id → (ncbi_id, symbol)
                 cur.execute(
                     "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref "
                     "WHERE gene_id = ANY(%s)",
@@ -628,7 +628,7 @@ class GOEnrichmentAnalyzer:
             finally:
                 pg_putconn(conn)
 
-            # 超几何检验 — 对所有命中 term 计算 p-value
+            # Hypergeometric test: compute p-value for all hit terms
             tested_results, significant_results = _compute_enrichment_for_namespace(
                 query_go_hits=query_go_hits,
                 bg_go_counts=bg_go_counts,
@@ -647,7 +647,7 @@ class GOEnrichmentAnalyzer:
 
             all_results.extend(tested_results)
 
-            # bar chart data — 只用 significant
+            # bar chart data — significant terms only
             code = ns_map[ns]
             for r in significant_results[:20]:
                 all_bar_data[code].append({
@@ -658,10 +658,10 @@ class GOEnrichmentAnalyzer:
                     "background_count": r["background_count"],
                 })
 
-        # 排序
+        # Sort results by FDR
         all_results.sort(key=lambda x: x["fdr"])
 
-        # 3. 计算 annotated_count（跨所有 namespace，唯一基因，与背景口径一致）
+        # 3. Compute annotated_count (unique genes across namespaces, matching background def)
         # evidence_filter applied consistently; uses canonical GO ID to match background definition
         conn = pg_getconn()
         try:
@@ -691,7 +691,7 @@ class GOEnrichmentAnalyzer:
         finally:
             pg_putconn(conn)
 
-        # 4. mapping report — no_go_annotation判断，与背景口径一致（ncbi + evidence_filter）
+        # 4. mapping report — no_go_annotation detection (ncbi + evidence_filter)
         ev_where_map, ev_args_map = self._evidence_filter_sql(params.evidence_filter)
         conn = pg_getconn()
         try:
@@ -739,7 +739,7 @@ class GOEnrichmentAnalyzer:
             else:
                 final_mapping.append(r)
 
-        # 5. 构建 GOEnrichmentResult
+        # 5. Build GOEnrichmentResult objects
         go_terms = [
             GOEnrichmentResult(
                 go_id=r["go_id"],
@@ -762,7 +762,7 @@ class GOEnrichmentAnalyzer:
             for r in all_results
         ]
 
-        # 背景基因总数 — "all" 模式返回 None，前端已展示为 "See below"
+        # Total background gene count — None for "all" namespace (frontend shows "See below")
         if params.namespace == "all":
             total_bg = None
         else:

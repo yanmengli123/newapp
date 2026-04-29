@@ -178,7 +178,7 @@ async def analyze_enrichment(req: AnalyzeRequest, request: Request):
 
 @router.get("/example-sets")
 async def get_example_sets(request: Request):
-    """动态生成示例基因集，从数据库选取共享 GO term 的真实基因"""
+    """Dynamically generate example gene sets from real shared-GO-term genes in the database."""
     pg_getconn = request.app.state.pg_getconn
     pg_putconn = request.app.state.pg_putconn
 
@@ -186,8 +186,8 @@ async def get_example_sets(request: Request):
     try:
         cur = conn.cursor()
 
-        # Step 1: 随机选 4 个 hub GO term（每个 30-600 个 direct 注释基因）
-        # 用当天日期做 seed，让同一天内结果稳定，方便用户复现和截图
+        # Step 1: randomly select 4 hub GO terms (30-600 direct-annotated genes each)
+        # Use today's date as seed so same day is stable for reproducibility and screenshots
         import datetime
         today = datetime.date.today()
         # PostgreSQL setseed() accepts values in [-1, 1]
@@ -206,7 +206,7 @@ async def get_example_sets(request: Request):
         """)
         hub_go_ids = [r[0] for r in cur.fetchall()]
 
-        # Step 2: 每个 hub 取 20 个基因（该 hub GO term + 总共 ≥2 个 direct GO term）
+        # Step 2: for each hub, pick 20 genes (that hub GO term + ≥2 total direct GO terms)
         all_rows = []
         for hub_id in hub_go_ids:
             cur.execute("""
@@ -236,14 +236,14 @@ async def get_example_sets(request: Request):
 
         cur.close()
 
-        # 按 go_id 分组
+        # Group by go_id
         by_go = {}
         for go_id, symbol in all_rows:
             if go_id not in by_go:
                 by_go[go_id] = []
             by_go[go_id].append(symbol)
 
-        # 构建 sets（复用同一个连接）
+        # Build sets (reusing the same connection)
         cur = conn.cursor()
         sets = []
         for i, (go_id, genes) in enumerate(by_go.items()):
@@ -265,7 +265,7 @@ async def get_example_sets(request: Request):
 
 @router.get("/term/{go_id}")
 async def get_go_term(go_id: str, request: Request):
-    """获取单个 GO term 详情"""
+    """Get single GO term detail."""
     pg_getconn = request.app.state.pg_getconn
     pg_putconn = request.app.state.pg_putconn
 
@@ -314,7 +314,7 @@ from typing import Annotated
 
 @router.get("/dag/metadata")
 async def get_dag_metadata(request: Request):
-    """返回 GO DAG 元信息：表是否已加载、行数、版本等"""
+    """Return GO DAG metadata: table load status, row counts, version."""
     pg_getconn = request.app.state.pg_getconn
     pg_putconn = request.app.state.pg_putconn
     conn = pg_getconn()
@@ -399,11 +399,11 @@ async def get_go_term_dag(
     max_nodes: Annotated[int, "Maximum nodes returned"] = 80,
 ):
     """
-    返回 GO DAG 子图（基于 go_edge BFS）。
+    Return GO DAG subgraph (via go_edge BFS).
 
-    使用 go_edge 而非 go_closure 来收集节点和边，
-    这样 include_is_a / include_part_of 过滤器能真正控制哪些路径被展开。
-    gene_count_propagated 仍然通过 go_closure 计算（与 relation 无关）。
+    Uses go_edge instead of go_closure to collect nodes and edges,
+    so include_is_a / include_part_of filters actually control which paths are expanded.
+    gene_count_propagated is still computed via go_closure (relation-agnostic).
     """
     depth = max(1, min(6, depth))
     max_nodes = max(10, min(200, max_nodes))
@@ -680,8 +680,8 @@ async def get_enrichment_dag_overview(
     request: Request,
 ):
     """
-    返回整次 SEA 结果的 Enrichment DAG Overview 图。
-    按 ontology (P/C/F) 分别构建，展示显著 GO terms 在 GO 层级中的全局位置。
+    Return Enrichment DAG Overview for an entire SEA run.
+    Builds per ontology (P/C/F), showing significant GO terms in global GO hierarchy context.
     """
     pg_getconn = request.app.state.pg_getconn
     pg_putconn = request.app.state.pg_putconn
@@ -802,11 +802,9 @@ async def get_enrichment_dag_overview(
                 conn_count = ancestor_sig_count.get(gid, 0)
                 min_dist_from_sig = min(
                     (depth_map.get((sig, gid), 999) for sig in sig_terms_sorted),
-                    default=999
+                    default=999,
                 )
-                dist_to_root = depth_map.get((gid, root_go_id), 999)
-                on_root_path = 0 if dist_to_root < 999 else 1
-                return (on_root_path, -conn_count, min_dist_from_sig, gid)
+                return (-conn_count, min_dist_from_sig, gid)
 
             non_sig_ancestors.sort(key=ancestor_priority)
             all_candidate_ids = (
@@ -819,7 +817,7 @@ async def get_enrichment_dag_overview(
             all_candidate_ids = sorted(candidate_ids)
             truncated = False
 
-        node_id_list = list(all_candidate_ids)
+        node_id_list = all_candidate_ids
         node_id_set = set(node_id_list)
 
         # Step 2: Fetch term details
