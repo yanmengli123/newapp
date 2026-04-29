@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-04-28T08:57:28.017Z",
+  "issues": [
+    {
+      "element": "Bar Chart Y-Axis Labels",
+      "issue": "bar chart y-axis labels appear faint or white-on-white",
+      "severity": "Major",
+      "evidence": "detailed-03-analysis-complete.png"
+    },
+    {
+      "element": "ERROR",
+      "issue": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('[role=\"combobox\"]').first()\u001b[22m\n",
+      "severity": "CRITICAL"
+    }
+  ]
+}

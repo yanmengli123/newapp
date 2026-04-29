@@ -1,0 +1,105 @@
+{
+  "timestamp": "2026-04-28T08:53:53.544Z",
+  "viewport": "1920x1080",
+  "tests": [
+    {
+      "test": "initial-load",
+      "status": "TESTED",
+      "screenshot": "01-initial-load.png"
+    },
+    {
+      "test": "example-sets-badges",
+      "status": "TESTED",
+      "count": 4
+    },
+    {
+      "test": "example-set-1-click",
+      "status": "TESTED"
+    },
+    {
+      "test": "gene-input-populated",
+      "status": "TESTED"
+    },
+    {
+      "test": "analyze-button",
+      "status": "TESTED"
+    },
+    {
+      "test": "bar-chart",
+      "status": "FAIL"
+    },
+    {
+      "test": "results-table",
+      "status": "TESTED"
+    },
+    {
+      "test": "summary-cards",
+      "status": "TESTED"
+    },
+    {
+      "test": "table-sorting",
+      "status": "TESTED"
+    },
+    {
+      "test": "term-drawer-open",
+      "status": "TESTED"
+    },
+    {
+      "test": "drawer-content",
+      "status": "TESTED"
+    },
+    {
+      "test": "dag-view-button",
+      "status": "FAIL"
+    },
+    {
+      "test": "drawer-close",
+      "status": "TESTED"
+    },
+    {
+      "test": "pagination",
+      "status": "NOT_FOUND"
+    },
+    {
+      "test": "show-all-terms-toggle",
+      "status": "TESTED"
+    },
+    {
+      "test": "parameter-controls",
+      "status": "FAIL"
+    },
+    {
+      "test": "bar-fullscreen",
+      "status": "NOT_FOUND"
+    },
+    {
+      "test": "mobile-responsive-375",
+      "status": "TESTED",
+      "screenshot": "14-mobile-375-initial.png"
+    },
+    {
+      "test": "tablet-responsive-768",
+      "status": "TESTED",
+      "screenshot": "15-tablet-768-initial.png"
+    },
+    {
+      "test": "empty-gene-error",
+      "status": "TESTED"
+    },
+    {
+      "test": "invalid-genes",
+      "status": "TESTED"
+    },
+    {
+      "test": "clear-button",
+      "status": "TESTED"
+    },
+    {
+      "test": "console-errors",
+      "status": "FAIL",
+      "errors": [
+        "Failed to load resource: the server responded with a status of 400 (Bad Request)"
+      ]
+    }
+  ]
+}
