@@ -9,7 +9,7 @@ import random
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
-from backend.go_enrichment_service import GOEnrichmentAnalyzer, EnrichmentParams
+from backend.go_enrichment_service import GOEnrichmentAnalyzer, EnrichmentParams, GODagNotReadyError
 
 router = APIRouter(prefix="/go-enrichment", tags=["GO Enrichment"])
 
@@ -20,10 +20,10 @@ VALID_EVIDENCE_FILTERS = {"all", "non_iea", "experimental"}
 
 
 class AnalyzeRequest(BaseModel):
-    gene_list: list[str] = Field(..., description="输入基因列表，支持 NCBI Gene ID / symbol / gene_id")
+    gene_list: list[str] = Field(..., description="Input gene list, supports NCBI Gene ID / symbol / gene_id")
     correction: Literal["bh", "by", "bonferroni", "none"] = Field(default="bh")
-    fdr_cutoff: float = Field(default=0.05, ge=0, le=1)
-    min_overlap: int = Field(default=2, ge=1)
+    fdr_cutoff: float = Field(default=0.05, ge=0.001, le=0.5)
+    min_overlap: int = Field(default=2, ge=1, le=100)
     namespace: Literal["all", "biological_process", "cellular_component", "molecular_function"] = Field(default="all")
     annotation_mode: Literal["direct", "propagated"] = Field(default="direct")
     evidence_filter: Literal["all", "non_iea", "experimental"] = Field(default="non_iea")
@@ -126,6 +126,8 @@ async def analyze_enrichment(req: AnalyzeRequest, request: Request):
         result = analyzer.analyze(req.gene_list, params, pg_getconn, pg_putconn)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except GODagNotReadyError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     return AnalyzeResponse(
         query_count=result.query_count,
@@ -717,16 +719,15 @@ async def get_enrichment_dag_overview(
 
         max_nodes = max(20, min(request_data.max_nodes, 500))
 
-        # Step 1: Get all ancestors via go_closure for significant terms
+        # Step 1: Get all ancestors via go_closure for significant terms (no LIMIT — rely on Python-side max_nodes)
         # Use list() not tuple() — psycopg2 interprets single-element tuple as scalar
         cur.execute(
             """
             SELECT DISTINCT ancestor_go_id
             FROM go_closure
             WHERE descendant_go_id = ANY(%s)
-            LIMIT %s
             """,
-            (list(sig_go_ids), max_nodes * 2),
+            (sorted(sig_go_ids),),
         )
         ancestor_ids = {row[0] for row in cur.fetchall()}
 
@@ -737,29 +738,100 @@ async def get_enrichment_dag_overview(
             if cur.fetchone():
                 candidate_ids.add(root_go_id)
 
-        # Enforce max_nodes by depth order (prefer enriched nodes)
-        all_candidate_ids = sorted(candidate_ids)
-        if len(all_candidate_ids) > max_nodes:
-            # Keep enriched first, then fill with ancestors
-            enriched_sorted = sorted(sig_go_ids)
-            others = [x for x in all_candidate_ids if x not in sig_go_ids]
-            all_candidate_ids = enriched_sorted + others[: max_nodes - len(enriched_sorted)]
+        # Build sig_data_raw for sorting and overflow handling
+        sig_data_raw: dict[str, OverviewTermItem] = {
+            t.go_id: t
+            for t in request_data.terms
+            if t.ontology == request_data.ontology and t.significant and t.fdr <= fdr_cutoff
+        }
+        # Sort sig terms by FDR then p-value for stable truncation
+        sig_terms_sorted = sorted(
+            sig_go_ids,
+            key=lambda gid: (
+                sig_data_raw[gid].fdr,
+                sig_data_raw[gid].p_value,
+                gid,
+            )
+        )
+
+        # Compute depth_map BEFORE truncation so ancestor priority is meaningful
+        cur.execute(
+            """
+            SELECT descendant_go_id, ancestor_go_id, distance
+            FROM go_closure
+            WHERE descendant_go_id = ANY(%s)
+              AND ancestor_go_id = ANY(%s)
+            """,
+            (sorted(sig_go_ids), sorted(candidate_ids)),
+        )
+        depth_map: dict[tuple[str, str], int] = {}
+        for desc, anc, dist in cur.fetchall():
+            key = (desc, anc)
+            if key not in depth_map or dist < depth_map[key]:
+                depth_map[key] = dist
+
+        root_depth = max((depth_map.get((g, root_go_id), 999) for g in sig_go_ids), default=0) + 1
+
+        # Enforce max_nodes: handle sig term overflow, then ancestor prioritization
+        root_slot = 1 if root_go_id in candidate_ids else 0
+        sig_slots = len(sig_go_ids)
+        total_candidates = len(candidate_ids)
+
+        if sig_slots + root_slot > max_nodes:
+            # Not enough room for all sig terms — truncate by FDR priority
+            kept_sig_ids: set[str] = set(sig_terms_sorted[: max_nodes - root_slot])
+            all_candidate_ids = sig_terms_sorted[: max_nodes - root_slot] + ([root_go_id] if root_slot else [])
+            truncated = True
+        elif len(candidate_ids) > max_nodes:
+            # Count how many sig terms each ancestor connects (via depth_map)
+            ancestor_sig_count: dict[str, int] = {}
+            for (desc, anc), _dist in depth_map.items():
+                if anc not in sig_go_ids:
+                    ancestor_sig_count[anc] = ancestor_sig_count.get(anc, 0) + 1
+
+            # Remaining slots for ancestors after reserving sig terms + root
+            remaining = max_nodes - sig_slots - root_slot
+
+            # Sort non-sig ancestors: prefer nodes on root paths from sig terms, then connectivity, then depth
+            non_sig_ancestors = [
+                x for x in candidate_ids
+                if x not in sig_go_ids and x != root_go_id
+            ]
+
+            def ancestor_priority(gid: str) -> tuple:
+                conn_count = ancestor_sig_count.get(gid, 0)
+                min_dist_from_sig = min(
+                    (depth_map.get((sig, gid), 999) for sig in sig_terms_sorted),
+                    default=999
+                )
+                dist_to_root = depth_map.get((gid, root_go_id), 999)
+                on_root_path = 0 if dist_to_root < 999 else 1
+                return (on_root_path, -conn_count, min_dist_from_sig, gid)
+
+            non_sig_ancestors.sort(key=ancestor_priority)
+            all_candidate_ids = (
+                sig_terms_sorted
+                + ([root_go_id] if root_slot else [])
+                + non_sig_ancestors[:remaining]
+            )
+            truncated = total_candidates > len(all_candidate_ids)
+        else:
+            all_candidate_ids = sorted(candidate_ids)
+            truncated = False
 
         node_id_list = list(all_candidate_ids)
         node_id_set = set(node_id_list)
-        total_candidates = len(node_id_set)
 
         # Step 2: Fetch term details
         cur.execute(
             "SELECT go_id, go_name, go_namespace FROM go_term WHERE go_id = ANY(%s)",
-            (list(node_id_list[:max_nodes]),),
+            (list(node_id_list),),
         )
         term_info: dict[str, tuple[str, str]] = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
 
         # Filter to only nodes that exist in go_term
         valid_ids = set(term_info.keys())
         sig_go_ids &= valid_ids
-        truncated = total_candidates > max_nodes
 
         # Step 3: Collect edges (go_edge, both endpoints in valid_ids)
         if relations:
@@ -783,23 +855,7 @@ async def get_enrichment_dag_overview(
             if t.go_id in sig_go_ids
         }
 
-        # Step 5: Compute depth from root for each node
-        cur.execute(
-            """
-            SELECT descendant_go_id, ancestor_go_id, distance
-            FROM go_closure
-            WHERE descendant_go_id = ANY(%s)
-              AND ancestor_go_id = ANY(%s)
-            """,
-            (list(sig_go_ids), list(valid_ids)),
-        )
-        depth_map: dict[tuple[str, str], int] = {}
-        for desc, anc, dist in cur.fetchall():
-            key = (desc, anc)
-            if key not in depth_map or dist < depth_map[key]:
-                depth_map[key] = dist
-
-        root_depth = max((depth_map.get((g, root_go_id), 999) for g in sig_go_ids), default=0) + 1
+        # Step 5: (depth_map already computed above)
 
         # Step 6: Build nodes
         nodes: list[OverviewDagNode] = []

@@ -93,6 +93,10 @@ export default function GOEnrichmentPage() {
       return;
     }
 
+    // Clamp parameters defensively before sending
+    const safeFdrCutoff = Math.min(0.5, Math.max(0.001, fdrCutoff));
+    const safeMinOverlap = Math.round(Math.min(100, Math.max(1, minOverlap)));
+
     setPageState("loading");
     setErrorMsg(null);
 
@@ -100,8 +104,8 @@ export default function GOEnrichmentPage() {
       const res = await analyzeGOEnrichment({
         gene_list: geneList,
         correction,
-        fdr_cutoff: fdrCutoff,
-        min_overlap: minOverlap,
+        fdr_cutoff: safeFdrCutoff,
+        min_overlap: safeMinOverlap,
         namespace,
         annotation_mode: annotationMode,
         evidence_filter: evidenceFilter,
@@ -263,7 +267,10 @@ export default function GOEnrichmentPage() {
             <NumberInput
               label="FDR Cutoff"
               value={fdrCutoff}
-              onChange={(v) => setFdrCutoff(Number(v) || 0.05)}
+              onChange={(v) => {
+                const n = Number(v);
+                if (Number.isFinite(n)) setFdrCutoff(Math.min(0.5, Math.max(0.001, n)));
+              }}
               min={0.001}
               max={0.5}
               step={0.01}
@@ -273,7 +280,10 @@ export default function GOEnrichmentPage() {
             <NumberInput
               label="Min Overlap"
               value={minOverlap}
-              onChange={(v) => setMinOverlap(Number(v) || 2)}
+              onChange={(v) => {
+                const n = Number(v);
+                if (Number.isFinite(n)) setMinOverlap(Math.round(Math.min(100, Math.max(1, n))));
+              }}
               min={1}
               max={100}
               size="sm"
@@ -342,7 +352,7 @@ export default function GOEnrichmentPage() {
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
               <Text fw={700} fz={24}>{result.mapped_count}</Text>
-              <Text size="xs" c="dimmed">Mapped Genes</Text>
+              <Text size="xs" c="dimmed">Resolved Genes</Text>
             </Card>
             <Card withBorder radius="md" p="sm" ta="center">
               <Text fw={700} fz={24}>{result.annotated_count}</Text>
@@ -387,12 +397,15 @@ export default function GOEnrichmentPage() {
                 <Title order={4}>Mapping Report</Title>
                 <Group gap="xs">
                   {(() => {
-                    const mapped = result.mapping.filter(m => m.status === "mapped").length;
-                    const abnormal = result.mapping.length - mapped;
+                    const analyzed = result.mapping.filter(m => m.status === "mapped").length;
+                    const noAnnotation = result.mapping.filter(m => m.status === "no_go_annotation").length;
+                    const resolved = analyzed + noAnnotation;
+                    const notFound = result.mapping.filter(m => m.status === "not_found").length;
+                    const duplicated = result.mapping.filter(m => m.status === "duplicated").length;
+                    const unresolved = notFound + duplicated;
                     return (
                       <Text size="xs" c="dimmed">
-                        {mapped} mapped, {abnormal} abnormal
-                        {abnormal > 0 && " — toggle to see all"}
+                        {resolved} resolved, {analyzed} analyzed, {noAnnotation} no annotation, {unresolved} unresolved
                       </Text>
                     );
                   })()}

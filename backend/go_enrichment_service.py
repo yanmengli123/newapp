@@ -1,6 +1,7 @@
 """
 GO Enrichment Analysis Service (SEA)
-基于 GRCg6a 本地 GO 注释库的富集分析，复用 gene_xref + gene_go + go_term
+Based on GRCg6a local GO annotation library.
+Reuses gene_xref + gene_go + go_term tables.
 """
 
 from dataclasses import dataclass, field
@@ -8,6 +9,11 @@ from typing import Optional
 import math
 from scipy.stats import hypergeom
 from statsmodels.stats.multitest import multipletests
+
+
+class GODagNotReadyError(RuntimeError):
+    """Raised when GO DAG tables (go_closure, go_edge, go_alt_id) are not loaded or empty."""
+    pass
 
 
 @dataclass
@@ -27,6 +33,99 @@ class MappingRecord:
     ncbi_gene_id: Optional[str] = None
     gene_symbol: Optional[str] = None
     status: str = "not_found"  # mapped / not_found / duplicated / no_go_annotation
+
+
+CORRECTION_MAP = {
+    "bh": "fdr_bh",
+    "by": "fdr_by",
+    "bonferroni": "bonferroni",
+    "none": "none",
+}
+
+
+def _compute_enrichment_for_namespace(
+    query_go_hits: dict[str, list[str]],
+    bg_go_counts: dict[str, int],
+    go_names: dict[str, tuple[str, str]],
+    gene_info: dict[str, tuple[Optional[str], Optional[str]]],
+    N: int,
+    n: int,
+    params: EnrichmentParams,
+) -> tuple[list[dict], list[dict]]:
+    """
+    Compute hypergeometric p-values and FDR-corrected enrichment results for one ontology.
+
+    Args:
+        query_go_hits: {go_id: [gene_ids]} — query gene hits per GO term
+        bg_go_counts: {go_id: K} — gene count in background for each GO term
+        go_names: {go_id: (term_name, namespace)}
+        gene_info: {gene_id: (ncbi_id, symbol)}
+        N: total background gene count
+        n: total query gene count (with GO annotation, after background filter)
+        params: EnrichmentParams (correction, fdr_cutoff, min_overlap)
+
+    Returns:
+        (tested_results, significant_results) where:
+        - tested_results: all terms meeting min_overlap, enriched fields added
+        - significant_results: FDR-significant subset, sorted by FDR
+    """
+    raw_results = []
+    for go_id, hit_gene_ids in query_go_hits.items():
+        k = len(hit_gene_ids)
+        K = bg_go_counts.get(go_id, 0)
+        if K == 0:
+            continue
+
+        p_value = hypergeom.sf(k - 1, N, K, n)
+        if not math.isfinite(p_value):
+            p_value = 1.0
+
+        if go_id in go_names:
+            term_name, namespace = go_names[go_id]
+            hit_ncbi = [gene_info[g][0] for g in hit_gene_ids if g in gene_info and gene_info[g][0]]
+            hit_syms = [gene_info[g][1] for g in hit_gene_ids if g in gene_info and gene_info[g][1]]
+
+            raw_results.append({
+                "go_id": go_id,
+                "term_name": term_name,
+                "namespace": namespace,
+                "query_count": k,
+                "query_total": n,
+                "background_count": K,
+                "background_total": N,
+                "gene_ratio": f"{k}/{n}",
+                "background_ratio": f"{K}/{N}",
+                "p_value": p_value,
+                "hit_genes": hit_gene_ids,
+                "hit_ncbi_ids": hit_ncbi,
+                "hit_symbols": hit_syms,
+            })
+
+    # Step 1: filter by min_overlap BEFORE FDR correction (tested terms)
+    tested_results = [
+        r for r in raw_results
+        if r["query_count"] >= params.min_overlap
+    ]
+
+    # Step 2: FDR correction over tested terms only
+    p_values = [r["p_value"] for r in tested_results]
+    if params.correction == "none":
+        fdr_values = p_values
+    else:
+        method = CORRECTION_MAP.get(params.correction, "fdr_bh")
+        _, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
+
+    for r, fdr in zip(tested_results, fdr_values):
+        r["fdr"] = fdr if math.isfinite(fdr) else 1.0
+
+    # Step 3: significant = FDR <= cutoff
+    for r in tested_results:
+        r["significant"] = r["fdr"] <= params.fdr_cutoff
+
+    significant_results = [r for r in tested_results if r["significant"]]
+    significant_results.sort(key=lambda x: x["fdr"])
+
+    return tested_results, significant_results
 
 
 @dataclass
@@ -156,13 +255,73 @@ class GeneIDResolver:
             pg_putconn(conn)
 
 
+def _table_exists(cur, table_name: str) -> bool:
+    cur.execute("""
+        SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = %s
+        )
+    """, (table_name,))
+    return bool(cur.fetchone()[0])
+
+
+def _go_id_expr(has_alt_table: bool) -> str:
+    return "COALESCE(galt.primary_go_id, gg.go_id)" if has_alt_table else "gg.go_id"
+
+
+def _go_alt_sql_parts(cur) -> tuple[str, str, bool]:
+    """
+    Returns (go_id_expr, alt_join, has_alt_table) for canonical GO ID queries.
+    Checks once whether go_alt_id exists, then returns all SQL parts.
+    """
+    has_alt_table = _table_exists(cur, "go_alt_id")
+    go_id_expr = _go_id_expr(has_alt_table)
+    alt_join = "LEFT JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id" if has_alt_table else ""
+    return go_id_expr, alt_join, has_alt_table
+
+
+def _ensure_go_dag_ready(cur) -> None:
+    """
+    Verify required GO DAG tables exist and go_closure / go_edge have data.
+    Raises GODagNotReadyError if missing or empty.
+    go_alt_id must exist (may be empty); go_closure and go_edge must be non-empty.
+    """
+    cur.execute("""
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name IN ('go_closure', 'go_edge', 'go_alt_id')
+    """)
+    found = {r[0] for r in cur.fetchall()}
+    required = {"go_closure", "go_edge", "go_alt_id"}
+    missing = required - found
+    if missing:
+        raise GODagNotReadyError(
+            f"GO DAG tables not loaded: {', '.join(sorted(missing))}. "
+            "Run: python -m backend.scripts.load_go_dag "
+            "--obo /d/jbrowsedata/projectdata/downloads/go/go-basic.obo "
+            "--dsn postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a --replace"
+        )
+    for table in ("go_closure", "go_edge"):
+        cur.execute(f"SELECT 1 FROM {table} LIMIT 1")
+        if cur.fetchone() is None:
+            raise GODagNotReadyError(
+                f"GO DAG table '{table}' is empty. "
+                "Run: python -m backend.scripts.load_go_dag "
+                "--obo /d/jbrowsedata/projectdata/downloads/go/go-basic.obo "
+                "--dsn postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a --replace"
+            )
+
+
 class GOBackgroundBuilder:
-    """按 ontology 构建背景基因集"""
+    """Build background gene sets per ontology."""
 
     @staticmethod
     def _evidence_filter_sql(evidence_filter: str) -> tuple[str, list]:
         """
-        返回 (WHERE clause fragment, list of bind values) for evidence filtering.
+        Returns (WHERE clause fragment, list of bind values) for evidence filtering.
         'all': no filter
         'non_iea': exclude IEA
         'experimental': exclude IEA + ISS/ISA/IBA (non-curated direct annotations)
@@ -178,9 +337,9 @@ class GOBackgroundBuilder:
     @staticmethod
     def get_background_and_terms(namespace: str, evidence_filter: str, annotation_mode: str, pg_getconn, pg_putconn) -> tuple[set[str], dict[str, int], dict[str, tuple]]:
         """
-        返回:
-        - background_gene_ids: 背景基因 ID 集合（有 GO 注释且有 ncbi_gene_id 的基因）
-        - bg_go_counts: {go_id: 在背景中的基因数}  — 与 N 的定义严格一致
+        Returns:
+        - background_gene_ids: gene IDs with GO annotations and NCBI Gene IDs
+        - bg_go_counts: {go_id: gene count in background} — strict definition matching N
         - go_names: {go_id: (term_name, namespace)}
         evidence_filter: "all" / "non_iea" / "experimental"
         """
@@ -188,30 +347,21 @@ class GOBackgroundBuilder:
         try:
             cur = conn.cursor()
 
-            # Guard: propagated mode requires go_closure table with data
+            # Guard: propagated mode requires DAG tables with data
             if annotation_mode == "propagated":
-                cur.execute("""
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_name = 'go_closure'
-                    UNION ALL
-                    SELECT 1 FROM go_closure LIMIT 1
-                """)
-                if cur.fetchone() is None:
-                    raise RuntimeError(
-                        "annotation_mode='propagated' requires the GO DAG closure table. "
-                        "Run: python -m backend.scripts.load_go_dag "
-                        "--obo /d/jbrowsedata/projectdata/downloads/go/go-basic.obo "
-                        "--dsn postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a --replace"
-                    )
+                _ensure_go_dag_ready(cur)
 
             ev_where, ev_args = GOBackgroundBuilder._evidence_filter_sql(evidence_filter)
 
-            # 背景基因 N：有 GO 注释且有 ncbi_gene_id 的基因
+            # Background genes N: genes with GO annotations and NCBI Gene IDs
+            go_id_expr, alt_join, has_alt_table = _go_alt_sql_parts(cur)
+
             if namespace == "all":
                 cur.execute(f"""
                     SELECT DISTINCT gg.gene_id
                     FROM gene_go gg
                     JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                    {alt_join}
                     WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
                 """, ev_args)
             else:
@@ -219,30 +369,35 @@ class GOBackgroundBuilder:
                     SELECT DISTINCT gg.gene_id
                     FROM gene_go gg
                     JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                    JOIN go_term gt ON gt.go_id = gg.go_id
+                    {alt_join}
+                    JOIN go_term gt ON gt.go_id = {go_id_expr}
                     WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s {ev_where}
                 """, (namespace,) + tuple(ev_args))
 
             background_gene_ids = {r[0] for r in cur.fetchall()}
 
-            # 每个 GO term 在背景中的基因数 K — 必须与 N 的定义严格一致
+            # Each GO term's gene count K in background — must match N definition exactly
             if annotation_mode == "direct":
                 if namespace == "all":
                     cur.execute(f"""
-                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        SELECT {go_id_expr} AS go_id,
+                               COUNT(DISTINCT gg.gene_id)
                         FROM gene_go gg
                         JOIN gene_xref gx ON gx.gene_id = gg.gene_id
+                        {alt_join}
                         WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
-                        GROUP BY gg.go_id
+                        GROUP BY {go_id_expr}
                     """, ev_args)
                 else:
                     cur.execute(f"""
-                        SELECT gg.go_id, COUNT(DISTINCT gg.gene_id)
+                        SELECT {go_id_expr} AS go_id,
+                               COUNT(DISTINCT gg.gene_id)
                         FROM gene_go gg
                         JOIN gene_xref gx ON gx.gene_id = gg.gene_id
-                        JOIN go_term gt ON gt.go_id = gg.go_id
+                        {alt_join}
+                        JOIN go_term gt ON gt.go_id = {go_id_expr}
                         WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s {ev_where}
-                        GROUP BY gg.go_id
+                        GROUP BY {go_id_expr}
                     """, (namespace,) + tuple(ev_args))
                 bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
             else:
@@ -250,6 +405,7 @@ class GOBackgroundBuilder:
                 if namespace == "all":
                     # Use UNION + COUNT(DISTINCT) to avoid double-counting genes
                     # that appear in both alt_id and direct branches
+                    # alt branch: gt_ann uses galt.primary_go_id (not gg.go_id which may be alt)
                     cur.execute(f"""
                         SELECT ancestor_go_id AS go_id, COUNT(DISTINCT gene_id) AS bg_count
                         FROM (
@@ -259,7 +415,6 @@ class GOBackgroundBuilder:
                             JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
                             JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
                             JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
-                            JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
                             WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
                             UNION
                             SELECT DISTINCT gg.gene_id, gc.ancestor_go_id
@@ -276,7 +431,7 @@ class GOBackgroundBuilder:
                     bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
                 else:
                     # specific namespace: filter by ancestor's namespace AND annotation's namespace
-                    # Use UNION to avoid double-counting genes that appear in both alt_id and direct branches
+                    # alt branch: gt_ann uses galt.primary_go_id (not gg.go_id which may be alt)
                     cur.execute(f"""
                         SELECT ancestor_go_id AS go_id, COUNT(DISTINCT gene_id) AS bg_count
                         FROM (
@@ -286,7 +441,7 @@ class GOBackgroundBuilder:
                             JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
                             JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
                             JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
-                            JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                            JOIN go_term gt_ann ON gt_ann.go_id = galt.primary_go_id
                             WHERE gx.ncbi_gene_id IS NOT NULL
                               AND gt.go_namespace = %s
                               AND gt_ann.go_namespace = %s
@@ -321,13 +476,6 @@ class GOBackgroundBuilder:
 
 class GOEnrichmentAnalyzer:
     """SEA 富集分析器"""
-
-    CORRECTION_MAP = {
-        "bh": "fdr_bh",
-        "by": "fdr_by",
-        "bonferroni": "bonferroni",
-        "none": "none",
-    }
 
     def __init__(self):
         self.resolver = GeneIDResolver()
@@ -409,14 +557,21 @@ class GOEnrichmentAnalyzer:
                 ev_where, ev_args = self._evidence_filter_sql(params.evidence_filter)
 
                 if params.annotation_mode == "direct":
+                    # Safe fallback: use canonical GO ID only when go_alt_id exists
+                    go_id_expr, alt_join, has_alt_table = _go_alt_sql_parts(cur)
                     cur.execute(
-                        f"SELECT go_id, ARRAY_AGG(DISTINCT gene_id) FROM gene_go gg "
-                        f"WHERE gene_id = ANY(%s) {ev_where} GROUP BY go_id",
+                        f"""SELECT {go_id_expr} AS go_id,
+                                  ARRAY_AGG(DISTINCT gg.gene_id)
+                           FROM gene_go gg
+                           {alt_join}
+                           WHERE gg.gene_id = ANY(%s) {ev_where}
+                           GROUP BY {go_id_expr}""",
                         (annotated_gene_ids,) + tuple(ev_args)
                     )
                     query_go_hits = {r[0]: list(set(r[1])) for r in cur.fetchall()}
                 else:
                     # propagated: propagate query gene annotations through closure
+                    # alt branch: gt_ann uses galt.primary_go_id (not gg.go_id which may be alt)
                     cur.execute(
                         f"""
                         SELECT gc.ancestor_go_id AS go_id,
@@ -425,7 +580,7 @@ class GOEnrichmentAnalyzer:
                         JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
                         JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
                         JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
-                        JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
+                        JOIN go_term gt_ann ON gt_ann.go_id = galt.primary_go_id
                         WHERE gg.gene_id = ANY(%s)
                           AND gt.go_namespace = %s
                           AND gt_ann.go_namespace = %s
@@ -473,57 +628,16 @@ class GOEnrichmentAnalyzer:
             finally:
                 pg_putconn(conn)
 
-            # 超几何检验 — 先对所有命中 term 计算 p-value（不过滤）
-            raw_results = []
-            for go_id, hit_gene_ids in query_go_hits.items():
-                k = len(hit_gene_ids)
-                K = bg_go_counts.get(go_id, 0)
-                if K == 0:
-                    continue
-
-                p_value = hypergeom.sf(k - 1, N, K, n)
-                if not math.isfinite(p_value):
-                    p_value = 1.0
-
-                if go_id in go_names:
-                    term_name, _ = go_names[go_id]
-                    hit_ncbi = [gene_info[g][0] for g in hit_gene_ids if g in gene_info and gene_info[g][0]]
-                    hit_syms = [gene_info[g][1] for g in hit_gene_ids if g in gene_info and gene_info[g][1]]
-
-                    raw_results.append({
-                        "go_id": go_id,
-                        "term_name": term_name,
-                        "namespace": ns,
-                        "query_count": k,
-                        "query_total": n,
-                        "background_count": K,
-                        "background_total": N,
-                        "gene_ratio": f"{k}/{n}",
-                        "background_ratio": f"{K}/{N}",
-                        "p_value": p_value,
-                        "hit_genes": hit_gene_ids,
-                        "hit_ncbi_ids": hit_ncbi,
-                        "hit_symbols": hit_syms,
-                    })
-
-            # FDR 校正 — 对全部命中的 term 一起做
-            p_values = [r["p_value"] for r in raw_results]
-            if params.correction == "none":
-                fdr_values = p_values
-            else:
-                method = self.CORRECTION_MAP.get(params.correction, "fdr_bh")
-                _, fdr_values, _, _ = multipletests(p_values, alpha=params.fdr_cutoff, method=method) if p_values else ([], [], [], [])
-
-            for r, fdr in zip(raw_results, fdr_values):
-                r["fdr"] = fdr if math.isfinite(fdr) else 1.0
-
-            # min_overlap 和 fdr_cutoff 过滤 — 过滤后才算作 significant
-            tested_results = [
-                r for r in raw_results
-                if r["query_count"] >= params.min_overlap
-            ]
-            significant_results = [r for r in tested_results if r["fdr"] < params.fdr_cutoff]
-            significant_results.sort(key=lambda x: x["fdr"])
+            # 超几何检验 — 对所有命中 term 计算 p-value
+            tested_results, significant_results = _compute_enrichment_for_namespace(
+                query_go_hits=query_go_hits,
+                bg_go_counts=bg_go_counts,
+                go_names=go_names,
+                gene_info=gene_info,
+                N=N,
+                n=n,
+                params=params,
+            )
 
             ontology_stats[ns_map[ns]] = {
                 "background_count": N,
@@ -531,9 +645,6 @@ class GOEnrichmentAnalyzer:
                 "significant_count": len(significant_results),
             }
 
-            # 返回全部 tested terms，标记 significant
-            for r in tested_results:
-                r["significant"] = r["fdr"] < params.fdr_cutoff
             all_results.extend(tested_results)
 
             # bar chart data — 只用 significant
@@ -551,15 +662,17 @@ class GOEnrichmentAnalyzer:
         all_results.sort(key=lambda x: x["fdr"])
 
         # 3. 计算 annotated_count（跨所有 namespace，唯一基因，与背景口径一致）
-        # evidence_filter applied consistently
+        # evidence_filter applied consistently; uses canonical GO ID to match background definition
         conn = pg_getconn()
         try:
             cur = conn.cursor()
+            go_id_expr, alt_join, has_alt_table = _go_alt_sql_parts(cur)
             ev_where, ev_args = self._evidence_filter_sql(params.evidence_filter)
             if params.namespace == "all":
                 cur.execute(
                     f"SELECT COUNT(DISTINCT gg.gene_id) FROM gene_go gg "
                     f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
+                    f"{alt_join} "
                     f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {ev_where}",
                     (mapped_gene_ids_unique,) + tuple(ev_args)
                 )
@@ -567,7 +680,8 @@ class GOEnrichmentAnalyzer:
                 cur.execute(
                     f"SELECT COUNT(DISTINCT gg.gene_id) FROM gene_go gg "
                     f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
-                    f"JOIN go_term gt ON gt.go_id = gg.go_id "
+                    f"{alt_join} "
+                    f"JOIN go_term gt ON gt.go_id = {go_id_expr} "
                     f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL "
                     f"AND gt.go_namespace = %s {ev_where}",
                     (mapped_gene_ids_unique, params.namespace) + tuple(ev_args)
@@ -577,28 +691,32 @@ class GOEnrichmentAnalyzer:
         finally:
             pg_putconn(conn)
 
-        # 4. mapping report — no_go_annotation 判断，与背景口径一致（ncbi + evidence_filter）
+        # 4. mapping report — no_go_annotation判断，与背景口径一致（ncbi + evidence_filter）
         ev_where_map, ev_args_map = self._evidence_filter_sql(params.evidence_filter)
-        if params.namespace == "all":
-            cur_annotated_query = (
-                f"SELECT DISTINCT gg.gene_id FROM gene_go gg "
-                f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
-                f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {ev_where_map}"
-            )
-            cur_annotated_args = (mapped_gene_ids_unique,) + tuple(ev_args_map)
-        else:
-            cur_annotated_query = (
-                f"SELECT DISTINCT gg.gene_id FROM gene_go gg "
-                f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
-                f"JOIN go_term gt ON gt.go_id = gg.go_id "
-                f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL "
-                f"AND gt.go_namespace = %s {ev_where_map}"
-            )
-            cur_annotated_args = (mapped_gene_ids_unique, params.namespace) + tuple(ev_args_map)
-
         conn = pg_getconn()
         try:
             cur = conn.cursor()
+            go_id_expr, alt_join, has_alt_table = _go_alt_sql_parts(cur)
+
+            if params.namespace == "all":
+                cur_annotated_query = (
+                    f"SELECT DISTINCT gg.gene_id FROM gene_go gg "
+                    f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
+                    f"{alt_join} "
+                    f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {ev_where_map}"
+                )
+                cur_annotated_args = (mapped_gene_ids_unique,) + tuple(ev_args_map)
+            else:
+                cur_annotated_query = (
+                    f"SELECT DISTINCT gg.gene_id FROM gene_go gg "
+                    f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
+                    f"{alt_join} "
+                    f"JOIN go_term gt ON gt.go_id = {go_id_expr} "
+                    f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL "
+                    f"AND gt.go_namespace = %s {ev_where_map}"
+                )
+                cur_annotated_args = (mapped_gene_ids_unique, params.namespace) + tuple(ev_args_map)
+
             cur.execute(cur_annotated_query, cur_annotated_args)
             all_annotated = {r[0] for r in cur.fetchall()}
             cur.close()

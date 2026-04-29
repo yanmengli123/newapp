@@ -148,7 +148,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
                     size="sm"
                     fw={600}
                     style={{ fontFamily: "monospace" }}
-                    c={term.fdr < 0.05 ? "red" : undefined}
+                    c={term.significant ? "red" : undefined}
                   >
                     {formatFDR(term.fdr)}
                   </Text>
