@@ -76,7 +76,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   );
 
   return (
-    <Box style={{ overflowX: "auto" }}>
+    <Box style={{ overflowX: "auto", maxHeight: 520, overflowY: "auto" }}>
       <Table striped highlightOnHover withTableBorder withColumnBorders>
         <Table.Thead>
           <Table.Tr>
