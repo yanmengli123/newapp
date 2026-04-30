@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Group,
-  Select,
+  NumberInput,
   SegmentedControl,
   Switch,
   Text,
@@ -13,6 +13,7 @@ import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
 import {
   getTopTerms,
   globalMaxNegLog10Fdr,
+  countAvailableTerms,
 } from "./goEnrichmentChartUtils";
 
 interface Props {
@@ -22,13 +23,6 @@ interface Props {
   onTermClick: (term: GOEnrichmentResult) => void;
 }
 
-const TOP_N_OPTIONS = [
-  { value: "10", label: "10" },
-  { value: "15", label: "15" },
-  { value: "20", label: "20" },
-  { value: "30", label: "30" },
-];
-
 export default function GOEnrichmentVisualization({
   results,
   ontologyFilter,
@@ -36,9 +30,16 @@ export default function GOEnrichmentVisualization({
   onTermClick,
 }: Props) {
   const [chartMode, setChartMode] = useState<"dotplot" | "barplot">("dotplot");
-  const [topN, setTopN] = useState(15);
+  const [topN, setTopN] = useState<number>(15);
   const [barValue, setBarValue] = useState<BarValue>("count");
   const [significantOnly, setSignificantOnly] = useState(true);
+
+  // Available term counts per ontology (for display hint)
+  const availableCounts = useMemo(() => ({
+    P: countAvailableTerms(results, "P", significantOnly),
+    C: countAvailableTerms(results, "C", significantOnly),
+    F: countAvailableTerms(results, "F", significantOnly),
+  }), [results, significantOnly]);
 
   const facetData = useMemo(
     () => ({
@@ -60,6 +61,13 @@ export default function GOEnrichmentVisualization({
     (ontologyFilter.C ? facetData.C.length : 0) +
     (ontologyFilter.F ? facetData.F.length : 0);
 
+  // Hint: show available counts for selected ontologies
+  const hintParts: string[] = [];
+  if (ontologyFilter.P) hintParts.push(`BP: ${availableCounts.P}`);
+  if (ontologyFilter.C) hintParts.push(`CC: ${availableCounts.C}`);
+  if (ontologyFilter.F) hintParts.push(`MF: ${availableCounts.F}`);
+  const hint = hintParts.join(" | ");
+
   return (
     <>
       {/* Control bar */}
@@ -75,13 +83,18 @@ export default function GOEnrichmentVisualization({
             size="sm"
           />
 
-          <Select
-            label="Top N"
-            data={TOP_N_OPTIONS}
-            value={String(topN)}
-            onChange={(v) => v && setTopN(Number(v))}
-            w={80}
+          <NumberInput
+            label="Display count"
+            value={topN}
+            onChange={(v) => {
+              const n = Number(v);
+              if (Number.isFinite(n) && n >= 0) setTopN(Math.round(n));
+            }}
+            min={0}
+            w={110}
             size="sm"
+            placeholder="0 = all"
+            description={topN === 0 ? "Showing all" : `Top ${topN}`}
           />
 
           {chartMode === "barplot" && (
@@ -109,6 +122,13 @@ export default function GOEnrichmentVisualization({
           <BarChartFilters filter={ontologyFilter} onChange={onOntologyFilterChange} />
         </Group>
       </Group>
+
+      {/* Available terms hint */}
+      {hint && (
+        <Text size="xs" c="dimmed" mb="xs">
+          Available terms — {hint}
+        </Text>
+      )}
 
       {/* Color legend (compact) */}
       <Group gap="xs" mb="sm">

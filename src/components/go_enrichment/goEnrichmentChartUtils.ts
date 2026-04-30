@@ -44,7 +44,7 @@ export function getTopTerms(
     .filter((t) => t.ontology === ontology)
     .filter((t) => !significantOnly || t.significant)
     .sort((a, b) => a.fdr - b.fdr || b.query_count - a.query_count)
-    .slice(0, topN)
+    .slice(0, topN || undefined) // topN=0 means show all
     .reverse() // most significant on top in ECharts horizontal layout
     .map((t) => ({
       goId: t.go_id,
@@ -59,6 +59,15 @@ export function getTopTerms(
       hitSymbols: t.hit_symbols,
       _original: t,
     }));
+}
+
+// Count available terms per ontology (before slicing)
+export function countAvailableTerms(
+  results: GOEnrichmentResult[],
+  ontology: "P" | "C" | "F",
+  significantOnly: boolean,
+): number {
+  return results.filter((t) => t.ontology === ontology && (!significantOnly || t.significant)).length;
 }
 
 // ── Global max -log10(FDR) across all ontologies ───────────────────────────
@@ -115,7 +124,7 @@ export function sigColor(negLog10Fdr: number, max: number): string {
 // ── Dynamic panel height ───────────────────────────────────────────────────
 
 export function panelHeight(termCount: number): number {
-  return Math.min(620, Math.max(280, termCount * 30 + 110));
+  return Math.min(1200, Math.max(280, termCount * 28 + 100));
 }
 
 // ── Tooltip formatter (shared) ─────────────────────────────────────────────
