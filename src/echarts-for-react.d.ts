@@ -7,6 +7,7 @@ declare module "echarts-for-react" {
     opts?: Record<string, unknown>;
     notMerge?: boolean;
     lazyUpdate?: boolean;
+    onEvents?: Record<string, (params: any) => void>;
   }
 
   const ReactECharts: ComponentType<ReactEChartsProps>;
