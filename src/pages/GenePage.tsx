@@ -520,6 +520,12 @@ export default function GenePage() {
     URL.revokeObjectURL(url);
   };
 
+  // Memoize GO namespace filtering (must be before early returns to follow Rules of Hooks)
+  const goItems = data?.annotations?.go?.items;
+  const goBP = useMemo(() => goItems?.filter(i => i.go_namespace === "biological_process") ?? [], [goItems]);
+  const goMF = useMemo(() => goItems?.filter(i => i.go_namespace === "molecular_function") ?? [], [goItems]);
+  const goCC = useMemo(() => goItems?.filter(i => i.go_namespace === "cellular_component") ?? [], [goItems]);
+
   if (loading) {
     return (
       <Paper withBorder radius="xl" p="xl">
@@ -545,11 +551,6 @@ export default function GenePage() {
   }
 
   const { gene, chromosome, transcript_count, transcripts } = data;
-
-  const goItems = data.annotations?.go?.items;
-  const goBP = useMemo(() => goItems?.filter(i => i.go_namespace === "biological_process") ?? [], [goItems]);
-  const goMF = useMemo(() => goItems?.filter(i => i.go_namespace === "molecular_function") ?? [], [goItems]);
-  const goCC = useMemo(() => goItems?.filter(i => i.go_namespace === "cellular_component") ?? [], [goItems]);
 
   return (
     <Stack gap="lg">
