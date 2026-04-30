@@ -1,12 +1,16 @@
 import { useMemo, useState } from "react";
 import {
+  ActionIcon,
   Group,
   NumberInput,
   SegmentedControl,
   Switch,
   Text,
+  Tooltip,
 } from "@mantine/core";
+import { IconMaximize } from "@tabler/icons-react";
 import GOEnrichmentFacetGrid from "./GOEnrichmentFacetGrid";
+import GOEnrichmentChartFullscreen from "./GOEnrichmentChartFullscreen";
 import { BarChartFilters } from "./GOEnrichmentPageFilters";
 import type { BarValue } from "./GOEnrichmentBarplotPanel";
 import type { GOEnrichmentResult } from "../../lib/goEnrichmentApi";
@@ -33,6 +37,7 @@ export default function GOEnrichmentVisualization({
   const [topN, setTopN] = useState<number>(15);
   const [barValue, setBarValue] = useState<BarValue>("count");
   const [significantOnly, setSignificantOnly] = useState(true);
+  const [fullscreenOpened, setFullscreenOpened] = useState(false);
 
   // Available term counts per ontology (for display hint)
   const availableCounts = useMemo(() => ({
@@ -121,6 +126,16 @@ export default function GOEnrichmentVisualization({
 
         <Group gap="xs" align="center">
           <BarChartFilters filter={ontologyFilter} onChange={onOntologyFilterChange} />
+          <Tooltip label="Fullscreen & Export">
+            <ActionIcon
+              variant="light"
+              color="gray"
+              size="lg"
+              onClick={() => setFullscreenOpened(true)}
+            >
+              <IconMaximize size={16} />
+            </ActionIcon>
+          </Tooltip>
         </Group>
       </Group>
 
@@ -182,6 +197,16 @@ export default function GOEnrichmentVisualization({
           No terms to display. Adjust filters or run a new analysis.
         </Text>
       )}
+
+      {/* Fullscreen modal */}
+      <GOEnrichmentChartFullscreen
+        opened={fullscreenOpened}
+        onClose={() => setFullscreenOpened(false)}
+        results={results}
+        ontologyFilter={ontologyFilter}
+        onOntologyFilterChange={onOntologyFilterChange}
+        onTermClick={onTermClick}
+      />
     </>
   );
 }
