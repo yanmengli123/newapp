@@ -87,7 +87,7 @@ export default function GOEnrichmentBarplotPanel({
     },
     grid: {
       left: 16,
-      right: 50,
+      right: 60,
       top: 40,
       bottom: 30,
       containLabel: true,
@@ -151,7 +151,7 @@ export default function GOEnrichmentBarplotPanel({
   return (
     <Box>
       <Text size="sm" fw={600} mb={4}>{meta.label}</Text>
-      <Text size="xs" c="dimmed" mb={8}>Top {terms.length} terms</Text>
+      <Text size="xs" c="dimmed" mb={8}>{terms.length} terms</Text>
       <ReactECharts
         key={`${ontology}-${terms.length}-${barValue}`}
         option={option}

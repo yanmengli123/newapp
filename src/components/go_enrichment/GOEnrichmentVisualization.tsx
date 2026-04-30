@@ -87,6 +87,7 @@ export default function GOEnrichmentVisualization({
             label="Display count"
             value={topN}
             onChange={(v) => {
+              if (v === "" || v === undefined) return;
               const n = Number(v);
               if (Number.isFinite(n) && n >= 0) setTopN(Math.round(n));
             }}

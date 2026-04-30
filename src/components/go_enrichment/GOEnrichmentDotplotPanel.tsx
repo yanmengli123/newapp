@@ -121,7 +121,7 @@ export default function GOEnrichmentDotplotPanel({
   return (
     <Box>
       <Text size="sm" fw={600} mb={4}>{meta.label}</Text>
-      <Text size="xs" c="dimmed" mb={8}>Top {terms.length} terms</Text>
+      <Text size="xs" c="dimmed" mb={8}>{terms.length} terms</Text>
       <ReactECharts
         key={`${ontology}-${terms.length}`}
         option={option}
