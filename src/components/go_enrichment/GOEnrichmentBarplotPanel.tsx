@@ -86,7 +86,7 @@ export default function GOEnrichmentBarplotPanel({
       },
     },
     grid: {
-      left: 16,
+      left: 20,
       right: 60,
       top: 40,
       bottom: 30,
@@ -106,7 +106,7 @@ export default function GOEnrichmentBarplotPanel({
       data: termNames,
       axisLabel: {
         fontSize: 10,
-        width: 140,
+        width: 160,
         overflow: "truncate",
         color: "#1f2937",
       },

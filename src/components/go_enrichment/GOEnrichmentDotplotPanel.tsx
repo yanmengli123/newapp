@@ -54,7 +54,7 @@ export default function GOEnrichmentDotplotPanel({
       },
     },
     grid: {
-      left: 16,
+      left: 20,
       right: 40,
       top: 40,
       bottom: 30,
@@ -77,7 +77,7 @@ export default function GOEnrichmentDotplotPanel({
       data: termNames,
       axisLabel: {
         fontSize: 10,
-        width: 140,
+        width: 160,
         overflow: "truncate",
         color: "#1f2937",
       },

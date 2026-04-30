@@ -84,7 +84,7 @@ export default function GOEnrichmentVisualization({
           />
 
           <NumberInput
-            label="Display count"
+            label="Terms per ontology"
             value={topN}
             onChange={(v) => {
               if (v === "" || v === undefined) return;
@@ -92,7 +92,7 @@ export default function GOEnrichmentVisualization({
               if (Number.isFinite(n) && n >= 0) setTopN(Math.round(n));
             }}
             min={0}
-            w={110}
+            w={130}
             size="sm"
             placeholder="0 = all"
             description={topN === 0 ? "Showing all" : `Top ${topN}`}
@@ -131,21 +131,36 @@ export default function GOEnrichmentVisualization({
         </Text>
       )}
 
-      {/* Color legend (compact) */}
-      <Group gap="xs" mb="sm">
-        <Text size="xs" c="dimmed">Color:</Text>
-        <svg width={100} height={12} style={{ verticalAlign: "middle" }}>
-          <defs>
-            <linearGradient id="sigGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#fee08b" />
-              <stop offset="33%" stopColor="#66c2a5" />
-              <stop offset="66%" stopColor="#3288bd" />
-              <stop offset="100%" stopColor="#253494" />
-            </linearGradient>
-          </defs>
-          <rect x={0} y={0} width={100} height={12} rx={2} fill="url(#sigGrad)" />
-        </svg>
-        <Text size="xs" c="dimmed">Low significance → High significance (-log10 FDR)</Text>
+      {/* Legends */}
+      <Group gap="lg" mb="sm" wrap="wrap">
+        {/* Color legend */}
+        <Group gap={6}>
+          <Text size="xs" c="dimmed">Color:</Text>
+          <svg width={80} height={10} style={{ verticalAlign: "middle" }}>
+            <defs>
+              <linearGradient id="sigGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#fee08b" />
+                <stop offset="33%" stopColor="#66c2a5" />
+                <stop offset="66%" stopColor="#3288bd" />
+                <stop offset="100%" stopColor="#253494" />
+              </linearGradient>
+            </defs>
+            <rect x={0} y={0} width={80} height={10} rx={2} fill="url(#sigGrad)" />
+          </svg>
+          <Text size="xs" c="dimmed">Higher -log10(FDR) = more significant</Text>
+        </Group>
+        {/* Size legend (Dotplot only) */}
+        {chartMode === "dotplot" && (
+          <Group gap={6} align="center">
+            <Text size="xs" c="dimmed">Size:</Text>
+            <svg width={60} height={16} style={{ verticalAlign: "middle" }}>
+              <circle cx={8} cy={8} r={4} fill="#999" opacity={0.5} />
+              <circle cx={26} cy={8} r={7} fill="#999" opacity={0.5} />
+              <circle cx={48} cy={6} r={10} fill="#999" opacity={0.5} />
+            </svg>
+            <Text size="xs" c="dimmed">Hit gene count</Text>
+          </Group>
+        )}
       </Group>
 
       {/* Facet grid */}
