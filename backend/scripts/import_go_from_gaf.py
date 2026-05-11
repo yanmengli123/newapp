@@ -290,11 +290,6 @@ def run_import(gaf_path: str, dry_run: bool = False, batch_size: int = 10000):
         print(f'  Genes with GO: {genes}')
         print(f'  From this import: {from_source}')
 
-        print(f'\nFinal statistics:')
-        print(f'  Total annotations: {total}')
-        print(f'  Genes with GO: {genes}')
-        print(f'  From this import: {from_source}')
-
     except Exception as e:
         conn.rollback()
         print(f'Error: {e}', file=sys.stderr)
