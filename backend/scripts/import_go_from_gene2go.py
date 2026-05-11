@@ -250,26 +250,31 @@ def run_import(gene2go_path: str, dry_run: bool = False, batch_size: int = 10000
             ON CONFLICT DO NOTHING
         '''
 
-        inserted = 0
+        # Get count before import
+        cur.execute('SELECT COUNT(*) FROM gene_go')
+        count_before = cur.fetchone()[0]
+
         for i in range(0, len(new_records), batch_size):
             batch = new_records[i:i+batch_size]
             execute_values(cur, insert_sql, batch, page_size=batch_size)
-            inserted += len(batch)
             conn.commit()
-            print(f'  Inserted {inserted} / {len(new_records)}', end='\r')
+            print(f'  Processed {min(i+batch_size, len(new_records))} / {len(new_records)}', end='\r')
 
-        print(f'\nImport complete: {inserted} new annotations')
+        # Get actual inserted count from DB
+        cur.execute('SELECT COUNT(*) FROM gene_go')
+        count_after = cur.fetchone()[0]
+        inserted = count_after - count_before
+
+        print(f'\nImport complete: {inserted} new annotations (verified by DB count)')
 
         # Final statistics
-        cur.execute('SELECT COUNT(*) FROM gene_go')
-        total = cur.fetchone()[0]
         cur.execute('SELECT COUNT(DISTINCT gene_id) FROM gene_go')
         genes = cur.fetchone()[0]
         cur.execute("SELECT COUNT(*) FROM gene_go WHERE source = %s", (source,))
         from_source = cur.fetchone()[0]
 
         print(f'\nFinal statistics:')
-        print(f'  Total annotations: {total}')
+        print(f'  Total annotations: {count_after}')
         print(f'  Genes with GO: {genes}')
         print(f'  From this import: {from_source}')
 

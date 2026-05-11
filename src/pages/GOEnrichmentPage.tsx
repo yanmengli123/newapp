@@ -205,7 +205,7 @@ export default function GOEnrichmentPage() {
           <b>Propagated</b>: direct annotations are propagated to all is_a/part_of ancestor terms
           (GO DAG from go-basic.obo, January 2026 release).
           FDR correction is applied within each ontology (BP/CC/MF corrected separately).
-          Evidence filter excludes electronic IEA annotations by default.
+          Evidence filter defaults to "all" (including electronic IEA). Switch to "non_iea" or "curated" to restrict background.
         </Text>
       </Box>
 

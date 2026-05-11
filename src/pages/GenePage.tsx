@@ -754,7 +754,7 @@ export default function GenePage() {
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {goBP.map(item => <GOTermCard key={item.go_id} item={item} />)}
+                    {goBP.map(item => <GOTermCard key={`${item.go_id}-${item.evidence_code}-${item.source}`} item={item} />)}
                   </Stack>
                 </Accordion.Panel>
               </Accordion.Item>
@@ -774,7 +774,7 @@ export default function GenePage() {
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {goMF.map(item => <GOTermCard key={item.go_id} item={item} />)}
+                    {goMF.map(item => <GOTermCard key={`${item.go_id}-${item.evidence_code}-${item.source}`} item={item} />)}
                   </Stack>
                 </Accordion.Panel>
               </Accordion.Item>
@@ -794,7 +794,7 @@ export default function GenePage() {
                 </Accordion.Control>
                 <Accordion.Panel>
                   <Stack gap="sm">
-                    {goCC.map(item => <GOTermCard key={item.go_id} item={item} />)}
+                    {goCC.map(item => <GOTermCard key={`${item.go_id}-${item.evidence_code}-${item.source}`} item={item} />)}
                   </Stack>
                 </Accordion.Panel>
               </Accordion.Item>
