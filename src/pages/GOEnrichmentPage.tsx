@@ -64,7 +64,7 @@ export default function GOEnrichmentPage() {
   const [minOverlap, setMinOverlap] = useState<number>(2);
   const [namespace, setNamespace] = useState("all");
   const [annotationMode, setAnnotationMode] = useState("direct");
-  const [evidenceFilter, setEvidenceFilter] = useState("non_iea");
+  const [evidenceFilter, setEvidenceFilter] = useState("all");
 
   const [pageState, setPageState] = useState<PageState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -391,6 +391,24 @@ export default function GOEnrichmentPage() {
               <Text size="xs" c="dimmed">Significant</Text>
             </Card>
           </SimpleGrid>
+
+          {/* Background Statistics */}
+          <Paper withBorder radius="md" p="sm">
+            <Group gap="lg">
+              <Group gap="xs">
+                <Text size="xs" c="dimmed">Evidence Mode:</Text>
+                <Badge size="xs" color="violet">{evidenceFilter}</Badge>
+              </Group>
+              <Group gap="xs">
+                <Text size="xs" c="dimmed">Annotation Source:</Text>
+                <Badge size="xs" color="cyan">{result.annotation_source || "—"}</Badge>
+              </Group>
+              <Group gap="xs">
+                <Text size="xs" c="dimmed">Background:</Text>
+                <Badge size="xs" color="teal">{result.background_mode || "—"}</Badge>
+              </Group>
+            </Group>
+          </Paper>
 
           {/* Ontology Stats (when namespace=all) */}
           {namespace === "all" && result.ontology_stats && (

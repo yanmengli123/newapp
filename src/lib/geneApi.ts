@@ -315,6 +315,11 @@ export interface GOAnnotation {
   evidence_code?: string;
   source?: string;
   official_link?: string;
+  qualifier?: string;
+  reference?: string;
+  pubmed_ids?: string;
+  assigned_by?: string;
+  aspect?: string;
 }
 
 export interface GOAnnotationsResponse {

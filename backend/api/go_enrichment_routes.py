@@ -26,7 +26,7 @@ class AnalyzeRequest(BaseModel):
     min_overlap: int = Field(default=2, ge=1, le=100)
     namespace: Literal["all", "biological_process", "cellular_component", "molecular_function"] = Field(default="all")
     annotation_mode: Literal["direct", "propagated"] = Field(default="direct")
-    evidence_filter: Literal["all", "non_iea", "experimental"] = Field(default="non_iea")
+    evidence_filter: Literal["all", "non_iea", "experimental"] = Field(default="all")
 
     @field_validator("correction")
     @classmethod

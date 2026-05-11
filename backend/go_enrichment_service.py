@@ -23,7 +23,7 @@ class EnrichmentParams:
     min_overlap: int = 2
     namespace: str = "all"
     annotation_mode: str = "direct"
-    evidence_filter: str = "non_iea"  # all / non_iea / experimental
+    evidence_filter: str = "all"  # all / non_iea / experimental
 
 
 @dataclass

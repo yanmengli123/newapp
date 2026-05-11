@@ -134,7 +134,12 @@ def load_gene_go(request: Request, gene_id: str) -> Dict[str, Any]:
                     gt.go_definition,
                     gt.go_namespace,
                     g.evidence_code,
-                    g.source
+                    g.source,
+                    g.qualifier,
+                    g.reference,
+                    g.pubmed_ids,
+                    g.assigned_by,
+                    g.aspect
                 FROM gene_go g
                 JOIN go_term gt ON g.go_id = gt.go_id
                 WHERE g.gene_id = %s
@@ -171,6 +176,11 @@ def load_gene_go(request: Request, gene_id: str) -> Dict[str, Any]:
                 "go_namespace": r["go_namespace"],
                 "evidence_code": r["evidence_code"],
                 "source": r["source"],
+                "qualifier": r.get("qualifier"),
+                "reference": r.get("reference"),
+                "pubmed_ids": r.get("pubmed_ids"),
+                "assigned_by": r.get("assigned_by"),
+                "aspect": r.get("aspect"),
                 "official_link": amigo_url(r["go_id"]),
             })
 
