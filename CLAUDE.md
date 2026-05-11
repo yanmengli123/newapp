@@ -92,7 +92,9 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
         ├── schema_esc_v1.sql      # Fixed: no duplicate columns
         └── migrations/             # Versioned schema changes
             ├── V002__add_dataset_alias.sql
-            └── V003__add_mv_dataset_metric.sql
+            ├── V003__add_mv_dataset_metric.sql
+            ├── V004__go_dag_closure.sql
+            └── V005__add_gene_go_provenance.sql
 
 D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 ├── grcg6a_nc.db                 # SQLite (gffutils, read-only at startup)
@@ -179,6 +181,8 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - **db/migrations/** — Versioned SQL migrations (authoritative source for schema changes):
   - `V002__add_dataset_alias.sql` — `dataset_alias` table for dataset code aliases
   - `V003__add_mv_dataset_metric.sql` — `mv_dataset_metric` materialized view for (dataset, metric) capability registry
+  - `V004__go_dag_closure.sql` — GO DAG closure tables (go_term, go_edge, go_closure, go_alt_id)
+  - `V005__add_gene_go_provenance.sql` — GO annotation provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
 
 ## Backend Endpoints
 
