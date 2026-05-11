@@ -525,6 +525,38 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **GO Enrichment service** (`go_enrichment_service.py`): Core enrichment math extracted to pure function `_compute_enrichment_for_namespace(query_go_hits, bg_go_counts, go_names, gene_info, N, n, params) → (tested_results, significant_results)`. Pure function handles: hypergeometric p-values, `min_overlap` filter (before FDR), per-ontology FDR correction, significance flagging. `_go_alt_sql_parts(cur)` helper centralizes the 3-line `_table_exists` + `_go_id_expr` + `alt_join` pattern used across 4 call sites (background builder, direct hits, annotated_count, mapping report).
 - **GO Enrichment DAG stability**: All set→list conversions use `sorted()` or pre-sorted lists. `sig_terms_sorted` (sorted by FDR, p_value, go_id) is the canonical order for DAG node truncation, ancestor prioritization, and SQL `ANY()` params. `ancestor_priority` key: `(-conn_count, min_dist_from_sig, gid)` — `on_root_path` was removed because `depth_map` keys are (sig→ancestor) not (ancestor→root), so the lookup was always 999.
 
+### GO Annotation Import Scripts
+
+**GAF Import** (`backend/scripts/import_go_from_gaf.py`):
+```bash
+# Dry-run (no DB changes)
+python backend/scripts/import_go_from_gaf.py --gaf GCF_016699485.2_gene_ontology.gaf --dry-run
+
+# Import
+python backend/scripts/import_go_from_gaf.py --gaf GCF_016699485.2_gene_ontology.gaf --batch-size 10000
+```
+
+**gene2go Import** (`backend/scripts/import_go_from_gene2go.py`):
+```bash
+# Dry-run (no DB changes)
+python backend/scripts/import_go_from_gene2go.py --gene2go gene2go.gz --dry-run --taxon 9031
+
+# Import
+python backend/scripts/import_go_from_gene2go.py --gene2go gene2go.gz --batch-size 10000 --taxon 9031
+```
+
+**QC Script** (`backend/scripts/qc_go_annotation_sources.py`):
+```bash
+python backend/scripts/qc_go_annotation_sources.py
+```
+
+**Current State** (as of 2026-05-11):
+- Source: `ensembl_biomart` (144,266 annotations) + `ncbi_gaf_gcf_016699485.2` (27,240 annotations)
+- Genes with GO: 14,835 (from 12,890, +15.1%)
+- GO coverage: 60.7% of NCBI GeneIDs
+- Background genes: P=12,739 / C=12,893 / F=12,701
+- Migration V005: Added provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
+
 ## Git
 
 ```bash
