@@ -397,8 +397,8 @@ function Top50HeatmapChart({ data, fullscreen }: { data: any; fullscreen?: boole
 
 function PCAChart({ data, fullscreen }: { data: any; fullscreen?: boolean }) {
   const stageColors: Record<string, string> = {
-    "E0": "#8B5CF6", "E3.5": "#7C3AED", "E7": "#6366F1", "E11": "#3B82F6",
-    "E14": "#0EA5E9", "E18.5": "#06B6D4", "P0": "#10B981", "Adult": "#F59E0B",
+    "E0": "#8B5CF6", "E3.5": "#7C3AED", "E4.5": "#6366F1", "E5.5": "#3B82F6",
+    "E6.5": "#0EA5E9", "E18.5": "#06B6D4",
   };
   const byStage: Record<string, number[]> = {};
   for (let i = 0; i < data.pc1.length; i++) {

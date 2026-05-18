@@ -144,6 +144,9 @@ class DatasetRegistry:
                 dict(m)
                 for m in self._cache.get(ds_code, {}).get("metrics", {}).values()
             ]
+            # Skip datasets with no available metrics (deprecated/empty)
+            if not metrics:
+                continue
             result.append({
                 **dict(ds_row),
                 "metrics": sorted(metrics, key=lambda m: m["metric_code"]),

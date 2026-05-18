@@ -71,7 +71,7 @@ const TABLE_TIPS_CONTENT = (
         <Text span fw={600}>Sample</Text> — 样本名称（如 E0_M_R1）
       </Text>
       <Text size="xs" c="dimmed">
-        <Text span fw={600}>Stage</Text> — 发育阶段（E0/E7/E11/E14/E18.5/P0/Adult）
+        <Text span fw={600}>Stage</Text> — 发育阶段（E0/E3.5/E4.5/E5.5/E6.5/E18.5）
       </Text>
       <Text size="xs" c="dimmed">
         <Text span fw={600}>SRR Run</Text> — SRA Run ID（等宽字体）
@@ -212,7 +212,7 @@ const TABLE_TIPS_CONTENT = (
 // ── Component ────────────────────────────────────────────────────────────────
 
 const STAGE_ORDER: Record<string, number> = {
-  E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8,
+  E0: 1, "E3.5": 2, "E4.5": 3, "E5.5": 4, "E6.5": 5, "E18.5": 6,
 };
 
 function normalizeSex(s: string | null | undefined): "Male" | "Female" | null {

@@ -19,7 +19,7 @@ function buildHeatmapOption(
   if (variant === "2x6") {
     // Stage × Sex (2 rows × 6 stages) summary heatmap
     const stageSexMap: Record<string, Record<string, number>> = {};
-    const STAGES = ["E0", "E3.5", "E7", "E11", "E14", "E18.5"];
+    const STAGES = ["E0", "E3.5", "E4.5", "E5.5", "E6.5", "E18.5"];
 
     for (const s of samples) {
       const stage = s.stage ?? "?";
@@ -126,7 +126,7 @@ function buildHeatmapOption(
   }
 
   // variant === "12x3": Stage × Sex rows × Replicate columns
-  const STAGES = ["E0", "E3.5", "E7", "E11", "E14", "E18.5"];
+  const STAGES = ["E0", "E3.5", "E4.5", "E5.5", "E6.5", "E18.5"];
   const REPS = [1, 2, 3];
 
   const matrix: Record<string, Record<string, number>> = {};

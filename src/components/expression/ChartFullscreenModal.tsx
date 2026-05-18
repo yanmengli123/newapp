@@ -330,7 +330,7 @@ function getMetricLabel(metric: string): string {
   return MAP[metric] ?? metric;
 }
 
-const STAGE_ORDER_MAP: Record<string, number> = { E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8 };
+const STAGE_ORDER_MAP: Record<string, number> = { E0: 1, "E3.5": 2, "E4.5": 3, "E5.5": 4, "E6.5": 5, "E18.5": 6 };
 
 function resolveStageMeans(
   stageMeans: Record<string, Record<string, number> | number | null> | null | undefined
@@ -338,7 +338,7 @@ function resolveStageMeans(
   if (!stageMeans || typeof stageMeans !== "object") {
     return { stages: [], maleValues: [], femaleValues: [], meanValues: [] };
   }
-  const STAGE_ORDER = ["E0", "E3.5", "E7", "E11", "E14", "E18.5", "P0", "Adult"];
+  const STAGE_ORDER = ["E0", "E3.5", "E4.5", "E5.5", "E6.5", "E18.5"];
   const entries = Object.entries(stageMeans as Record<string, unknown>);
   entries.sort(([a], [b]) => {
     const ai = STAGE_ORDER.indexOf(a);

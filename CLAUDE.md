@@ -410,7 +410,8 @@ interface GeneExpressionExpandResponse {
 |---|---|---|
 | `day_deseq2_36` | DESeq2 NC — 36 developmental stage samples | normcount |
 | `raw_ballgown_36` | Ballgown TPM/FPKM — 36 developmental stage samples | tpm, fpkm |
-| `esc_srr_23` | ESC SRR Runs — 23 SRA Runs | tpm, fpkm, normcount |
+| `day_featurecounts_36` | featureCounts Raw Count — 36 developmental stage samples | raw_count |
+| `esc_srr_23` | ESC SRR Runs — 23 SRA Runs (deprecated, no data) | — |
 
 ### Registered Routers
 All routers registered in `main.py`:
@@ -438,15 +439,16 @@ Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`
 - `gene_xref` new fields: `gene_type`, `display_symbol`, `is_canonical`
 
 **Expression star-schema**:
-- `dataset` — Dataset definitions (3: raw_ballgown_36 / day_deseq2_36 / esc_srr_23)
+- `dataset` — Dataset definitions (4: raw_ballgown_36 / day_deseq2_36 / day_featurecounts_36 / esc_srr_23[deprecated])
 - `expr_metric` — Metric definitions (tpm / fpkm / normcount / raw_count)
-- `dataset_sample` — Dataset-sample associations (SRA Run / stage / sex / replicate / tissue / batch)
-- `expression_sample` — Sample metadata (stage / stage_label / sex / replicate)
-- `expression_fact` — Expression fact table (~3M rows, gene × sample × metric center table)
-- `gene_expression_summary` — Pre-aggregated stats (mean/max/min/std / sex_bias / stage_means)
+- `dataset_sample` — Dataset-sample associations (144 rows: 4 datasets × 36 samples)
+- `expression_sample` — Sample metadata (36 rows: 6 stages × 2 sexes × 3 replicates)
+- `expression_fact` — Expression fact table (~3.3M rows, gene × sample × metric center table)
+- `gene_expression_summary` — Pre-aggregated stats (93,040 rows: mean/max/min/std/cv/sex_bias/stage_means/top_stage/fold_change)
 
 **dataset_alias table** (V002 migration):
-- `alias_code` → `canonical_code` mapping (e.g. `raw_ballgown_36` → `esc_srr_23`)
+- `alias_code` → `canonical_code` mapping
+- Currently empty (no active aliases after 2026-05-18 expression data update)
 
 **mv_dataset_metric materialized view** (V003 migration):
 - (dataset, metric) capability registry; `ExpressionService` validates user query against enabled pairs
@@ -529,6 +531,28 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **GO Enrichment service** (`go_enrichment_service.py`): Core enrichment math extracted to pure function `_compute_enrichment_for_namespace(query_go_hits, bg_go_counts, go_names, gene_info, N, n, params) → (tested_results, significant_results)`. Pure function handles: hypergeometric p-values, `min_overlap` filter (before FDR), per-ontology FDR correction, significance flagging. `_go_alt_sql_parts(cur)` helper centralizes the 3-line `_table_exists` + `_go_id_expr` + `alt_join` pattern used across 4 call sites (background builder, direct hits, annotated_count, mapping report).
 - **GO Enrichment DAG stability**: All set→list conversions use `sorted()` or pre-sorted lists. `sig_terms_sorted` (sorted by FDR, p_value, go_id) is the canonical order for DAG node truncation, ancestor prioritization, and SQL `ANY()` params. `ancestor_priority` key: `(-conn_count, min_dist_from_sig, gid)` — `on_root_path` was removed because `depth_map` keys are (sig→ancestor) not (ancestor→root), so the lookup was always 999.
 
+### Expression Data Import
+
+**Update Data Import** (`backend/scripts/import_update_data.py`):
+Replaces expression-related tables from `D:\jbrowsedata\projectdata\update data\` while preserving GO/KEGG/genome annotations.
+```bash
+# Dry-run (no DB changes)
+python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectdata/update data" --dry-run
+
+# Import (replaces expression_fact, gene_expression_summary, expression_sample, dataset_sample)
+python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectdata/update data"
+```
+
+**Post-import steps**:
+1. Refresh materialized view: `REFRESH MATERIALIZED VIEW mv_dataset_metric;`
+2. Remove stale dataset aliases if needed
+3. Rebuild summary derived fields: `docker exec -i grc_postgres psql -U grcuser -d grcg6a < backend/scripts/fix_summary.sql`
+
+**Current State** (as of 2026-05-18):
+- expression_fact: 3,349,440 rows (23,373 genes × 36 samples × 4 metrics)
+- gene_expression_summary: 93,040 rows (all derived fields populated)
+- Datasets: day_deseq2_36/normcount, raw_ballgown_36/tpm+fpkm, day_featurecounts_36/raw_count
+
 ### GO Annotation Import Scripts
 
 **GAF Import** (`backend/scripts/import_go_from_gaf.py`):
@@ -554,12 +578,13 @@ python backend/scripts/import_go_from_gene2go.py --gene2go gene2go.gz --batch-si
 python backend/scripts/qc_go_annotation_sources.py
 ```
 
-**Current State** (as of 2026-05-11):
+**Current State** (as of 2026-05-18):
 - Source: `ensembl_biomart` (144,266 annotations) + `ncbi_gaf_gcf_016699485.2` (27,240 annotations)
 - Genes with GO: 14,835 (from 12,890, +15.1%)
 - GO coverage: 60.7% of NCBI GeneIDs
 - Background genes: P=12,739 / C=12,893 / F=12,701
 - Migration V005: Added provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
+- **Expression data**: 3,349,440 fact rows, 23,373 genes, 36 samples, 4 metrics
 
 ## Git
 

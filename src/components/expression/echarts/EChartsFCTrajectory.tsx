@@ -11,7 +11,7 @@ interface EChartsFCTrajectoryProps {
 
 function buildFCtrajectoryOption(samples: ExpressionSample[]): any {
   const STAGE_ORDER: Record<string, number> = {
-    E0: 1, "E3.5": 2, E7: 3, "E11": 4, "E14": 5, "E18.5": 6, P0: 7, Adult: 8,
+    E0: 1, "E3.5": 2, "E4.5": 3, "E5.5": 4, "E6.5": 5, "E18.5": 6,
   };
 
   // Compute stage × sex means
