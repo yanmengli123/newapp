@@ -619,7 +619,7 @@ function FCBarChart({ summary, styleConfig, ...plotProps }: { summary: any; styl
     textposition: showValueLabel ? "outside" : "none",
     textfont: { size: fontSize - 1, color: foldData.map(d => d.direction === "up" ? upColor : downColor) },
     marker: { color: foldData.map(d => d.direction === "up" ? upColor : downColor), opacity: 0.85, width: barWidth },
-    hovertemplate: foldData.map(d => "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
+    hovertemplate: foldData.map(() => "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
     orientation: "v" as const
   }];
   const layout: any = { margin: { t: 16, b: 64, l: 96, r: 24 }, yaxis: { title: { text: "log2(Fold Change)", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", zeroline: true, zerolinecolor: "#ccc", tickfont: { size: fontSize - 1 } }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, showlegend: false, ...PAPER_STYLE_FULLSCREEN };

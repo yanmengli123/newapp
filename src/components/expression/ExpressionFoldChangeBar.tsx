@@ -82,7 +82,7 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
         opacity: 0.85,
         width: barWidth,
       },
-      hovertemplate: foldData.map(d => "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
+      hovertemplate: foldData.map(() => "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
       orientation: "v" as const,
     },
   ];
