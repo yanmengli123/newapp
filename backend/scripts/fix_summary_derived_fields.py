@@ -148,20 +148,18 @@ def main():
 
             sex_bias_ratio = female_mean / male_mean if male_mean > 0 else None
 
-            # Fold change (top/bottom stage vs overall mean, log2 scale)
+            # Fold change (stage-level max/min vs overall mean, log2 scale)
             import math
             overall_mean = float(row['mean_value'] or 0)
-            max_value = float(row['max_value'] or 0)
-            min_value = float(row['min_value'] or 0)
             fold_change_top = None
             fold_change_bottom = None
-            if overall_mean > 0:
-                if max_value > 0:
-                    fold_change_top = math.log2(max_value / overall_mean)
-                if min_value > 0:
-                    fold_change_bottom = math.log2(min_value / overall_mean)
-                elif min_value == 0:
-                    fold_change_bottom = -999
+            if overall_mean > 0 and stages:
+                stage_means_list = [s['mean'] for s in stages.values() if s['mean'] > 0]
+                if stage_means_list:
+                    max_stage = max(stage_means_list)
+                    min_stage = min(stage_means_list)
+                    fold_change_top = math.log2(max_stage / overall_mean)
+                    fold_change_bottom = math.log2(min_stage / overall_mean)
 
             batch.append((
                 json.dumps(stage_means) if stage_means else None,

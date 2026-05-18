@@ -101,19 +101,30 @@ WHERE ges.gene_id = sub.gene_id
   AND ges.metric_code = sub.metric_code;
 
 -- Step 6: Update fold_change_top and fold_change_bottom (log2 fold change)
-UPDATE gene_expression_summary
+-- Uses stage-level max/min means, not sample-level max/min
+UPDATE gene_expression_summary ges
 SET
     fold_change_top = CASE
-        WHEN max_value > 0 AND mean_value > 0
-        THEN LN(max_value / mean_value) / LN(2)
+        WHEN sub.max_stage > 0 AND ges.mean_value > 0
+        THEN LN(sub.max_stage / ges.mean_value) / LN(2)
         ELSE NULL
     END,
     fold_change_bottom = CASE
-        WHEN min_value > 0 AND mean_value > 0
-        THEN LN(min_value / mean_value) / LN(2)
-        WHEN min_value = 0 THEN -999
+        WHEN sub.min_stage > 0 AND ges.mean_value > 0
+        THEN LN(sub.min_stage / ges.mean_value) / LN(2)
         ELSE NULL
-    END;
+    END
+FROM (
+    SELECT
+        gene_id, dataset_code, metric_code,
+        MAX(stage_mean) as max_stage,
+        MIN(stage_mean) as min_stage
+    FROM _fix_stage_agg
+    GROUP BY gene_id, dataset_code, metric_code
+) sub
+WHERE ges.gene_id = sub.gene_id
+  AND ges.dataset_code = sub.dataset_code
+  AND ges.metric_code = sub.metric_code;
 
 -- Cleanup
 DROP TABLE IF EXISTS _fix_stage_agg;

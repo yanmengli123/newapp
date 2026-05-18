@@ -31,11 +31,8 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
   const foldBottom = summary?.fold_change_bottom;
   const topStage = summary?.top_stage;
 
-  const hasData = (
-    isValidNumber(foldTop) && foldTop > 0
-  ) || (
-    isValidNumber(foldBottom) && foldBottom > 0
-  );
+  // DB already stores log2 fold change values
+  const hasData = isValidNumber(foldTop) || isValidNumber(foldBottom);
 
   if (!hasData) {
     return (
@@ -47,37 +44,49 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
 
   const foldData: Array<{
     label: string;
-    raw: number;
-    log2: number;
+    log2Value: number;
+    displayValue: number;
     direction: "up" | "down";
   }> = [];
 
-  if (isValidNumber(foldTop) && foldTop! > 0) {
-    const raw = foldTop!;
+  if (isValidNumber(foldTop)) {
+    // fold_change_top is already log2(max/mean), always positive
     foldData.push({
       label: topStage && topStage !== "—" ? `Top (${topStage})` : "Top Stage",
-      raw,
-      log2: Math.log2(raw),
+      log2Value: foldTop!,
+      displayValue: Math.pow(2, foldTop!), // convert back to raw ratio for display
       direction: "up",
     });
   }
 
-  if (isValidNumber(foldBottom) && foldBottom! > 0) {
-    const raw = foldBottom!;
-    foldData.push({
-      label: "Bottom Stage",
-      raw,
-      log2: -Math.log2(raw), // negative for down
-      direction: "down",
-    });
+  if (isValidNumber(foldBottom)) {
+    if (foldBottom! === -999) {
+      // Special case: min value is 0, cannot compute log2
+      foldData.push({
+        label: "Bottom Stage",
+        log2Value: -999,
+        displayValue: 0,
+        direction: "down",
+      });
+    } else if (foldBottom! < 0) {
+      // fold_change_bottom is log2(min/mean), negative means down-regulation
+      foldData.push({
+        label: "Bottom Stage",
+        log2Value: foldBottom!,
+        displayValue: Math.pow(2, foldBottom!), // convert back to raw ratio for display
+        direction: "down",
+      });
+    }
   }
 
   const traces: any[] = [
     {
       type: "bar",
       x: foldData.map(d => d.label),
-      y: foldData.map(d => d.log2),
-      text: showValueLabel ? foldData.map(d => `${d.raw.toFixed(2)}x`) : undefined,
+      y: foldData.map(d => d.log2Value === -999 ? -10 : d.log2Value), // cap -999 at -10 for display
+      text: showValueLabel ? foldData.map(d =>
+        d.log2Value === -999 ? "0x" : `${d.displayValue.toFixed(2)}x`
+      ) : undefined,
       textposition: showValueLabel ? "outside" : "none",
       textfont: { size: fontSize - 1, color: foldData.map(d => d.direction === "up" ? upColor : downColor) },
       marker: {
@@ -85,7 +94,11 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
         opacity: 0.85,
         width: barWidth,
       },
-      hovertemplate: "%{x}: %{text} (log2: %{y:.2f})<extra></extra>",
+      hovertemplate: foldData.map(d =>
+        d.log2Value === -999
+          ? "%{x}: Zero expression<extra></extra>"
+          : "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"
+      ),
       orientation: "v" as const,
     },
   ];
@@ -113,7 +126,7 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
       <Stack gap="xs">
         <Group justify="space-between" align="center">
           <Text size="xs" fw={600} c="dimmed">
-            {titleOverride ?? "Fold Change (Max vs Min Stage)"}
+            {titleOverride ?? "Fold Change (Stage vs Mean)"}
           </Text>
           {renderMode !== "fullscreen" && onOpenFullscreen && (
             <ActionIcon variant="subtle" color="gray" size="sm" onClick={onOpenFullscreen}>
