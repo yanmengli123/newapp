@@ -94,7 +94,8 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
             ├── V002__add_dataset_alias.sql
             ├── V003__add_mv_dataset_metric.sql
             ├── V004__go_dag_closure.sql
-            └── V005__add_gene_go_provenance.sql
+            ├── V005__add_gene_go_provenance.sql
+            └── V006__fix_fold_change_to_stage_level.sql
 
 D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 ├── grcg6a_nc.db                 # SQLite (gffutils, read-only at startup)
@@ -183,6 +184,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `V003__add_mv_dataset_metric.sql` — `mv_dataset_metric` materialized view for (dataset, metric) capability registry
   - `V004__go_dag_closure.sql` — GO DAG closure tables (go_term, go_edge, go_closure, go_alt_id)
   - `V005__add_gene_go_provenance.sql` — GO annotation provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
+  - `V006__fix_fold_change_to_stage_level.sql` — Fix fold_change to use stage-level means (log2 scale, NULL for uncomputable)
 
 ## Backend Endpoints
 
@@ -603,6 +605,7 @@ python backend/scripts/qc_go_annotation_sources.py
 - GO coverage: 60.7% of NCBI GeneIDs
 - Background genes: P=12,739 / C=12,893 / F=12,701
 - Migration V005: Added provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
+- Migration V006: Fixed fold_change to use stage-level means (log2 scale, NULL for uncomputable)
 - **Expression data**: 3,349,440 fact rows, 23,373 genes, 36 samples, 4 metrics
 
 ## Git
