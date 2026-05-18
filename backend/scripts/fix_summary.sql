@@ -118,7 +118,7 @@ FROM (
     SELECT
         gene_id, dataset_code, metric_code,
         MAX(stage_mean) as max_stage,
-        MIN(stage_mean) as min_stage
+        MIN(CASE WHEN stage_mean > 0 THEN stage_mean END) as min_stage
     FROM _fix_stage_agg
     GROUP BY gene_id, dataset_code, metric_code
 ) sub

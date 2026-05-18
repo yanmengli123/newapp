@@ -59,34 +59,22 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
     });
   }
 
-  if (isValidNumber(foldBottom)) {
-    if (foldBottom! === -999) {
-      // Special case: min value is 0, cannot compute log2
-      foldData.push({
-        label: "Bottom Stage",
-        log2Value: -999,
-        displayValue: 0,
-        direction: "down",
-      });
-    } else if (foldBottom! < 0) {
-      // fold_change_bottom is log2(min/mean), negative means down-regulation
-      foldData.push({
-        label: "Bottom Stage",
-        log2Value: foldBottom!,
-        displayValue: Math.pow(2, foldBottom!), // convert back to raw ratio for display
-        direction: "down",
-      });
-    }
+  if (isValidNumber(foldBottom) && foldBottom! < 0) {
+    // fold_change_bottom is log2(min_positive_stage_mean/overall_mean), always negative
+    foldData.push({
+      label: "Bottom Stage",
+      log2Value: foldBottom!,
+      displayValue: Math.pow(2, foldBottom!),
+      direction: "down",
+    });
   }
 
   const traces: any[] = [
     {
       type: "bar",
       x: foldData.map(d => d.label),
-      y: foldData.map(d => d.log2Value === -999 ? -10 : d.log2Value), // cap -999 at -10 for display
-      text: showValueLabel ? foldData.map(d =>
-        d.log2Value === -999 ? "0x" : `${d.displayValue.toFixed(2)}x`
-      ) : undefined,
+      y: foldData.map(d => d.log2Value),
+      text: showValueLabel ? foldData.map(d => `${d.displayValue.toFixed(2)}x`) : undefined,
       textposition: showValueLabel ? "outside" : "none",
       textfont: { size: fontSize - 1, color: foldData.map(d => d.direction === "up" ? upColor : downColor) },
       marker: {
@@ -94,11 +82,7 @@ export default function ExpressionFoldChangeBar({ summary, styleConfig, renderMo
         opacity: 0.85,
         width: barWidth,
       },
-      hovertemplate: foldData.map(d =>
-        d.log2Value === -999
-          ? "%{x}: Zero expression<extra></extra>"
-          : "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"
-      ),
+      hovertemplate: foldData.map(d => "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
       orientation: "v" as const,
     },
   ];

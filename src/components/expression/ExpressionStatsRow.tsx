@@ -85,10 +85,11 @@ export default function ExpressionStatsRow({ summary, sampleCount }: ExpressionS
   const exprCount = summary.expressed_samples ?? 0;
   const zeroCount = summary.zero_samples ?? 0;
 
+  // fold_change is log2 scale: >1 means 2x up, <-1 means 2x down
   const trendIcon =
-    (summary.fold_change_top ?? 0) > 2 ? (
+    (summary.fold_change_top ?? 0) > 1 ? (
       <IconTrendingUp size={12} />
-    ) : (summary.fold_change_top ?? 0) < 0.5 ? (
+    ) : (summary.fold_change_bottom ?? 0) < -1 ? (
       <IconTrendingDown size={12} />
     ) : (
       <IconActivity size={12} />

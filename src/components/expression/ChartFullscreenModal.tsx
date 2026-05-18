@@ -608,22 +608,18 @@ function FCBarChart({ summary, styleConfig, ...plotProps }: { summary: any; styl
   if (isValidNumber(foldTop)) {
     foldData.push({ label: topStage && topStage !== "—" ? `Top (${topStage})` : "Top Stage", log2Value: foldTop!, displayValue: Math.pow(2, foldTop!), direction: "up" });
   }
-  if (isValidNumber(foldBottom)) {
-    if (foldBottom! === -999) {
-      foldData.push({ label: "Bottom Stage", log2Value: -999, displayValue: 0, direction: "down" });
-    } else if (foldBottom! < 0) {
-      foldData.push({ label: "Bottom Stage", log2Value: foldBottom!, displayValue: Math.pow(2, foldBottom!), direction: "down" });
-    }
+  if (isValidNumber(foldBottom) && foldBottom! < 0) {
+    foldData.push({ label: "Bottom Stage", log2Value: foldBottom!, displayValue: Math.pow(2, foldBottom!), direction: "down" });
   }
   const traces: any[] = [{
     type: "bar",
     x: foldData.map(d => d.label),
-    y: foldData.map(d => d.log2Value === -999 ? -10 : d.log2Value),
-    text: showValueLabel ? foldData.map(d => d.log2Value === -999 ? "0x" : `${d.displayValue.toFixed(2)}x`) : undefined,
+    y: foldData.map(d => d.log2Value),
+    text: showValueLabel ? foldData.map(d => `${d.displayValue.toFixed(2)}x`) : undefined,
     textposition: showValueLabel ? "outside" : "none",
     textfont: { size: fontSize - 1, color: foldData.map(d => d.direction === "up" ? upColor : downColor) },
     marker: { color: foldData.map(d => d.direction === "up" ? upColor : downColor), opacity: 0.85, width: barWidth },
-    hovertemplate: foldData.map(d => d.log2Value === -999 ? "%{x}: Zero expression<extra></extra>" : "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
+    hovertemplate: foldData.map(d => "%{x}: %{text} (log2: %{y:.2f})<extra></extra>"),
     orientation: "v" as const
   }];
   const layout: any = { margin: { t: 16, b: 64, l: 96, r: 24 }, yaxis: { title: { text: "log2(Fold Change)", font: { size: fontSize } }, gridcolor: showGrid ? gridColor : "transparent", zeroline: true, zerolinecolor: "#ccc", tickfont: { size: fontSize - 1 } }, xaxis: { tickfont: { size: fontSize - 1 }, gridcolor: "transparent" }, showlegend: false, ...PAPER_STYLE_FULLSCREEN };
