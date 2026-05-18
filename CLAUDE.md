@@ -547,6 +547,25 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 1. Refresh materialized view: `REFRESH MATERIALIZED VIEW mv_dataset_metric;`
 2. Remove stale dataset aliases if needed
 3. Rebuild summary derived fields: `docker exec -i grc_postgres psql -U grcuser -d grcg6a < backend/scripts/fix_summary.sql`
+4. Regenerate overview static cache: `cd backend && python -m scripts.generate_overview_static`
+5. Verify API spot checks (see below)
+
+**fold_change formula** (log2 scale):
+- `fold_change_top = log2(max_stage_mean / overall_mean)`
+- `fold_change_bottom = log2(min_positive_stage_mean / overall_mean)`
+- Uncomputable values → `NULL` (not -999)
+
+**Post-import verification checklist**:
+```bash
+# 1. Check fold_change_bottom has no -999 sentinel
+curl -s "http://localhost:8001/genes/gene-GOLGB1/expression?dataset=raw_ballgown_36&metric=tpm" | python -c "import sys,json; s=json.load(sys.stdin)['summary']; print('fc_top:', s['fold_change_top'], 'fc_bottom:', s['fold_change_bottom'])"
+
+# 2. Verify /datasets filters deprecated datasets
+curl -s "http://localhost:8001/datasets" | python -c "import sys,json; d=json.load(sys.stdin); print([x['dataset_code'] for x in d['datasets']])"
+
+# 3. Frontend build
+npm run build
+```
 
 **Current State** (as of 2026-05-18):
 - expression_fact: 3,349,440 rows (23,373 genes × 36 samples × 4 metrics)

@@ -7,9 +7,8 @@ Architecture:
   GET /datasets                       → DatasetRegistry.list_datasets()
 
 DatasetRegistry:
-  - Resolves dataset aliases (raw_ballgown_36 → esc_srr_23)
   - Validates (dataset, metric) against mv_dataset_metric
-  - Returns available datasets + metrics
+  - Returns available datasets + metrics (filters deprecated/empty)
 
 ExpressionService:
   - load()        : single dataset + metric (default: day_deseq2_36/normcount)
@@ -32,14 +31,10 @@ DEFAULT_METRIC  = "normcount"
 
 class DatasetRegistry:
     """
-    Resolves dataset aliases and validates (dataset, metric) availability.
+    Validates (dataset, metric) availability against mv_dataset_metric.
 
-    Resolution chain:
-      raw_ballgown_36  → esc_srr_23 (same 23-SRR master TSV, canonical)
-      esc_srr_23       → esc_srr_23 (no-op)
-
-    Validation against mv_dataset_metric:
-      Returns 422 if the (resolved_dataset, metric) combination is not available.
+    Active datasets: raw_ballgown_36 (tpm/fpkm), day_deseq2_36 (normcount),
+    day_featurecounts_36 (raw_count). esc_srr_23 is deprecated (no metrics).
     """
 
     def __init__(self, pg_conn):
@@ -180,7 +175,7 @@ class ExpressionService:
         Parameters
         ----------
         gene_id  : canonical gene ID, e.g. 'gene-A4GALT'
-        dataset  : dataset code (e.g. 'day_deseq2_36', 'esc_srr_23');
+        dataset  : dataset code (e.g. 'day_deseq2_36', 'raw_ballgown_36');
                    None defaults to 'day_deseq2_36'
         metric   : metric code (e.g. 'normcount', 'tpm', 'fpkm');
                    None defaults to 'normcount'
@@ -227,7 +222,7 @@ class ExpressionService:
           "gene_id": "gene-A4GALT",
           "cross_comparison": {
             "dataset_count": 2,
-            "available_datasets": ["day_deseq2_36", "esc_srr_23"],
+            "available_datasets": ["day_deseq2_36", "raw_ballgown_36"],
             "trend_note": "...",
             "opposite_trends": True/False
           },
@@ -419,7 +414,7 @@ class ExpressionService:
     @staticmethod
     def _detect_opposite_trends(summaries: dict[tuple[str, str], dict]) -> bool | None:
         """
-        Detect if top_stage differs across datasets (excluding esc_srr_23 SRR-only).
+        Detect if top_stage differs across datasets.
         Returns True if opposing trends detected, None if only one dataset has data.
         """
         top_stages = {}
@@ -488,9 +483,8 @@ class ExpressionService:
         """
         Fetch per-sample fact rows with full metadata from dataset_sample.
 
-        stage_label comes from stage_dim (canonical stage dimension table),
-        so it is available for ALL datasets — including esc_srr_23 which has
-        biosample_id = NULL.
+        stage_label comes from expression_sample (canonical stage dimension table),
+        so it is available for ALL datasets.
 
         ORDER BY uses COALESCE(ds.stage_order, sd.stage_order, 999) to handle
         datasets where stage_order might not be pre-filled in dataset_sample.
