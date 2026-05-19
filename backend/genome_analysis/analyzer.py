@@ -268,9 +268,9 @@ def std_layout(title, xaxis_title=None, yaxis_title=None, barmode=None, log_x=Fa
 # =============================================================================
 def run_genome_analysis(job_id: str) -> None:
     """Run complete genome analysis pipeline."""
-    from genome_analysis.task_manager import genome_task_manager
-    from genome_analysis.file_discovery import genome_file_discovery
-    from genome_analysis.carousel_service import generate_carousel_from_job
+    from backend.genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.file_discovery import genome_file_discovery
+    from backend.genome_analysis.carousel_service import generate_carousel_from_job
 
     start_time = time.time()
     genome_task_manager.update_job(job_id, "running", "Analysis started")

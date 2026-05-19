@@ -48,7 +48,7 @@ FEATURED_META = {
 
 def get_carousel_dir() -> Path:
     """Get the public carousel directory."""
-    from genome_analysis.output_config import PUBLIC_CAROUSEL_DIR
+    from backend.genome_analysis.output_config import PUBLIC_CAROUSEL_DIR
     return PUBLIC_CAROUSEL_DIR
 
 

@@ -44,14 +44,14 @@ async def scan_genome_files():
     - protein (protein sequences)
     - rna (RNA sequences)
     """
-    from genome_analysis.file_discovery import genome_file_discovery
+    from backend.genome_analysis.file_discovery import genome_file_discovery
     return genome_file_discovery.scan()
 
 
 @router.get("/files")
 async def list_genome_files():
     """Get information about available genome files."""
-    from genome_analysis.file_discovery import genome_file_discovery
+    from backend.genome_analysis.file_discovery import genome_file_discovery
     return genome_file_discovery.scan()
 
 
@@ -73,8 +73,8 @@ async def run_analysis(
     - Chart generation (PNG, SVG, HTML, JSON)
     - Table export (CSV, XLSX)
     """
-    from genome_analysis.task_manager import genome_task_manager
-    from genome_analysis.analyzer import run_genome_analysis
+    from backend.genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.analyzer import run_genome_analysis
 
     job = genome_task_manager.create_job()
     background_tasks.add_task(run_genome_analysis, job["job_id"])
@@ -90,7 +90,7 @@ async def run_analysis(
 @router.get("/jobs/{job_id}")
 async def get_job_status(job_id: str):
     """Get the status of a genome analysis job."""
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     job = genome_task_manager.get_job(job_id)
     if job is None:
@@ -102,7 +102,7 @@ async def get_job_status(job_id: str):
 @router.get("/jobs")
 async def list_jobs():
     """List all genome analysis jobs."""
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
     return {
         "success": True,
         "jobs": genome_task_manager.list_jobs(),
@@ -112,7 +112,7 @@ async def list_jobs():
 @router.get("/jobs/{job_id}/result")
 async def get_analysis_result(job_id: str):
     """Get complete analysis results for a job."""
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     job = genome_task_manager.get_job(job_id)
     if job is None:
@@ -141,7 +141,7 @@ async def get_analysis_result(job_id: str):
 @router.get("/jobs/{job_id}/result/{module_name}")
 async def get_module_result(job_id: str, module_name: str):
     """Get results for a specific analysis module."""
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     job = genome_task_manager.get_job(job_id)
     if job is None:
@@ -186,7 +186,7 @@ async def get_download_index(job_id: str):
     - result: Analysis result JSON files
     - metadata: Job metadata files
     """
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     job = genome_task_manager.get_job(job_id)
     if job is None:
@@ -274,7 +274,7 @@ async def get_carousel():
     Returns the manifest.json from public/genome_carousel/ directory.
     Contains metadata for all featured carousel images with dimensions 1600x900.
     """
-    from genome_analysis.carousel_service import get_carousel_manifest, list_carousel_files
+    from backend.genome_analysis.carousel_service import get_carousel_manifest, list_carousel_files
 
     manifest = get_carousel_manifest()
     if manifest is None:
@@ -295,7 +295,7 @@ async def get_carousel():
 @router.get("/carousel/images")
 async def list_carousel_images():
     """List all available carousel image files."""
-    from genome_analysis.carousel_service import list_carousel_files
+    from backend.genome_analysis.carousel_service import list_carousel_files
 
     files = list_carousel_files()
     return {
@@ -313,7 +313,7 @@ async def download_carousel_file(filename: str):
     Args:
         filename: Carousel image filename (e.g., featured_01_assembly_contig_length_bar.png)
     """
-    from genome_analysis.carousel_service import get_carousel_dir
+    from backend.genome_analysis.carousel_service import get_carousel_dir
 
     carousel_dir = get_carousel_dir()
     file_path = carousel_dir / filename
@@ -348,7 +348,7 @@ async def download_file(job_id: str, category: str, filename: str):
         category: One of: charts, tables, result, metadata
         filename: The filename to download
     """
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     valid_categories = ["charts", "tables", "result", "metadata"]
     if category not in valid_categories:
@@ -393,7 +393,7 @@ async def download_file(job_id: str, category: str, filename: str):
 @router.get("/charts/{job_id}/{chart_key}/json")
 async def get_chart_json(job_id: str, chart_key: str):
     """Get Plotly JSON for a specific chart."""
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     job = genome_task_manager.get_job(job_id)
     if job is None:
@@ -409,7 +409,7 @@ async def get_chart_json(job_id: str, chart_key: str):
 @router.get("/charts/{job_id}/{chart_key}/html")
 async def get_chart_html(job_id: str, chart_key: str):
     """Get standalone HTML for a specific chart."""
-    from genome_analysis.task_manager import genome_task_manager
+    from backend.genome_analysis.task_manager import genome_task_manager
 
     job = genome_task_manager.get_job(job_id)
     if job is None:

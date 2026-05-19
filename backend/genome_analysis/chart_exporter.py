@@ -176,7 +176,7 @@ def create_and_save_bar(
     """Create and save a bar chart."""
     try:
         from plotly import graph_objects as go
-        from genome_analysis.chart_styles import (
+        from backend.genome_analysis.chart_styles import (
             get_layout, bar_trace, COLORS, BAR_COLORS
         )
 
@@ -242,7 +242,7 @@ def create_and_save_histogram(
     """Create and save a histogram."""
     try:
         from plotly import graph_objects as go
-        from genome_analysis.chart_styles import get_layout, COLORS
+        from backend.genome_analysis.chart_styles import get_layout, COLORS
 
         fig = go.Figure()
         fig.add_trace(go.Histogram(
@@ -285,7 +285,7 @@ def create_and_save_line(
     """Create and save a line chart."""
     try:
         from plotly import graph_objects as go
-        from genome_analysis.chart_styles import get_layout, COLORS
+        from backend.genome_analysis.chart_styles import get_layout, COLORS
 
         fill_args = {}
         if fill:
@@ -329,7 +329,7 @@ def create_and_save_grouped_bar(
     """Create and save a grouped bar chart."""
     try:
         from plotly import graph_objects as go
-        from genome_analysis.chart_styles import get_layout, BAR_COLORS
+        from backend.genome_analysis.chart_styles import get_layout, BAR_COLORS
 
         fig = go.Figure()
         for i, (name, values) in enumerate(series_dict.items()):
