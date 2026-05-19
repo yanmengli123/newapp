@@ -341,7 +341,7 @@ function StageDEGCountChart({ data, fullscreen }: { data: any; fullscreen?: bool
 function Top50HeatmapChart({ data, fullscreen }: { data: any; fullscreen?: boolean }) {
   const geneIds = (data.genes || []) as string[];
   const sampleNames = (data.samples || []) as string[];
-  const zmatrix = (data.zmatrix || []) as number[][];
+  const zmatrix = useMemo(() => (data.zmatrix || []) as number[][], [data.zmatrix]);
 
   // Hierarchical cluster genes so similar expression patterns are adjacent
   const geneOrder = useMemo(() => cluster_hierarchy(zmatrix, 8), [zmatrix]);

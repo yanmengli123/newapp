@@ -150,7 +150,7 @@ export default function GOEnrichmentPage() {
     const notFound = result.mapping.filter(m => m.status === "not_found").length;
     const duplicated = result.mapping.filter(m => m.status === "duplicated").length;
     return { analyzed, noAnnotation, resolved: analyzed + noAnnotation, notFound, duplicated, unresolved: notFound + duplicated };
-  }, [result?.mapping]);
+  }, [result]);
 
   const handleDownloadCSV = () => {
     if (!result) return;

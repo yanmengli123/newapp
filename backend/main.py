@@ -1,6 +1,6 @@
 """
 GRCg6a Gene API — FastAPI backend entry point.
-Only start with: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+Only start with: uvicorn backend.main:app --host 0.0.0.0 --port 8001
 """
 from __future__ import annotations
 
@@ -291,7 +291,9 @@ app.mount("/genome", StaticFiles(directory=str(RAWDATA_ROOT.parent)), name="geno
 bwdata_router = APIRouter()
 @bwdata_router.get("/{filename:path}")
 async def serve_bwdata(filename: str):
-    file_path = BWDATA_ROOT / filename
+    file_path = (BWDATA_ROOT / filename).resolve()
+    if not str(file_path).startswith(str(BWDATA_ROOT.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied")
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(file_path, media_type="application/octet-stream", filename=filename)

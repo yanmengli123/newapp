@@ -26,6 +26,7 @@ export default defineConfig({
       '/annotations': 'http://localhost:8001',
       '/kegg-images': 'http://localhost:8001',
       '/tools':    'http://localhost:8001',
+      '/genome-api': 'http://localhost:8001',
       '/genome':   'http://localhost:8001',
       '/search':   'http://localhost:8001',
       '/datasets': 'http://localhost:8001',

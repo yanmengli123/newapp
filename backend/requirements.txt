@@ -7,3 +7,11 @@ psycopg2-binary
 requests
 scipy
 statsmodels
+numpy
+pandas
+biopython
+pyfaidx
+primer3-py
+plotly
+kaleido
+openpyxl
