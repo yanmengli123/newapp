@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 
-from config import GRCG6A_SAMPLE_RESULTS
+from backend.config import GRCG6A_SAMPLE_RESULTS
 
 logger = logging.getLogger("grcg6a_fastapi_backend.chat")
 

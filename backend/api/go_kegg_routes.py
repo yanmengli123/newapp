@@ -22,7 +22,7 @@ _backend_dir = Path(__file__).parent.parent
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
-from config import KEGG_IMAGE_DIR, GRCG6A_STATIC_ROOT
+from backend.config import KEGG_IMAGE_DIR, GRCG6A_STATIC_ROOT
 
 # ========== 3. 全局配置（只定义一次，删除重复） ==========
 router = APIRouter(prefix="/annotations", tags=["annotations"])

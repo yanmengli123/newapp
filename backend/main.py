@@ -291,8 +291,11 @@ app.mount("/genome", StaticFiles(directory=str(RAWDATA_ROOT.parent)), name="geno
 bwdata_router = APIRouter()
 @bwdata_router.get("/{filename:path}")
 async def serve_bwdata(filename: str):
-    file_path = (BWDATA_ROOT / filename).resolve()
-    if not str(file_path).startswith(str(BWDATA_ROOT.resolve())):
+    root = BWDATA_ROOT.resolve()
+    file_path = (root / filename).resolve()
+    try:
+        file_path.relative_to(root)
+    except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")

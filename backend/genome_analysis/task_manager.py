@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Literal, Optional
 
-from config import GRCG6A_GENOME_OUTPUT
+from backend.config import GRCG6A_GENOME_OUTPUT
 
 JobStatus = Literal["pending", "running", "success", "failed"]
 

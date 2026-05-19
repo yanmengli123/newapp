@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Optional
 
-from config import GRCG6A_DB_PATH, GRCG6A_RAWDATA_ROOT
+from backend.config import GRCG6A_DB_PATH, GRCG6A_RAWDATA_ROOT
 
 
 class GenomeFileDiscovery:

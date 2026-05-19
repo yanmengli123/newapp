@@ -18,8 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import psycopg2
-from config import GRCG6A_PG_DSN
-from overview_service import (
+from backend.config import GRCG6A_PG_DSN
+from backend.overview_service import (
     SampleCompositionService,
     SexBiasedGenesService,
     FemaleMaleScatterService,

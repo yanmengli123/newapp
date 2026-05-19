@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from config import GRCG6A_SAMPLE_RESULTS
+from backend.config import GRCG6A_SAMPLE_RESULTS
 
 logger = logging.getLogger("grcg6a_fastapi_backend.genome_analysis")
 

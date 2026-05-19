@@ -4,11 +4,11 @@
 """
 from fastapi import APIRouter, HTTPException, Request, Query
 
-from tools.primer3_designer import (
+from backend.tools.primer3_designer import (
     Primer3Request,
     design_primers_for_gene,
 )
-from tools.domain_searcher import (
+from backend.tools.domain_searcher import (
     search_domains_for_gene,
 )
 

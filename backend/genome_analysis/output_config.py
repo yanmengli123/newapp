@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from config import GRCG6A_GENOME_OUTPUT
+from backend.config import GRCG6A_GENOME_OUTPUT
 
 # Base output directory
 OUTPUT_BASE = GRCG6A_GENOME_OUTPUT

@@ -11,7 +11,7 @@ _backend_dir = PP(__file__).parent.parent
 if str(_backend_dir) not in sys.path:
     sys.path.insert(0, str(_backend_dir))
 
-from config import KEGG_IMAGE_DIR
+from backend.config import KEGG_IMAGE_DIR
 
 # 新建独立路由（避免和原有路由冲突）
 kegg_image_router = APIRouter(prefix="/kegg-images", tags=["kegg-images"])

@@ -8,7 +8,7 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from config import GRCG6A_HMMER_DB
+from backend.config import GRCG6A_HMMER_DB
 
 logger = logging.getLogger(__name__)
 

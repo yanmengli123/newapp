@@ -11,7 +11,7 @@ from Bio import SeqIO
 from primer3 import design_primers
 from pydantic import BaseModel, Field
 
-from genome_analysis.file_discovery import GenomeFileDiscovery
+from backend.genome_analysis.file_discovery import GenomeFileDiscovery
 
 logger = logging.getLogger(__name__)
 

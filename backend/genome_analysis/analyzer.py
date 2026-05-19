@@ -10,7 +10,7 @@ from typing import Iterator
 
 import pandas as pd
 
-from config import GRCG6A_DB_PATH, GRCG6A_GENOME_OUTPUT
+from backend.config import GRCG6A_DB_PATH, GRCG6A_GENOME_OUTPUT
 
 logger = logging.getLogger("grcg6a_fastapi_backend.analyzer")
 
