@@ -120,16 +120,57 @@ class DatasetRegistry:
     def list_datasets(self) -> list[dict[str, Any]]:
         """
         Return all registered datasets with their metrics inline.
+        Includes data lineage info from the latest import batch.
         Used by GET /datasets.
         """
         self._ensure_loaded()
         result = []
         cur = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
+        # Get latest import batch info
+        cur.execute("""
+            SELECT batch_id, data_dir, file_hashes, source_gene_count,
+                   mapped_gene_count, unmapped_gene_count, ambiguous_gene_count,
+                   total_staging_rows, total_fact_rows, started_at, completed_at
+            FROM import_batch
+            WHERE status = 'completed'
+            ORDER BY batch_id DESC
+            LIMIT 1
+        """)
+        latest_batch = cur.fetchone()
+
+        # Get per-file QC summary from latest batch
+        qc_summary = {}
+        if latest_batch:
+            cur.execute("""
+                SELECT file_name,
+                       COUNT(*) as total_checks,
+                       SUM(CASE WHEN passed THEN 1 ELSE 0 END) as passed_checks,
+                       BOOL_AND(passed) as all_passed
+                FROM import_qc_result
+                WHERE batch_id = %s
+                GROUP BY file_name
+            """, (latest_batch["batch_id"],))
+            for row in cur.fetchall():
+                qc_summary[row["file_name"]] = dict(row)
+
+        # Get per-dataset gene counts from gene_expression_summary
+        cur.execute("""
+            SELECT dataset_code, metric_code,
+                   COUNT(DISTINCT gene_id) as curated_genes
+            FROM gene_expression_summary
+            GROUP BY dataset_code, metric_code
+        """)
+        metric_genes = {}
+        for row in cur.fetchall():
+            key = (row["dataset_code"], row["metric_code"])
+            metric_genes[key] = row["curated_genes"]
+
         cur.execute("""
             SELECT dataset_id, dataset_code, dataset_name,
                    sample_scope, normalization_family,
-                   description, source_file
+                   description, source_file,
+                   source_gene_count, curated_gene_count
             FROM dataset
             ORDER BY dataset_id
         """)
@@ -142,9 +183,45 @@ class DatasetRegistry:
             # Skip datasets with no available metrics (deprecated/empty)
             if not metrics:
                 continue
+
+            # Enrich metrics with per-metric curated gene counts
+            for m in metrics:
+                key = (ds_code, m["metric_code"])
+                m["curated_gene_count"] = metric_genes.get(key)
+
+            # Build lineage info
+            lineage = None
+            if latest_batch:
+                file_hashes = latest_batch.get("file_hashes", {})
+                source_files = (ds_row.get("source_file") or "").split(";")
+                file_lineage = []
+                for sf in source_files:
+                    sf = sf.strip()
+                    if not sf:
+                        continue
+                    entry = {
+                        "file_name": sf,
+                        "file_hash": file_hashes.get(sf),
+                    }
+                    qc = qc_summary.get(sf)
+                    if qc:
+                        entry["qc"] = qc
+                    file_lineage.append(entry)
+
+                lineage = {
+                    "batch_id": latest_batch["batch_id"],
+                    "import_time": latest_batch["completed_at"].isoformat() if latest_batch["completed_at"] else None,
+                    "source_gene_count": ds_row.get("source_gene_count"),
+                    "curated_gene_count": ds_row.get("curated_gene_count"),
+                    "unmapped_gene_count": latest_batch.get("unmapped_gene_count"),
+                    "ambiguous_gene_count": latest_batch.get("ambiguous_gene_count"),
+                    "files": file_lineage,
+                }
+
             result.append({
-                **dict(ds_row),
+                **{k: v for k, v in dict(ds_row).items() if k not in ("source_gene_count", "curated_gene_count")},
                 "metrics": sorted(metrics, key=lambda m: m["metric_code"]),
+                "lineage": lineage,
             })
         cur.close()
         return result

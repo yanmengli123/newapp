@@ -183,6 +183,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `V004__go_dag_closure.sql` — GO DAG closure tables (go_term, go_edge, go_closure, go_alt_id)
   - `V005__add_gene_go_provenance.sql` — GO annotation provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
   - `V006__fix_fold_change_to_stage_level.sql` — Fix fold_change to use stage-level means (log2 scale, NULL for uncomputable)
+- `V007__expression_staging_layer.sql` — Staging layer: `import_batch`, `stg_update_expression_matrix`, `gene_source_mapping` tables + `source_gene_count`/`curated_gene_count` on `dataset`
 
 ## Backend Endpoints
 
@@ -456,6 +457,9 @@ Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`
 **Staging tables**:
 - `stg_esc_master` — ESC raw data (23 SRR Run × 3 metrics)
 - `stg_day_deseq2` — DESeq2 results (36-sample wide table)
+- `stg_update_expression_matrix` — Raw staging: 100% of source matrix data (V007)
+- `gene_source_mapping` — Audit trail: source gene_id → canonical mapping (V007)
+- `import_batch` — Import run tracking with file hashes and gene counts (V007)
 
 ### KEGG Asset Tables (from KGML cache import)
 | Table | Rows | Description |
@@ -534,8 +538,42 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 
 ### Expression Data Import
 
+**Three-Layer Architecture** (V007 migration):
+1. **Staging** (multiple tables): 100% raw source data, no gene mapping, no data loss
+   - `stg_update_expression_matrix` — 4 matrix files (TPM/FPKM/normcount/raw_count), includes `source_gene_id_raw` (original) + `source_gene_id` (normalized)
+   - `stg_update_gene_annotation` — gene annotation (chr/start/end/strand/length)
+   - `stg_featurecounts_raw` — featureCounts raw output (all columns)
+   - `stg_featurecounts_summary` — featureCounts assignment summary
+   - `stg_master_expression_table` — master expression table (wide format)
+2. **Mapping** (`gene_source_mapping`): Full audit trail — every source gene_id tracked with status/reason
+3. **Curated** (`expression_fact`): Only mapped genes, product-ready for frontend queries
+
+**Import batch tracking** (`import_batch`): Each import run recorded with file hashes, gene counts, staging/fact row counts, status.
+
+**QC Assertions** (`import_qc_result`): Per-file QC checks recorded during import — row counts, gene counts, 36-sample completeness, mapping completeness.
+
+**Mapping status enum**:
+- `mapped_exact_symbol` — gene_symbol exact match (confidence=1.0)
+- `mapped_display_symbol` — display_symbol match (confidence=0.9)
+- `mapped_alias` — gene_alias match (confidence=0.8)
+- `ambiguous_symbol` — multiple genes share same symbol (excluded from fact)
+- `unmapped` — no match found (excluded from fact)
+- `invalid_source_id` — source gene_id is `.`, empty, or `#`-prefixed
+
 **Update Data Import** (`backend/scripts/import_update_data.py`):
-Replaces expression-related tables from `D:\jbrowsedata\projectdata\update data\` while preserving GO/KEGG/genome annotations.
+Replaces expression-related tables from `D:\jbrowsedata\projectdata\update data\` while preserving GO/KEGG/genome annotations. **All 8 files** in the directory are staged.
+
+| File | Table | Content |
+|------|-------|---------|
+| `gene_TPM_matrix.tsv` | `stg_update_expression_matrix` | TPM values |
+| `gene_FPKM_matrix.tsv` | `stg_update_expression_matrix` | FPKM values |
+| `day_DESeq2_normalized_counts.tsv` | `stg_update_expression_matrix` | normcount values |
+| `day_gene_count_matrix.tsv` | `stg_update_expression_matrix` | raw_count values |
+| `day_gene_annotation.tsv` | `stg_update_gene_annotation` | Gene coordinates |
+| `day_featureCounts.txt` | `stg_featurecounts_raw` | Raw featureCounts |
+| `day_featureCounts.txt.summary` | `stg_featurecounts_summary` | Assignment stats |
+| `day_master_expression_table.tsv` | `stg_master_expression_table` | Wide-format all metrics |
+
 ```bash
 # Dry-run (no DB changes)
 python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectdata/update data" --dry-run
@@ -546,9 +584,9 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 
 **Post-import steps**:
 1. Refresh materialized view: `REFRESH MATERIALIZED VIEW mv_dataset_metric;`
-2. Remove stale dataset aliases if needed
-3. Rebuild summary derived fields: `docker exec -i grc_postgres psql -U grcuser -d grcg6a < backend/scripts/fix_summary.sql`
-4. Regenerate overview static cache: `cd backend && python -m scripts.generate_overview_static`
+2. Run derived fields: `python backend/scripts/fix_summary_derived_fields.py`
+3. Regenerate overview static cache: `cd backend && python -m scripts.generate_overview_static`
+4. Restart backend (to pick up new data)
 5. Verify API spot checks (see below)
 
 **fold_change formula** (log2 scale):
@@ -556,22 +594,21 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 - `fold_change_bottom = log2(min_positive_stage_mean / overall_mean)`
 - Uncomputable values → `NULL` (not -999)
 
-**Post-import verification checklist**:
-```bash
-# 1. Check fold_change_bottom has no -999 sentinel
-curl -s "http://localhost:8001/genes/gene-GOLGB1/expression?dataset=raw_ballgown_36&metric=tpm" | python -c "import sys,json; s=json.load(sys.stdin)['summary']; print('fc_top:', s['fold_change_top'], 'fc_bottom:', s['fold_change_bottom'])"
+**Per-metric gene counts** (source vs curated):
+| Dataset | Metric | Source genes | Curated genes |
+|---------|--------|-------------|---------------|
+| raw_ballgown_36 | tpm/fpkm | 23,701 | 23,119 |
+| day_deseq2_36 | normcount | 24,154 | 23,300 |
+| day_featurecounts_36 | raw_count | 24,154 | 23,300 |
 
-# 2. Verify /datasets filters deprecated datasets
-curl -s "http://localhost:8001/datasets" | python -c "import sys,json; d=json.load(sys.stdin); print([x['dataset_code'] for x in d['datasets']])"
+**`/datasets` API lineage info**: Each dataset now includes `lineage` with batch_id, import_time, source/curated gene counts, unmapped/ambiguous counts, and per-file hash + QC summary.
 
-# 3. Frontend build
-npm run build
-```
-
-**Current State** (as of 2026-05-18):
-- expression_fact: 3,349,440 rows (23,373 genes × 36 samples × 4 metrics)
-- gene_expression_summary: 93,040 rows (all derived fields populated)
-- Datasets: day_deseq2_36/normcount, raw_ballgown_36/tpm+fpkm, day_featurecounts_36/raw_count
+**Current State** (as of 2026-05-20, V007 3-layer import):
+- **Staging**: 3,445,632 matrix rows + 24,154 gene annotations + 869,544 featureCounts + 14 summary rows + 24,359 master rows
+- **Mapping audit**: 24,156 source genes → 23,300 mapped + 783 unmapped + 73 ambiguous
+- **expression_fact**: 3,342,168 rows (mapped genes only)
+- **gene_expression_summary**: 92,838 rows (all derived fields populated)
+- **QC**: All 14 checks passed (row counts, gene counts, 36-sample completeness, mapping completeness)
 
 ### GO Annotation Import Scripts
 
@@ -623,14 +660,27 @@ git push origin <branch>
 ## Running Services
 
 ```bash
-# Frontend (from C root)
+# Frontend (from C root) — runs on port 5173
 npm run dev
 
-# Backend (ONLY way — from C root)
+# Backend (ONLY way — from C root) — runs on port 8001
 D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
+
+# Restart all services (kill then start)
+taskkill //F //IM node.exe 2>/dev/null; taskkill //F //IM python.exe 2>/dev/null
 
 # Restart PostgreSQL Docker
 cd /d/jbrowsedata/projectdata && docker-compose stop postgres && docker-compose rm -f postgres && docker-compose up -d
+```
+
+**Service status check**:
+```bash
+# Check if ports are listening
+netstat -ano | grep -E "5173|8001"
+
+# Quick health check
+curl -s http://localhost:5173 | head -3    # Frontend
+curl -s http://localhost:8001/health       # Backend
 ```
 
 ## Backend Tests
