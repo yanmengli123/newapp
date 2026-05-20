@@ -541,14 +541,14 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 **Three-Layer Architecture** (V007 migration):
 1. **Staging** (multiple tables): 100% raw source data, no gene mapping, no data loss
    - `stg_update_expression_matrix` — 4 matrix files (TPM/FPKM/normcount/raw_count), includes `source_gene_id_raw` (original) + `source_gene_id` (normalized)
-   - `stg_update_gene_annotation` — gene annotation (chr/start/end/strand/length)
-   - `stg_featurecounts_raw` — featureCounts raw output (all columns)
-   - `stg_featurecounts_summary` — featureCounts assignment summary
-   - `stg_master_expression_table` — master expression table (wide format)
-2. **Mapping** (`gene_source_mapping`): Full audit trail — every source gene_id tracked with status/reason
+   - `stg_update_gene_annotation` — gene annotation (chr/start/end/strand/length), includes `source_gene_id_raw`, `is_valid`, `invalid_reason`
+   - `stg_featurecounts_raw` — featureCounts raw output, includes `raw_line` (original TSV line) + `sample_column_raw` (BAM path column name)
+   - `stg_featurecounts_summary` — featureCounts assignment summary, includes `raw_line`
+   - `stg_master_expression_table` — master expression table (wide format), includes `source_gene_id_raw`, `is_valid`, `invalid_reason`, `raw_line`
+2. **Mapping** (`gene_source_mapping`): Full audit trail — every source gene_id tracked with status/reason/metric_code
 3. **Curated** (`expression_fact`): Only mapped genes, product-ready for frontend queries
 
-**Import batch tracking** (`import_batch`): Each import run recorded with file hashes, gene counts, staging/fact row counts, status.
+**Import batch tracking** (`import_batch`): Each import run recorded with file hashes, gene counts, staging/fact row counts, status. Key fields: `matrix_staging_rows` (4 matrix files), `total_staging_rows_all_files` (all 8 files combined: 4,363,703).
 
 **QC Assertions** (`import_qc_result`): Per-file QC checks recorded during import — row counts, gene counts, 36-sample completeness, mapping completeness.
 
@@ -601,7 +601,7 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 | day_deseq2_36 | normcount | 24,154 | 23,300 |
 | day_featurecounts_36 | raw_count | 24,154 | 23,300 |
 
-**`/datasets` API lineage info**: Each dataset now includes `lineage` with batch_id, import_time, source/curated gene counts, unmapped/ambiguous counts, and per-file hash + QC summary.
+**`/datasets` API lineage info**: Each dataset now includes `lineage` with batch_id, import_time, source/curated gene counts, unmapped/ambiguous counts (per-metric), and per-file hash + QC summary. Each metric also includes `mapping_stats` (mapped/unmapped/ambiguous counts).
 
 **Current State** (as of 2026-05-20, V007 3-layer import):
 - **Staging**: 3,445,632 matrix rows + 24,154 gene annotations + 869,544 featureCounts + 14 summary rows + 24,359 master rows
