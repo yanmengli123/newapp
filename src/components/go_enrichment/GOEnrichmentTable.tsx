@@ -15,7 +15,7 @@ const ONTOLOGY_COLORS = {
   F: { color: "green", label: "F" },
 };
 
-type SortField = "fdr" | "p_value" | "query_count" | "background_count";
+type SortField = "fdr" | "p_value" | "gene_ratio" | "background_ratio";
 type SortDirection = "asc" | "desc";
 
 function formatPValue(p: number): string {
@@ -38,8 +38,18 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
   useEffect(() => { setPage(1); }, [terms]);
 
   const sorted = useMemo(() => [...terms].sort((a, b) => {
-    const av = a[sortField];
-    const bv = b[sortField];
+    let av: number;
+    let bv: number;
+    if (sortField === "gene_ratio") {
+      av = a.query_total > 0 ? a.query_count / a.query_total : 0;
+      bv = b.query_total > 0 ? b.query_count / b.query_total : 0;
+    } else if (sortField === "background_ratio") {
+      av = a.background_total > 0 ? a.background_count / a.background_total : 0;
+      bv = b.background_total > 0 ? b.background_count / b.background_total : 0;
+    } else {
+      av = a[sortField];
+      bv = b[sortField];
+    }
     const delta = av - bv;
     return sortDirection === "asc" ? delta : -delta;
   }), [terms, sortField, sortDirection]);
@@ -66,7 +76,7 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
       return;
     }
     setSortField(field);
-    setSortDirection(field === "query_count" || field === "background_count" ? "desc" : "asc");
+    setSortDirection(field === "gene_ratio" || field === "background_ratio" ? "desc" : "asc");
   };
 
   const sortLabel = (field: SortField, label: string) => (
@@ -85,19 +95,19 @@ export default function GOEnrichmentTable({ terms, onRowClick }: Props) {
             <Table.Th>Description</Table.Th>
             <Table.Th
               style={{ cursor: "pointer", whiteSpace: "nowrap" }}
-              aria-sort={sortField === "query_count" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
-              onClick={(e) => { e.stopPropagation(); handleSort("query_count"); }}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSort("query_count"); }}
+              aria-sort={sortField === "gene_ratio" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
+              onClick={(e) => { e.stopPropagation(); handleSort("gene_ratio"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSort("gene_ratio"); }}
             >
-              {sortLabel("query_count", "Gene Ratio")}
+              {sortLabel("gene_ratio", "Gene Ratio")}
             </Table.Th>
             <Table.Th
               style={{ cursor: "pointer", whiteSpace: "nowrap" }}
-              aria-sort={sortField === "background_count" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
-              onClick={(e) => { e.stopPropagation(); handleSort("background_count"); }}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSort("background_count"); }}
+              aria-sort={sortField === "background_ratio" ? sortDirection === "asc" ? "ascending" : "descending" : "none"}
+              onClick={(e) => { e.stopPropagation(); handleSort("background_ratio"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSort("background_ratio"); }}
             >
-              {sortLabel("background_count", "BG Ratio")}
+              {sortLabel("background_ratio", "BG Ratio")}
             </Table.Th>
             <Table.Th
               style={{ cursor: "pointer" }}

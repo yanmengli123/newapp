@@ -47,8 +47,6 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
 │   │   │   ├── GOEnrichmentDotplotPanel.tsx   # Single ontology ECharts scatter (x=GeneRatio, size=Count, color=FDR)
 │   │   │   ├── GOEnrichmentBarplotPanel.tsx   # Single ontology ECharts bar (Count/Ratio/-log10FDR)
 │   │   │   ├── goEnrichmentChartUtils.ts      # ratio parsing, sort/slice/reverse, sigColor, tooltip
-│   │   │   ├── GOEnrichmentBarChart.tsx       # Legacy Plotly bar chart (kept as fallback)
-│   │   │   ├── GOEnrichmentBarChartFullscreen.tsx
 │   │   │   ├── GOEnrichmentTable.tsx
 │   │   │   ├── GOEnrichmentTermDrawer.tsx
 │   │   │   └── GOTermDagViewer.tsx   # Cytoscape+dagre DAG viewer (fullscreen via createPortal)
@@ -220,7 +218,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 ### GO Enrichment — SEA (6, prefix `/go-enrichment`)
 - `POST /go-enrichment/analyze` — Singular Enrichment Analysis for Gallus gallus GRCg6a genes. Params: `gene_list`, `correction` (bh/by/bonferroni/none), `fdr_cutoff` (0–1), `min_overlap` (≥1), `namespace` (all/biological_process/cellular_component/molecular_function), `annotation_mode` (direct/propagated), `evidence_filter` (all/non_iea/experimental). FDR correction applied per ontology (BP/CC/MF corrected separately within each namespace). Returns `results[]` (enriched GO terms with hit genes/symbols/ncbi_ids), `bar_chart_data`, `mapping[]`, `ontology_stats`.
 - `GET /go-enrichment/example-sets` — Dynamically generated example gene sets (stable within same day via PostgreSQL `setseed`). Returns 4 sets × 20 genes each, drawn from real shared GO terms in the database.
-- `GET /go-enrichment/term/{go_id}` — GO term detail: name, namespace, definition, total_genes, genes[] (gene_id/ncbi_id/symbol).
+- `GET /go-enrichment/term/{go_id}` — GO term detail: name, namespace, definition, total_genes, genes[] (gene_id/ncbi_id/symbol). **Supports alt GO ID resolution** — if `go_id` is an alt ID, queries `go_alt_id` table first and returns canonical ID. Response includes `resolved_from_alt: true` when an alt ID was resolved.
 - `GET /go-enrichment/dag/metadata` — GO DAG metadata: ready status, term/edge/closure counts, data version, loaded timestamp.
 - `GET /go-enrichment/term/{go_id}/dag` — GO DAG sub-graph via BFS on `go_edge` table. Params: `direction` (ancestors/descendants/both), `depth` (1–6), `include_is_a` (bool), `include_part_of` (bool), `max_nodes` (default 80). Returns `{center, resolved_center, direction, depth, nodes[], edges[], truncated, node_count_total, node_count_returned}`.
 - `POST /go-enrichment/dag/overview` — Enrichment DAG Overview for SEA results. Accepts `terms[]` (GO terms with p-value/FDR/hit counts), `ontology` (P/C/F), `fdr_cutoff`, `include_is_a`, `include_part_of`, `max_nodes`. Returns DAG subgraph showing all significant terms in GO hierarchy context, with FDR-based significance coloring (sig_level 0-9). Uses BFS via `go_closure` + `go_edge`; `ANY()` params must use `list()` not `tuple()` for psycopg2.
@@ -531,6 +529,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **Plotly image export** (ChartFullscreenModal): Use `react-plotly`'s `onInitialized`/`onUpdate` callbacks to capture the real Plotly `graphDiv` DOM node into a `useRef`. Download sequence: save original `paper_bgcolor`/`plot_bgcolor` → `window.Plotly.relayout(gd, {paper_bgcolor:"rgba(0,0,0,0)", plot_bgcolor:"rgba(0,0,0,0)"})` → `PlotlyModule.downloadImage(gd, {format:"png", width, height, scale:2})` → restore original bg. `PlotlyModule.downloadImage` is the primary API (direct import); `window.Plotly.downloadImage` is the fallback. `PlotlyModule.relayout` does not exist on the module type — always use `window.Plotly.relayout` for the relayout calls.
 - **ECharts image export** (GOEnrichmentChartFullscreen): Canvas compositing approach — no external dependency. `exportGOEnrichmentChart()` in `goEnrichmentChartExport.ts` finds all `<canvas>` elements in the modal container via `querySelectorAll`, composites them onto a single canvas at the target size (preserving relative positions), and triggers PNG download via `canvas.toDataURL()`. Background can be white or transparent. Size presets: 1200×800, 1600×1000, 2000×1200, 2400×1600. The fullscreen modal renders `GOEnrichmentVisualization` inside a Mantine `Modal fullScreen` — the export captures the canvases from that rendered content.
 - **GO Enrichment service** (`go_enrichment_service.py`): Core enrichment math extracted to pure function `_compute_enrichment_for_namespace(query_go_hits, bg_go_counts, go_names, gene_info, N, n, params) → (tested_results, significant_results)`. Pure function handles: hypergeometric p-values, `min_overlap` filter (before FDR), per-ontology FDR correction, significance flagging. `_go_alt_sql_parts(cur)` helper centralizes the 3-line `_table_exists` + `_go_id_expr` + `alt_join` pattern used across 4 call sites (background builder, direct hits, annotated_count, mapping report).
+- **GO Enrichment table sort**: `GOEnrichmentTable` sorts Gene Ratio and BG Ratio columns by actual computed ratio (`query_count / query_total` and `background_count / background_total`), not just the numerator count. Sort field names are `"gene_ratio"` and `"background_ratio"` (computed values), not `"query_count"` / `"background_count"` (raw integers).
 - **GO Enrichment DAG stability**: All set→list conversions use `sorted()` or pre-sorted lists. `sig_terms_sorted` (sorted by FDR, p_value, go_id) is the canonical order for DAG node truncation, ancestor prioritization, and SQL `ANY()` params. `ancestor_priority` key: `(-conn_count, min_dist_from_sig, gid)` — `on_root_path` was removed because `depth_map` keys are (sig→ancestor) not (ancestor→root), so the lookup was always 999.
 
 ### Expression Data Import
@@ -576,6 +575,8 @@ npm run build
 
 ### GO Annotation Import Scripts
 
+**Coverage note**: 60.7% GO coverage is normal for chicken (GRCg6a) — it's not a model organism like human/mouse. The two annotation sources (Ensembl BioMart + NCBI GAF) complement each other well. For publication-level enrichment analysis, consider using `evidence_filter="non_iea"` to exclude electronic annotations (IEA is 92.9% of all annotations).
+
 **GAF Import** (`backend/scripts/import_go_from_gaf.py`):
 ```bash
 # Dry-run (no DB changes)
@@ -599,11 +600,12 @@ python backend/scripts/import_go_from_gene2go.py --gene2go gene2go.gz --batch-si
 python backend/scripts/qc_go_annotation_sources.py
 ```
 
-**Current State** (as of 2026-05-18):
-- Source: `ensembl_biomart` (144,266 annotations) + `ncbi_gaf_gcf_016699485.2` (27,240 annotations)
-- Genes with GO: 14,835 (from 12,890, +15.1%)
-- GO coverage: 60.7% of NCBI GeneIDs
-- Background genes: P=12,739 / C=12,893 / F=12,701
+**Current State** (as of 2026-05-20):
+- Source: `ensembl_biomart` (144,234 annotations, 12,890 genes) + `ncbi_gaf_gcf_016699485.2` (27,239 annotations, 9,987 genes)
+- Genes with GO: 14,835 (60.7% of 24,421 total gene_xref)
+- Background genes: P=12,739 / C=12,893 / F=12,702
+- Evidence codes: IEA 92.9%, IBA 5.1%, experimental <1%
+- GO DAG: 14,651 terms, 497,764 closure rows, 65,124 edges, 3,646 alt IDs
 - Migration V005: Added provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
 - Migration V006: Fixed fold_change to use stage-level means (log2 scale, NULL for uncomputable)
 - **Expression data**: 3,349,440 fact rows, 23,373 genes, 36 samples, 4 metrics

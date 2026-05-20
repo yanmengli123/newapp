@@ -272,9 +272,18 @@ async def get_go_term(go_id: str, request: Request):
     conn = pg_getconn()
     try:
         cur = conn.cursor()
+
+        # Resolve alt_id → primary (same as /term/{go_id}/dag)
+        cur.execute(
+            "SELECT primary_go_id FROM go_alt_id WHERE alt_go_id = %s",
+            (go_id,),
+        )
+        row = cur.fetchone()
+        resolved_go_id = row[0] if row else go_id
+
         cur.execute(
             "SELECT go_id, go_name, go_namespace, go_definition FROM go_term WHERE go_id = %s",
-            (go_id,)
+            (resolved_go_id,)
         )
         row = cur.fetchone()
         if not row:
@@ -286,14 +295,16 @@ async def get_go_term(go_id: str, request: Request):
             "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref "
             "WHERE gene_id IN (SELECT gene_id FROM gene_go WHERE go_id = %s) "
             "AND ncbi_gene_id IS NOT NULL",
-            (go_id,)
+            (resolved_go_id,)
         )
         genes = [{"gene_id": r[0], "ncbi_id": r[1], "symbol": r[2]} for r in cur.fetchall()]
 
         cur.close()
 
         return {
-            "go_id": go_id,
+            "go_id": resolved_go_id,
+            "input_go_id": go_id,
+            "resolved_from_alt": go_id != resolved_go_id,
             "term_name": term_name,
             "namespace": namespace,
             "definition": definition or "",
