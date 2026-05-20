@@ -607,7 +607,7 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 - **Staging**: 3,445,632 matrix rows + 24,154 gene annotations + 869,544 featureCounts + 14 summary rows + 24,359 master rows
 - **Mapping audit**: 24,156 source genes → 23,300 mapped + 783 unmapped + 73 ambiguous
 - **expression_fact**: 3,342,168 rows (mapped genes only)
-- **gene_expression_summary**: 92,838 rows (all derived fields populated)
+- **gene_expression_summary**: 92,838 rows (mean/max/min/std/cv/sex_bias/stage_means/top_stage populated; fold_change NULL for zero-expression genes)
 - **QC**: All 14 checks passed (row counts, gene counts, 36-sample completeness, mapping completeness)
 
 ### GO Annotation Import Scripts

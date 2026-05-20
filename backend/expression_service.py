@@ -154,6 +154,31 @@ class DatasetRegistry:
             for row in cur.fetchall():
                 qc_summary[row["file_name"]] = dict(row)
 
+        # Get per-metric mapping stats from gene_source_mapping
+        # metric_code is comma-separated (e.g., "tpm,fpkm"), need to unnest
+        metric_mapping_stats = {}
+        if latest_batch:
+            cur.execute("""
+                SELECT m.metric, gsm.mapping_status, COUNT(*) as cnt
+                FROM gene_source_mapping gsm,
+                     unnest(string_to_array(gsm.metric_code, ',')) AS m(metric)
+                WHERE gsm.batch_id = %s
+                  AND gsm.metric_code IS NOT NULL
+                GROUP BY m.metric, gsm.mapping_status
+            """, (latest_batch["batch_id"],))
+            for row in cur.fetchall():
+                mc = row["metric"]
+                if mc not in metric_mapping_stats:
+                    metric_mapping_stats[mc] = {"mapped": 0, "unmapped": 0, "ambiguous": 0}
+                status = row["mapping_status"]
+                cnt = row["cnt"]
+                if status.startswith("mapped"):
+                    metric_mapping_stats[mc]["mapped"] += cnt
+                elif status == "unmapped":
+                    metric_mapping_stats[mc]["unmapped"] += cnt
+                elif status == "ambiguous_symbol":
+                    metric_mapping_stats[mc]["ambiguous"] += cnt
+
         # Get per-dataset gene counts from gene_expression_summary
         cur.execute("""
             SELECT dataset_code, metric_code,
@@ -184,10 +209,15 @@ class DatasetRegistry:
             if not metrics:
                 continue
 
-            # Enrich metrics with per-metric curated gene counts
+            # Enrich metrics with per-metric curated gene counts and mapping stats
             for m in metrics:
                 key = (ds_code, m["metric_code"])
                 m["curated_gene_count"] = metric_genes.get(key)
+                # Add per-metric mapping stats
+                mc = m["metric_code"]
+                stats = metric_mapping_stats.get(mc)
+                if stats:
+                    m["mapping_stats"] = stats
 
             # Build lineage info
             lineage = None
@@ -208,13 +238,17 @@ class DatasetRegistry:
                         entry["qc"] = qc
                     file_lineage.append(entry)
 
+                # Get per-metric stats for this dataset's primary metric
+                primary_metric = metrics[0]["metric_code"] if metrics else None
+                primary_stats = metric_mapping_stats.get(primary_metric, {}) if primary_metric else {}
+
                 lineage = {
                     "batch_id": latest_batch["batch_id"],
                     "import_time": latest_batch["completed_at"].isoformat() if latest_batch["completed_at"] else None,
                     "source_gene_count": ds_row.get("source_gene_count"),
                     "curated_gene_count": ds_row.get("curated_gene_count"),
-                    "unmapped_gene_count": latest_batch.get("unmapped_gene_count"),
-                    "ambiguous_gene_count": latest_batch.get("ambiguous_gene_count"),
+                    "unmapped_gene_count": primary_stats.get("unmapped", 0),
+                    "ambiguous_gene_count": primary_stats.get("ambiguous", 0),
                     "files": file_lineage,
                 }
 

@@ -7,9 +7,7 @@ Three-layer architecture:
   Layer 2 (Mapping):  Full audit trail in gene_source_mapping — every source gene_id tracked
   Layer 3 (Curated):  Only mapped data in expression_fact — product-ready
 
-All 8 files in the update data directory are staged:
-  - 4 matrix files: TPM, FPKM, normcount, raw_count
-  - gene_annotation, featureCounts raw, featureCounts summary, master expression table
+All 8 files in the update data directory are staged.
 
 Usage:
     python import_update_data.py --data-dir "D:/jbrowsedata/projectdata/update data" [--dry-run]
@@ -107,12 +105,16 @@ def file_hash(filepath: str) -> str:
     return h.hexdigest()
 
 
-def normalize_gene_id(raw: str) -> str:
-    """Normalize source gene_id: trim whitespace, empty/dot/comment → sentinel."""
+def normalize_gene_id(raw: str) -> tuple[str, bool, str]:
+    """Normalize source gene_id. Returns (normalized, is_valid, invalid_reason)."""
     s = raw.strip()
-    if not s or s == '.' or s.startswith('#'):
-        return '.'
-    return s
+    if not s:
+        return '.', False, 'empty_gene_id'
+    if s == '.':
+        return '.', False, 'dot_gene_id'
+    if s.startswith('#'):
+        return '.', False, 'comment_gene_id'
+    return s, True, None
 
 
 def load_matrix_file(filepath: str, metric_code: str) -> tuple[list, list]:
@@ -131,19 +133,17 @@ def load_matrix_file(filepath: str, metric_code: str) -> tuple[list, list]:
 
         for line_num, row in enumerate(reader, 2):
             raw_gene_id = row[0] if row else ''
-            source_gene_id = normalize_gene_id(raw_gene_id)
+            source_gene_id, is_valid, reason = normalize_gene_id(raw_gene_id)
 
-            # Invalid gene_id
-            if source_gene_id == '.':
+            if not is_valid:
                 for i, col in enumerate(sample_cols, 1):
                     raw_val = row[i] if i < len(row) else ''
-                    invalid_rows.append((raw_gene_id, source_gene_id, col, raw_val, 'invalid_gene_id'))
+                    invalid_rows.append((raw_gene_id, source_gene_id, col, raw_val, reason))
                 continue
 
             for i, col in enumerate(sample_cols, 1):
                 raw_val = row[i] if i < len(row) else ''
 
-                # Parse numeric value
                 try:
                     if raw_val == '' or raw_val == 'NA':
                         value = 0.0
@@ -159,24 +159,34 @@ def load_matrix_file(filepath: str, metric_code: str) -> tuple[list, list]:
 
 
 def load_gene_annotation(filepath: str) -> list:
-    """Load day_gene_annotation.tsv. Returns list of tuples."""
+    """
+    Load day_gene_annotation.tsv. Returns list of tuples:
+    (source_gene_id_raw, source_gene_id, row_num, chr, start, end, strand, length, raw_line, is_valid, invalid_reason)
+    """
     rows = []
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.reader(f, delimiter='\t')
         header = next(reader)  # gene_id, chr, start, end, strand, length
 
         for line_num, row in enumerate(reader, 2):
-            if len(row) < 6:
-                continue
-            gene_id = row[0].strip()
+            raw_gene_id = row[0] if row else ''
+            gene_id, is_valid, reason = normalize_gene_id(raw_gene_id)
+            raw_line = '\t'.join(row)
+
             gene_length = None
-            try:
-                gene_length = int(row[5])
-            except (ValueError, TypeError):
-                pass
+            if len(row) >= 6:
+                try:
+                    gene_length = int(row[5])
+                except (ValueError, TypeError):
+                    pass
+
             rows.append((
-                gene_id, line_num, row[1], row[2], row[3], row[4], gene_length,
-                '\t'.join(row),
+                raw_gene_id, gene_id, line_num,
+                row[1] if len(row) > 1 else None,
+                row[2] if len(row) > 2 else None,
+                row[3] if len(row) > 3 else None,
+                row[4] if len(row) > 4 else None,
+                gene_length, raw_line, is_valid, reason,
             ))
 
     return rows
@@ -186,9 +196,12 @@ def load_featurecounts_raw(filepath: str) -> tuple[list, list, list]:
     """
     Load day_featureCounts.txt (2 header lines).
     Returns (sample_names, records, invalid_rows).
+    records: list of (gene_id, row_num, chr, start, end, strand, length,
+                      sample_name, sample_column_raw, raw_count_text, raw_count_value, raw_line)
     """
     records = []
     invalid_rows = []
+    sample_column_raw_names = []
 
     with open(filepath, 'r', encoding='utf-8') as f:
         # Skip comment line (line 1)
@@ -200,14 +213,15 @@ def load_featurecounts_raw(filepath: str) -> tuple[list, list, list]:
         # header: Geneid, Chr, Start, End, Strand, Length, sample1.bam, sample2.bam, ...
         sample_names = []
         for col in header[6:]:
-            # Extract sample name from path: .../E0_Female1.bam -> E0_Female1
             basename = os.path.basename(col)
             sample_name = basename.replace('.bam', '')
             sample_names.append(sample_name)
+            sample_column_raw_names.append(col)  # preserve original column name
 
         for line_num, row in enumerate(reader, 3):
             if len(row) < 7:
                 continue
+            raw_line = '\t'.join(row)
             gene_id = row[0].strip()
             chr_val = row[1]
             start_val = row[2]
@@ -231,19 +245,20 @@ def load_featurecounts_raw(filepath: str) -> tuple[list, list, list]:
 
                 records.append((
                     gene_id, line_num, chr_val, start_val, end_val, strand_val, length_val,
-                    sample_name, raw_val, count_val,
+                    sample_name, sample_column_raw_names[i], raw_val, count_val, raw_line,
                 ))
 
     return sample_names, records, invalid_rows
 
 
 def load_featurecounts_summary(filepath: str) -> list:
-    """Load day_featureCounts.txt.summary. Returns list of (status, sample_values_dict)."""
+    """
+    Load day_featureCounts.txt.summary. Returns list of (status, sample_values_dict, raw_line).
+    """
     rows = []
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.reader(f, delimiter='\t')
         header = next(reader)
-        # header: Status, sample1.bam, sample2.bam, ...
         sample_names = []
         for col in header[1:]:
             basename = os.path.basename(col)
@@ -253,36 +268,39 @@ def load_featurecounts_summary(filepath: str) -> list:
         for row in reader:
             if not row:
                 continue
+            raw_line = '\t'.join(row)
             status = row[0].strip()
             values = {}
             for i, sample_name in enumerate(sample_names):
                 col_idx = 1 + i
                 val = row[col_idx] if col_idx < len(row) else '0'
                 values[sample_name] = val
-            rows.append((status, values))
+            rows.append((status, values, raw_line))
 
     return rows
 
 
 def load_master_expression(filepath: str) -> list:
-    """Load day_master_expression_table.tsv (wide format: gene_id, gene_name, all sample cols)."""
+    """
+    Load day_master_expression_table.tsv (wide format: gene_id, gene_name, all sample cols).
+    Returns list of (raw_gene_id, gene_id, line_num, gene_name, values_dict, raw_line, is_valid, invalid_reason).
+    """
     rows = []
     with open(filepath, 'r', encoding='utf-8') as f:
         reader = csv.reader(f, delimiter='\t')
         header = next(reader)
-        # header: gene_id, gene_name, TPM_E0_Female1, ..., NORMCOUNT_E6_5_Male3, ...
 
         for line_num, row in enumerate(reader, 2):
-            if len(row) < 3:
-                continue
-            gene_id = row[0].strip()
+            raw_gene_id = row[0] if row else ''
+            gene_id, is_valid, reason = normalize_gene_id(raw_gene_id)
             gene_name = row[1] if len(row) > 1 else ''
-            # Store all sample columns as JSONB
+            raw_line = '\t'.join(row)
+
             values = {}
             for i, col in enumerate(header[2:], 2):
                 if i < len(row):
                     values[col] = row[i]
-            rows.append((gene_id, line_num, gene_name, values))
+            rows.append((raw_gene_id, gene_id, line_num, gene_name, values, raw_line, is_valid, reason))
 
     return rows
 
@@ -304,7 +322,6 @@ def build_gene_mapping(cur, source_gene_ids: set[str]) -> dict[str, dict]:
             FROM gene_xref
             WHERE gene_symbol IN ({placeholders})
         ''', batch)
-        # Collect all matches per symbol
         symbol_matches: dict[str, list[str]] = {}
         for symbol, gene_id in cur.fetchall():
             symbol_matches.setdefault(symbol, []).append(gene_id)
@@ -320,9 +337,8 @@ def build_gene_mapping(cur, source_gene_ids: set[str]) -> dict[str, dict]:
                     'reason': None,
                 }
             else:
-                # Ambiguous — multiple genes share this symbol
                 mapping[symbol] = {
-                    'canonical_gene_id': gene_ids[0],  # pick first, mark ambiguous
+                    'canonical_gene_id': gene_ids[0],
                     'status': STATUS_AMBIGUOUS,
                     'method': 'gene_symbol',
                     'confidence': 0.5,
@@ -447,10 +463,10 @@ def run_import(data_dir: str, dry_run: bool = False):
     # Layer 1: Load ALL raw data (staging)
     # ──────────────────────────────────────────────────────────────────────────
     print('Layer 1: Loading raw matrix data (staging)...')
-    all_records = []       # (source_gene_id_raw, source_gene_id, sample_name, raw_text, value, row_num, metric, source_file)
-    all_invalid = []       # (source_gene_id_raw, source_gene_id, sample_name, raw_text, reason, metric, source_file)
+    all_records = []
+    all_invalid = []
     source_gene_ids = set()
-    per_metric_gene_ids = {}  # metric -> set of gene_ids
+    per_metric_gene_ids = {}
 
     for metric, filename in MATRIX_FILES.items():
         filepath = os.path.join(data_dir, filename)
@@ -458,7 +474,7 @@ def run_import(data_dir: str, dry_run: bool = False):
         metric_genes = set()
         for r in records:
             all_records.append((*r, metric, filename))
-            source_gene_ids.add(r[1])  # normalized gene_id
+            source_gene_ids.add(r[1])
             metric_genes.add(r[1])
         for inv in invalid:
             all_invalid.append((*inv, metric, filename))
@@ -473,12 +489,12 @@ def run_import(data_dir: str, dry_run: bool = False):
     # Count per metric
     metric_counts = {}
     for r in all_records:
-        m = r[6]  # metric
+        m = r[6]
         metric_counts[m] = metric_counts.get(m, 0) + 1
 
     if dry_run:
         print('[DRY RUN] Would import:')
-        print(f'  Staging rows: {len(all_records) + len(all_invalid):,}')
+        print(f'  Matrix staging rows: {len(all_records) + len(all_invalid):,}')
         print(f'  Source genes (union): {len(source_gene_ids):,}')
         for m, genes in sorted(per_metric_gene_ids.items()):
             print(f'  {m}: {len(genes):,} genes')
@@ -509,6 +525,8 @@ def run_import(data_dir: str, dry_run: bool = False):
         print(f'  batch_id: {batch_id}')
         print()
 
+        matrix_staging_rows = 0
+
         # ──────────────────────────────────────────────────────────────────────
         # Layer 1a: Write matrix staging (100% raw, no loss)
         # ──────────────────────────────────────────────────────────────────────
@@ -521,12 +539,13 @@ def run_import(data_dir: str, dry_run: bool = False):
                 row_num, sample_name, raw_text, value, True, None,
             ))
 
-        # Add invalid rows too
         for source_gene_id_raw, source_gene_id, sample_name, raw_text, reason, metric, source_file in all_invalid:
             staging_data.append((
                 batch_id, source_file, metric, source_gene_id_raw, source_gene_id,
                 None, sample_name, raw_text, None, False, reason,
             ))
+
+        matrix_staging_rows = len(staging_data)
 
         staging_batch_size = 100000
         for i in range(0, len(staging_data), staging_batch_size):
@@ -540,23 +559,24 @@ def run_import(data_dir: str, dry_run: bool = False):
             conn.commit()
             print(f'  Staged {min(i+staging_batch_size, len(staging_data)):,} / {len(staging_data):,}', end='\r')
         print()
-        print(f'  Total matrix staging rows: {len(staging_data):,}')
+        print(f'  Total matrix staging rows: {matrix_staging_rows:,}')
         print()
 
         # ──────────────────────────────────────────────────────────────────────
-        # Layer 1b: Stage gene annotation file
+        # Layer 1b: Stage gene annotation file (raw/normalized/valid)
         # ──────────────────────────────────────────────────────────────────────
         print('Layer 1b: Staging gene annotation file...')
         filepath = os.path.join(data_dir, NON_MATRIX_FILES['gene_annotation'])
         gene_annot_rows = load_gene_annotation(filepath)
         annot_data = [
-            (batch_id, NON_MATRIX_FILES['gene_annotation'], r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7])
+            (batch_id, NON_MATRIX_FILES['gene_annotation'],
+             r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10])
             for r in gene_annot_rows
         ]
         execute_values(cur, '''
             INSERT INTO stg_update_gene_annotation
-                (batch_id, source_file, source_gene_id, source_row_number,
-                 chromosome, start_pos, end_pos, strand, gene_length, raw_line)
+                (batch_id, source_file, source_gene_id_raw, source_gene_id, source_row_number,
+                 chromosome, start_pos, end_pos, strand, gene_length, raw_line, is_valid, invalid_reason)
             VALUES %s
         ''', annot_data, page_size=10000)
         conn.commit()
@@ -564,14 +584,14 @@ def run_import(data_dir: str, dry_run: bool = False):
         print()
 
         # ──────────────────────────────────────────────────────────────────────
-        # Layer 1c: Stage featureCounts raw file
+        # Layer 1c: Stage featureCounts raw file (with raw_line and sample_column_raw)
         # ──────────────────────────────────────────────────────────────────────
         print('Layer 1c: Staging featureCounts raw file...')
         filepath = os.path.join(data_dir, NON_MATRIX_FILES['featurecounts_raw'])
         fc_sample_names, fc_records, fc_invalid = load_featurecounts_raw(filepath)
         fc_data = [
             (batch_id, NON_MATRIX_FILES['featurecounts_raw'], r[0], r[1], r[2], r[3], r[4], r[5], r[6],
-             r[7], r[8], r[9], True, None)
+             r[7], r[8], r[9], r[10], r[11], True, None)
             for r in fc_records
         ]
         # Add invalid rows
@@ -579,7 +599,7 @@ def run_import(data_dir: str, dry_run: bool = False):
             fc_data.append((
                 batch_id, NON_MATRIX_FILES['featurecounts_raw'], gene_id, None,
                 None, None, None, None, None,
-                sample, raw, None, False, reason,
+                sample, None, raw, None, None, False, reason,
             ))
 
         for i in range(0, len(fc_data), 100000):
@@ -588,7 +608,8 @@ def run_import(data_dir: str, dry_run: bool = False):
                 INSERT INTO stg_featurecounts_raw
                     (batch_id, source_file, source_gene_id, source_row_number,
                      chromosome, start_pos, end_pos, strand, gene_length,
-                     sample_name, raw_count_text, raw_count_value, is_valid, invalid_reason)
+                     sample_name, sample_column_raw, raw_count_text, raw_count_value, raw_line,
+                     is_valid, invalid_reason)
                 VALUES %s
             ''', batch, page_size=100000)
             conn.commit()
@@ -598,18 +619,18 @@ def run_import(data_dir: str, dry_run: bool = False):
         print()
 
         # ──────────────────────────────────────────────────────────────────────
-        # Layer 1d: Stage featureCounts summary file
+        # Layer 1d: Stage featureCounts summary file (with raw_line)
         # ──────────────────────────────────────────────────────────────────────
         print('Layer 1d: Staging featureCounts summary file...')
         filepath = os.path.join(data_dir, NON_MATRIX_FILES['featurecounts_summary'])
         fc_summary_rows = load_featurecounts_summary(filepath)
         summary_data = [
-            (batch_id, NON_MATRIX_FILES['featurecounts_summary'], status, json.dumps(values))
-            for status, values in fc_summary_rows
+            (batch_id, NON_MATRIX_FILES['featurecounts_summary'], status, json.dumps(values), raw_line)
+            for status, values, raw_line in fc_summary_rows
         ]
         execute_values(cur, '''
             INSERT INTO stg_featurecounts_summary
-                (batch_id, source_file, status_category, sample_values)
+                (batch_id, source_file, status_category, sample_values, raw_line)
             VALUES %s
         ''', summary_data, page_size=50)
         conn.commit()
@@ -617,20 +638,22 @@ def run_import(data_dir: str, dry_run: bool = False):
         print()
 
         # ──────────────────────────────────────────────────────────────────────
-        # Layer 1e: Stage master expression table
+        # Layer 1e: Stage master expression table (raw/normalized/valid/raw_line)
         # ──────────────────────────────────────────────────────────────────────
         print('Layer 1e: Staging master expression table...')
         filepath = os.path.join(data_dir, NON_MATRIX_FILES['master_expression'])
         master_rows = load_master_expression(filepath)
         master_data = [
-            (batch_id, NON_MATRIX_FILES['master_expression'], r[0], r[1], r[2], json.dumps(r[3]))
+            (batch_id, NON_MATRIX_FILES['master_expression'],
+             r[0], r[1], r[2], r[3], json.dumps(r[4]), r[5], r[6], r[7])
             for r in master_rows
         ]
         for i in range(0, len(master_data), 10000):
             batch = master_data[i:i+10000]
             execute_values(cur, '''
                 INSERT INTO stg_master_expression_table
-                    (batch_id, source_file, source_gene_id, source_row_number, gene_name, raw_values)
+                    (batch_id, source_file, source_gene_id_raw, source_gene_id, source_row_number,
+                     gene_name, raw_values, raw_line, is_valid, invalid_reason)
                 VALUES %s
             ''', batch, page_size=10000)
             conn.commit()
@@ -639,8 +662,14 @@ def run_import(data_dir: str, dry_run: bool = False):
         print(f'  Total master expression rows: {len(master_data):,}')
         print()
 
+        # Compute total staging rows across ALL tables
+        total_staging_all = (matrix_staging_rows + len(annot_data) + len(fc_data)
+                             + len(summary_data) + len(master_data))
+        print(f'  Total staging rows (all files): {total_staging_all:,}')
+        print()
+
         # ──────────────────────────────────────────────────────────────────────
-        # Layer 2: Build gene mapping with full audit
+        # Layer 2: Build gene mapping with full audit (per-metric)
         # ──────────────────────────────────────────────────────────────────────
         print('Layer 2: Building gene mapping (audit trail)...')
         mapping = build_gene_mapping(cur, source_gene_ids)
@@ -659,10 +688,14 @@ def run_import(data_dir: str, dry_run: bool = False):
         ambiguous_count = sum(1 for m in mapping.values() if m['status'] == STATUS_AMBIGUOUS)
         print()
 
-        # Write mapping audit to gene_source_mapping
-        print('Layer 2: Writing mapping audit table...')
+        # Write mapping audit to gene_source_mapping (per-metric entries)
+        print('Layer 2: Writing mapping audit table (per-metric)...')
         mapping_data = []
         for source_gene_id, m in mapping.items():
+            # Find which metrics this gene appears in
+            gene_metrics = [metric for metric, genes in per_metric_gene_ids.items() if source_gene_id in genes]
+            metric_str = ','.join(sorted(gene_metrics)) if gene_metrics else None
+
             mapping_data.append((
                 batch_id,
                 source_gene_id,
@@ -674,16 +707,27 @@ def run_import(data_dir: str, dry_run: bool = False):
                 psycopg2.extras.Json({'details': m.get('ambiguity_details', [])}) if m.get('ambiguity_details') else None,
                 m['reason'],
                 'update_data',
+                metric_str,
             ))
 
         execute_values(cur, '''
             INSERT INTO gene_source_mapping
                 (batch_id, source_gene_id, canonical_gene_id, mapping_status, mapping_method,
-                 confidence, ambiguity_count, ambiguity_details, reason, source_dataset)
+                 confidence, ambiguity_count, ambiguity_details, reason, source_dataset, metric_code)
             VALUES %s
         ''', mapping_data, page_size=5000)
         conn.commit()
         print(f'  Written {len(mapping_data):,} mapping records')
+        print()
+
+        # Per-metric mapping stats
+        for metric in MATRIX_FILES:
+            metric_genes = per_metric_gene_ids.get(metric, set())
+            m_mapped = sum(1 for g in metric_genes if mapping.get(g, {}).get('status', '').startswith('mapped'))
+            m_unmapped = sum(1 for g in metric_genes if mapping.get(g, {}).get('status') == STATUS_UNMAPPED)
+            m_ambiguous = sum(1 for g in metric_genes if mapping.get(g, {}).get('status') == STATUS_AMBIGUOUS)
+            print(f'  {metric}: mapped={m_mapped}, unmapped={m_unmapped}, ambiguous={m_ambiguous}')
+
         print()
 
         # ──────────────────────────────────────────────────────────────────────
@@ -735,15 +779,11 @@ def run_import(data_dir: str, dry_run: bool = False):
                 'developmental_36', 'raw_count',
                 'Raw read counts from featureCounts',
                 NON_MATRIX_FILES['featurecounts_raw'], ['raw_count'],
-                per_metric_gene_ids.get('raw_count', set()) and len(per_metric_gene_ids['raw_count']),
+                len(per_metric_gene_ids.get('raw_count', set())),
             ))
 
-        # raw_ballgown_36: uses TPM + FPKM (both have same gene set)
-        tpm_genes = len(per_metric_gene_ids.get('tpm', set()))
-        fpkm_genes = len(per_metric_gene_ids.get('fpkm', set()))
-        ballgown_genes = tpm_genes  # TPM and FPKM have same genes
-
-        # Count curated (mapped) genes for each metric
+        # raw_ballgown_36: uses TPM + FPKM
+        ballgown_genes = len(per_metric_gene_ids.get('tpm', set()))
         ballgown_curated = sum(
             1 for g in per_metric_gene_ids.get('tpm', set())
             if mapping.get(g, {}).get('status', '').startswith('mapped')
@@ -855,7 +895,6 @@ def run_import(data_dir: str, dry_run: bool = False):
             if not m:
                 continue
 
-            # Only import clean mapped genes (not ambiguous)
             if m['status'] not in (STATUS_MAPPED_EXACT, STATUS_MAPPED_DISPLAY, STATUS_MAPPED_ALIAS):
                 if m['status'] == STATUS_AMBIGUOUS:
                     skipped_ambiguous += 1
@@ -870,7 +909,6 @@ def run_import(data_dir: str, dry_run: bool = False):
             if dsid:
                 fact_data.append((canonical_gene_id, dsid, metric, value))
 
-        # Batch insert
         batch_size = 100000
         for i in range(0, len(fact_data), batch_size):
             batch = fact_data[i:i+batch_size]
@@ -942,14 +980,17 @@ def run_import(data_dir: str, dry_run: bool = False):
                 mapped_gene_count = %s,
                 unmapped_gene_count = %s,
                 ambiguous_gene_count = %s,
+                matrix_staging_rows = %s,
                 total_staging_rows = %s,
+                total_staging_rows_all_files = %s,
                 total_fact_rows = %s,
                 status = 'completed',
                 completed_at = NOW()
             WHERE batch_id = %s
         ''', (
             len(source_gene_ids), mapped_count, unmapped_count, ambiguous_count,
-            len(all_records) + len(all_invalid), len(fact_data), batch_id,
+            matrix_staging_rows, matrix_staging_rows, total_staging_all,
+            len(fact_data), batch_id,
         ))
         conn.commit()
 
@@ -961,7 +1002,7 @@ def run_import(data_dir: str, dry_run: bool = False):
         print('QC ASSERTIONS')
         print('=' * 70)
 
-        # QC 1: Staging row counts
+        # QC 1: Matrix staging row counts
         cur.execute('SELECT COUNT(*) FROM stg_update_expression_matrix WHERE batch_id = %s AND is_valid = TRUE', (batch_id,))
         staging_valid = cur.fetchone()[0]
         cur.execute('SELECT COUNT(*) FROM stg_update_expression_matrix WHERE batch_id = %s AND is_valid = FALSE', (batch_id,))
@@ -1060,7 +1101,16 @@ def run_import(data_dir: str, dry_run: bool = False):
                   mapping_rows == len(source_gene_ids))
         print(f'  Mapping audit rows: {mapping_rows:,} (expected {len(source_gene_ids):,})')
 
-        # QC 6: Fact row count
+        # QC 6: Total staging rows all files
+        record_qc(cur, batch_id, 'ALL_FILES', '',
+                  'row_count', 'total_staging_all_files',
+                  str(total_staging_all), str(total_staging_all),
+                  True,
+                  {'matrix': matrix_staging_rows, 'annot': len(annot_data),
+                   'fcraw': len(fc_data), 'fcsumm': len(summary_data), 'master': len(master_data)})
+        print(f'  Total staging rows (all files): {total_staging_all:,}')
+
+        # QC 7: Fact row count
         cur.execute('SELECT COUNT(*) FROM expression_fact')
         fact_rows = cur.fetchone()[0]
         print(f'  Fact rows: {fact_rows:,}')
@@ -1083,7 +1133,6 @@ def run_import(data_dir: str, dry_run: bool = False):
 
     except Exception as e:
         conn.rollback()
-        # Mark batch as failed
         try:
             cur.execute('''
                 UPDATE import_batch SET status = 'failed', error_message = %s, completed_at = NOW()
