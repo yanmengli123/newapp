@@ -76,8 +76,14 @@ export const grcg7bAssembly = {
     trackId: "GRCg7b-ReferenceSequenceTrack",
     adapter: {
       type: "IndexedFastaAdapter",
-      fastaLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_genomic.fna.gz" },
-      faiLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_genomic.fna.gz.fai" },
+      fastaLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_main_chr.fna" },
+      faiLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_main_chr.fna.fai" },
+    },
+  },
+  refNameAliases: {
+    adapter: {
+      type: "RefNameAliasAdapter",
+      uri: "/genome/grcg7b_main_aliases.txt",
     },
   },
 };
@@ -101,7 +107,7 @@ export const geneTrackGRCg7b = {
   assemblyNames: ["GRCg7b"],
   adapter: {
     type: "Gff3Adapter",
-    gffLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_genomic.gff.gz" },
+    gffLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_main_chr.gff.gz" },
   },
 };
 

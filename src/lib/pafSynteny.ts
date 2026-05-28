@@ -40,6 +40,48 @@ const CHR_TO_GRCG6A_REFSEQ: Record<string, string> = {
   chrMT: "NC_040902.1",
 };
 
+const GRCG6A_REFSEQ_TO_CHR = Object.fromEntries(
+  Object.entries(CHR_TO_GRCG6A_REFSEQ).map(([chrName, accession]) => [accession, chrName]),
+) as Record<string, string>;
+
+const GRCG7B_REFSEQ_TO_CHR: Record<string, string> = {
+  "NC_052532.1": "chr1",
+  "NC_052533.1": "chr2",
+  "NC_052534.1": "chr3",
+  "NC_052535.1": "chr4",
+  "NC_052536.1": "chr5",
+  "NC_052537.1": "chr6",
+  "NC_052538.1": "chr7",
+  "NC_052539.1": "chr8",
+  "NC_052540.1": "chr9",
+  "NC_052541.1": "chr10",
+  "NC_052542.1": "chr11",
+  "NC_052543.1": "chr12",
+  "NC_052544.1": "chr13",
+  "NC_052545.1": "chr14",
+  "NC_052546.1": "chr15",
+  "NC_052547.1": "chr16",
+  "NC_052548.1": "chr17",
+  "NC_052549.1": "chr18",
+  "NC_052550.1": "chr19",
+  "NC_052551.1": "chr20",
+  "NC_052552.1": "chr21",
+  "NC_052553.1": "chr22",
+  "NC_052554.1": "chr23",
+  "NC_052555.1": "chr24",
+  "NC_052556.1": "chr25",
+  "NC_052557.1": "chr26",
+  "NC_052558.1": "chr27",
+  "NC_052559.1": "chr28",
+  "NC_052560.1": "chr29",
+  "NC_052561.1": "chr30",
+  "NC_052562.1": "chr31",
+  "NC_052563.1": "chr32",
+  "NC_052571.1": "chrW",
+  "NC_052572.1": "chrZ",
+  "NC_053523.1": "chrMT",
+};
+
 export async function loadPafSyntenyFeatures(): Promise<SyntenyFeature[]> {
   const response = await fetch(PAF_URL);
   if (!response.ok) {
@@ -58,7 +100,7 @@ export function parsePaf(text: string): SyntenyFeature[] {
 export function findMateLocation(features: SyntenyFeature[], loc: string) {
   const parsed = parseLoc(loc);
   if (!parsed) return undefined;
-  const refName = CHR_TO_GRCG6A_REFSEQ[parsed.refName] ?? parsed.refName;
+  const refName = GRCG6A_REFSEQ_TO_CHR[parsed.refName] ?? parsed.refName;
   const hit = features.find((feature) => (
     feature.refName === refName &&
     feature.start < parsed.end &&
@@ -100,20 +142,25 @@ function parsePafLine(line: string, index: number): SyntenyFeature | undefined {
 
   const strand = strandRaw === "-" ? -1 : 1;
   const uniqueId = `grcg6a-grcg7b-paf-${index}`;
+  const queryRefName = GRCG6A_REFSEQ_TO_CHR[queryName];
+  const targetRefName = GRCG7B_REFSEQ_TO_CHR[targetName];
+  if (!queryRefName || !targetRefName) {
+    return undefined;
+  }
   return {
     uniqueId,
-    refName: queryName,
+    refName: queryRefName,
     start: queryStart,
     end: queryEnd,
     type: "match",
-    name: `${queryName}:${queryStart + 1}-${queryEnd}`,
+    name: `${queryRefName}:${queryStart + 1}-${queryEnd}`,
     strand,
     assemblyName: "GRCg6a",
     CIGAR: `${Math.max(1, alignmentLength)}M`,
     score,
     mate: {
       uniqueId: `${uniqueId}-mate`,
-      refName: targetName,
+      refName: targetRefName,
       start: targetStart,
       end: targetEnd,
       type: "match",
