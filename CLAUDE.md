@@ -122,11 +122,12 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `BrowserPage`, `VizPage`, `DataPage`, `BlastPage`, `ToolsPage` — Additional pages
   - **Genome module pages** (registered in App.tsx): `GenomeHomePage`, `GenomeFilesPage`, `GenomeRunPage`, `GenomeJobsPage`, `GenomeJobPage`, `GenomeResultPage`, `GenomeDownloadsPage`
 - **`GOEnrichmentPage.tsx`** — GO Enrichment Analysis (SEA) page: gene list input, example gene sets (daily-stable), parameters (ontology/correction/evidence/fdr/min_overlap), **ECharts Dotplot/Barplot visualization** with BP/CC/MF facet panels (clusterProfiler-style), results table with FDR sorting + pagination, term detail drawer with AmiGO/QuickGO links. Toggle "Show all tested terms" to reveal non-significant results. Visualization module uses `result.results` (not `bar_chart_data`) as data source; supports configurable display count (0=all), Dotplot/Barplot mode toggle, per-ontology filtering, and **fullscreen export** (canvas compositing PNG download with size presets and background toggle).
+- **`ComparativeGenomicsPage.tsx`** — Comparative genomics page for GRCg6a vs GRCg7b: Overview (stats + chromosome mapping), Synteny (block table), Dotplot (SVG visualization), Gene Orthologs (paginated table), Coordinate Mapper (gene ID lookup). Uses `comparativeApi.ts` client. Route: `/comparative`
 - **`EscOverviewSection.tsx`** — ESC Gene Expression Atlas homepage section: 8 clickable chart cards (Sample Composition / Sex-Biased Genes / Female vs Male Scatter / Stage DEG Count / Expression Distribution / PCA / Top50 Heatmap / Trajectory Clusters). Each card opens in a `Drawer` fullscreen view via `useDisclosure` + `useHotkeys`. Heatmap uses agglomerative hierarchical clustering (pure TypeScript, single linkage) for gene ordering.
 - **`DownloadsPage.tsx`** — CSV download cards for all 8 overview charts. Download via `fetch` + `Blob` + `createObjectURL` pattern hitting `/overview/<id>/csv` endpoints.
-- **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis — **all paths use `/genome-api/` prefix**), `src/lib/chatApi.ts` (chat)
+- **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis — **all paths use `/genome-api/` prefix**), `src/lib/chatApi.ts` (chat), `src/lib/comparativeApi.ts` (comparative genomics — `/comparative` prefix)
   - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `''` — dev proxy handles routing). Never hardcode URLs in components.
-- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/go-enrichment`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.**
+- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/go-enrichment`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`, `/comparative`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.**
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (section container), `KeggPathwayCard` (View/Interactive/Download/KEGG 4 buttons), `KeggInteractiveViewer` (PNG+SVG proportional overlay interactive viewer). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (single GO entry card with ID/name/evidence code/source/definition)
@@ -427,7 +428,8 @@ All routers registered in `main.py`:
 | genome_analysis_routes.py | `/genome-api` | 21 |
 | chat_router.py | `/api` | 1 |
 | overview_routes.py | `/overview` | 17 |
-| **Total** | | **69** |
+| comparative_routes.py | `/comparative` | 11 |
+| **Total** | | **80** |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
@@ -609,6 +611,51 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 - **expression_fact**: 3,342,168 rows (mapped genes only)
 - **gene_expression_summary**: 92,838 rows (mean/max/min/std/cv/sex_bias/stage_means/top_stage populated; fold_change NULL for zero-expression genes)
 - **QC**: All 14 checks passed (row counts, gene counts, 36-sample completeness, mapping completeness)
+
+### Comparative Genomics (GRCg6a vs GRCg7b)
+
+**Overview**: Cross-assembly comparison between GRCg6a (White Leghorn) and GRCg7b (Broiler) chicken genomes.
+
+**Data sources**:
+- GRCg6a: `GCF_000002315.6` (existing)
+- GRCg7b: `GCF_016699485.2` downloaded to `D:/jbrowsedata/projectdata/grcg7b/`
+
+**Database tables** (V009 migration):
+- `genome_assembly` — Assembly registry (GRCg6a, GRCg7b)
+- `chromosome_mapping` — Chromosome-level mapping (35 chromosomes)
+- `synteny_block` — Synteny blocks from whole-genome alignment (1,068 blocks)
+- `paf_alignment` — PAF-format alignments for JBrowse2 SyntenyTrack
+- `gene_coordinate_mapping` — Gene-level coordinate mapping via NCBI GeneID (17,137 genes)
+
+**API endpoints** (`/comparative`):
+| Endpoint | Description |
+|----------|-------------|
+| `GET /comparative/assemblies` | List genome assemblies |
+| `GET /comparative/chromosome-mapping` | Chromosome mapping between assemblies |
+| `GET /comparative/synteny` | Synteny blocks |
+| `GET /comparative/dotplot` | Dotplot data |
+| `GET /comparative/map` | Gene coordinate mapping |
+| `GET /comparative/paf/file` | PAF file for JBrowse2 |
+| `GET /comparative/stats` | Comparison statistics |
+| `GET /comparative/orthologs` | Gene ortholog table |
+
+**Frontend pages**:
+- `/comparative` — Comparative genomics dashboard (Overview, Synteny, Dotplot, Orthologs, Coordinate Mapper)
+- `/jbrowse` — JBrowse2 with dual assembly support (GRCg6a + GRCg7b)
+
+**Import scripts**:
+```bash
+# Import comparative data
+D:/soft/python310/python.exe backend/scripts/import_comparative_data.py \
+  --gff6a "D:/jbrowsedata/projectdata/GCF_000002315.6_GRCg6a_genomic.gff" \
+  --gff7b "D:/jbrowsedata/projectdata/grcg7b/GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_genomic.gff.gz"
+```
+
+**Current statistics**:
+- Chromosome mappings: 35
+- Synteny blocks: 1,068
+- PAF alignments: 1,068
+- Gene orthologs: 17,137
 
 ### GO Annotation Import Scripts
 
