@@ -520,7 +520,7 @@ Charts (12 types), tables, result JSON, metadata. Charts: amino_acid_composition
 - **Genome API paths**: All `genomeApi.ts` functions use `/genome-api/` prefix (changed from `/genome/`). Frontend components only call `genomeApi.ts` functions — never hardcode `/genome-api/` paths directly.
 - **Gene IDs**: `gene-XXXXX` format (e.g., `gene-A4GALT`). Search accepts gene_id, symbol, name, or ncbi_gene_id. Use `resolveGeneId()` to canonicalize before API calls — geneApi functions call this internally, components should NOT call search separately.
 - **Chromosome IDs**: seqid is the NC_ accession (e.g., `NC_006088.5`); chr_name is the display name (e.g., `1`, `W`, `Z`, `MT`). `genes_by_seqid` uses seqid as key.
-- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Gene-specific navigation via `?loc=chrN:start..end` query param (e.g. from GeneStructurePlot "Open in JBrowse" button); NC_ accessions are auto-converted to chr IDs using a 35-entry lookup table. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`. BigWig tracks in `jbrowseConfig.ts` use `QuantitativeTrack` + `BigWigAdapter` referencing `/bwdata/*.bw` (29 files, stage × sex × replicate naming, e.g. `E0_Female1.bw`). **NOTE: BigWig files have non-standard header byte order — mixed BE/LE in 8-byte offset fields. UCSC `bedGraphToBigWig` re-generation required for full JBrowse2 compatibility.**
+- **JBrowse**: Chromosome list in `JBrowsePage.tsx` hardcodes the 35 GRCg6a chromosomes (chr1–32, chrW, chrZ, chrMT) with their NC_ accessions. Search uses the chr-only FASTA (`.chr.fna`) so only these 35 appear — NW_ scaffolds are excluded. Gene-specific navigation via `?loc=chrN:start..end` query param (e.g. from GeneStructurePlot "Open in JBrowse" button); NC_ accessions are auto-converted to chr IDs using a 35-entry lookup table. Navigate to `${chr.id}:1..${Math.min(chr.length, 5000000)}`. BigWig tracks in `jbrowseConfig.ts` use `QuantitativeTrack` + `BigWigAdapter` referencing `/bwdata/*.bw` (29 files, stage × sex × replicate naming, e.g. `E0_Female1.bw`). **NOTE: BigWig files have non-standard header byte order — mixed BE/LE in 8-byte offset fields. UCSC `bedGraphToBigWig` re-generation required for full JBrowse2 compatibility.** **Comparative mode** (`?mode=comparative`): Uses `LinearSyntenyView` with dual panels (GRCg6a top, GRCg7b bottom) and synteny ribbons. PAF features loaded from `/genome/synteny/grcg6a_vs_grcg7b.paf` via `FromConfigAdapter`. Only primary chromosomes (chr1-32, chrW, chrZ, chrMT) — no scaffolds. Implementation in `src/jbrowseSyntenyViewState.ts`.
 - **Chat**: Never hardcode numbers in responses. All stats must come from `state.sql.execute("SELECT ...")` or in-memory indexes. Chromosome lookup uses `chr_name` field, not hardcoded NC_ mapping.
 - **Mantine**: `size` prop with `rem()` for responsive sizing. `<Button component={Link}>` for nav links. `useDisclosure` for modal state. `<Text>` defaults to `<p>` — never nest block elements (`<div>`, `<Badge>`, `<Card>`) inside `<Text>`; use `component="span"` if Badge is needed inline.
 - **React Router v7**: `<Routes>` + `<Route element=...>` pattern in App.tsx.
@@ -614,11 +614,17 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 
 ### Comparative Genomics (GRCg6a vs GRCg7b)
 
-**Overview**: Cross-assembly comparison between GRCg6a (White Leghorn) and GRCg7b (Broiler) chicken genomes.
+**Overview**: Cross-assembly comparison between GRCg6a (White Leghorn) and GRCg7b (Broiler) chicken genomes. Uses **LinearSyntenyView** for dual-panel visualization with synteny ribbons.
 
 **Data sources**:
 - GRCg6a: `GCF_000002315.6` (existing)
 - GRCg7b: `GCF_016699485.2` downloaded to `D:/jbrowsedata/projectdata/grcg7b/`
+
+**Filtered chromosome assets** (primary chromosomes only):
+- `GCF_016699485.2_GRCg7b_main_chr.fna` — GRCg7b FASTA (chr1-32, chrW, chrZ, chrMT)
+- `GCF_016699485.2_GRCg7b_main_chr.gff.gz` — GRCg7b GFF (filtered: no cDNA_match/region)
+- `grcg7b_main_aliases.txt` — chr name aliases (NC_ → chr mapping)
+- Build script: `backend/scripts/build_grcg7b_main_jbrowse_assets.py`
 
 **Database tables** (V009 migration):
 - `genome_assembly` — Assembly registry (GRCg6a, GRCg7b)
@@ -641,21 +647,32 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 
 **Frontend pages**:
 - `/comparative` — Comparative genomics dashboard (Overview, Synteny, Dotplot, Orthologs, Coordinate Mapper)
-- `/jbrowse` — JBrowse2 with dual assembly support (GRCg6a + GRCg7b)
+- `/jbrowse` — JBrowse2 with LinearSyntenyView (GRCg6a top + GRCg7b bottom + synteny ribbons)
+
+**JBrowse2 LinearSyntenyView** (`src/jbrowseSyntenyViewState.ts`):
+- Creates dual-panel view: GRCg6a (top) + GRCg7b (bottom)
+- Synteny ribbons connect homologous regions
+- PAF features loaded from `/genome/synteny/grcg6a_vs_grcg7b.paf`
+- Uses `FromConfigAdapter` for in-memory synteny features
+- Supports linked navigation between assemblies
 
 **Import scripts**:
 ```bash
 # Import comparative data
 D:/soft/python310/python.exe backend/scripts/import_comparative_data.py \
   --gff6a "D:/jbrowsedata/projectdata/GCF_000002315.6_GRCg6a_genomic.gff" \
-  --gff7b "D:/jbrowsedata/projectdata/grcg7b/GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_genomic.gff.gz"
+  --gff7b "D:/jbrowsedata/projectdata/GCF_016699485.2_GRCg7b_main_chr.gff.gz"
+
+# Build filtered GRCg7b assets
+D:/soft/python310/python.exe backend/scripts/build_grcg7b_main_jbrowse_assets.py
 ```
 
 **Current statistics**:
 - Chromosome mappings: 35
 - Synteny blocks: 1,068
-- PAF alignments: 1,068
+- PAF alignments: 1,068 (primary chromosomes only)
 - Gene orthologs: 17,137
+- Average synteny identity: 97.5%
 
 ### GO Annotation Import Scripts
 
