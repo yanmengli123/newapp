@@ -82,6 +82,9 @@ function HeaderNav() {
       <Button variant="subtle" component={Link} to="/go-enrichment" leftSection={<IconDna size={16} />}>
         GO Enrichment
       </Button>
+      <Button variant="subtle" component={Link} to="/comparative" leftSection={<IconDna size={16} />}>
+        Comparative
+      </Button>
       <Button variant="subtle" component={Link} to="/data">
         Datasets
       </Button>

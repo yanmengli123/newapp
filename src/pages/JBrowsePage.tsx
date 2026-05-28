@@ -1,13 +1,28 @@
-import { useMemo, useEffect, useRef } from "react";
-import { Button, Card, Stack, Text, Title, SimpleGrid } from "@mantine/core";
+import { useMemo, useEffect, useRef, useState } from "react";
+import {
+  Badge,
+  Button,
+  Card,
+  Group,
+  SimpleGrid,
+  Stack,
+  Text,
+  Title,
+} from "@mantine/core";
 import {
   createViewState,
   JBrowseLinearGenomeView,
 } from "@jbrowse/react-linear-genome-view2";
-import { useSearchParams } from "react-router-dom";
-import { jbrowseConfig } from "../jbrowseConfig";
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  comparativeConfig,
+  comparativeTrackIds,
+  jbrowseConfig,
+  jbrowseModes,
+} from "../jbrowseConfig";
 
-// 染色体列表
+type JBrowseMode = "single" | "comparative";
+
 const chromosomes = [
   { id: "chr1", name: "1", seqid: "NC_006088.5", length: 197608386 },
   { id: "chr2", name: "2", seqid: "NC_006089.5", length: 149682049 },
@@ -46,7 +61,6 @@ const chromosomes = [
   { id: "chrMT", name: "MT", seqid: "NC_040902.1", length: 16784 },
 ];
 
-// NC_ accession → chr ID
 const NC_TO_CHR: [string, string][] = [
   ["NC_006088.5", "chr1"], ["NC_006089.5", "chr2"], ["NC_006090.5", "chr3"],
   ["NC_006091.5", "chr4"], ["NC_006092.5", "chr5"], ["NC_006093.5", "chr6"],
@@ -73,70 +87,71 @@ function formatLength(len: number): string {
 }
 
 function parseLocParam(locParam: string): string {
-  // locParam format: "chr1:start..end" or "NC_006088.5:start..end"
   const match = locParam.match(/^(.+?):(\d+)\.\.(\d+)$/);
   if (!match) return "chr1:1..5000000";
-
   const [, refName, startStr, endStr] = match;
   const start = parseInt(startStr, 10);
   const end = parseInt(endStr, 10);
-  if (isNaN(start) || isNaN(end)) return "chr1:1..5000000";
+  if (Number.isNaN(start) || Number.isNaN(end)) return "chr1:1..5000000";
+  return `${toChrId(refName)}:${start}..${end}`;
+}
 
-  // Convert NC_ accession to chr ID
-  const chrId = toChrId(refName);
-  return `${chrId}:${start}..${end}`;
+function getInitialMode(searchParams: URLSearchParams): JBrowseMode {
+  return searchParams.get("mode") === "comparative" ? "comparative" : "single";
 }
 
 export default function JBrowsePage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewMode] = useState<JBrowseMode>(() => getInitialMode(searchParams));
 
-  // Compute initial location from ?loc= param; falls back to default
   const locParam = searchParams.get("loc");
+
+  useEffect(() => {
+    setViewMode(getInitialMode(searchParams));
+  }, [searchParams]);
 
   const initialLoc = useMemo(() => {
     if (!locParam) return "chr1:1..5000000";
     return parseLocParam(locParam);
   }, [locParam]);
 
-  // Non-padded gene coordinates for nav + highlight
   const geneLoc = useMemo(() => {
     if (!locParam) return "";
-    const match = locParam.match(/^(.+?):(\d+)\.\.(\d+)$/);
-    if (!match) return "";
-    const [, refName, startStr, endStr] = match;
-    const start = parseInt(startStr, 10);
-    const end = parseInt(endStr, 10);
-    if (isNaN(start) || isNaN(end)) return "";
-    const chrId = toChrId(refName);
-    return `${chrId}:${start}..${end}`;
+    return parseLocParam(locParam);
   }, [locParam]);
 
-  // Create fresh viewState on every mount to avoid stale/corrupted session from /jbrowse/gene
-  const viewState = createViewState({
+  const singleViewState = useMemo(() => createViewState({
     ...jbrowseConfig,
     location: initialLoc,
+  }), [initialLoc]);
+
+  const comparativeViewState = useMemo(() => createViewState({
+    ...comparativeConfig,
+    location: initialLoc,
     defaultSession: {
-      ...jbrowseConfig.defaultSession,
+      name: "GRCg6a vs GRCg7b",
       view: {
-        ...jbrowseConfig.defaultSession.view,
+        id: "comparativeLinearGenomeView",
+        type: "LinearGenomeView",
         init: {
-          ...jbrowseConfig.defaultSession.view.init,
+          assembly: "GRCg6a",
           loc: initialLoc,
+          tracks: [comparativeTrackIds.grcg6aGenes],
         },
       },
     },
-  });
+  }), [initialLoc]);
 
-  const navRef = useRef(false);
+  const viewState = viewMode === "single" ? singleViewState : comparativeViewState;
+  const currentMode = jbrowseModes[viewMode];
+  const navRef = useRef("");
 
-  // Navigate + highlight to exact gene region when ?loc= is present
   useEffect(() => {
-    if (!geneLoc || navRef.current) return;
-    navRef.current = true;
+    if (!geneLoc || navRef.current === `${viewMode}:${geneLoc}`) return;
+    navRef.current = `${viewMode}:${geneLoc}`;
     const timer = setTimeout(() => {
       try {
         viewState.session.view.navToLocString(geneLoc);
-        // Parse geneLoc like "chr1:123..456" for setHighlight
         const locMatch = geneLoc.match(/^(.+?):(\d+)\.\.(\d+)$/);
         if (locMatch) {
           const [, refName, startStr, endStr] = locMatch;
@@ -148,12 +163,19 @@ export default function JBrowsePage() {
           }]);
         }
       } catch {
-        // ignore if view not ready
+        // JBrowse can still be initializing immediately after mode switches.
       }
     }, 1200);
     return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geneLoc]);
+  }, [geneLoc, viewMode, viewState]);
+
+  const switchMode = (mode: JBrowseMode) => {
+    const next = new URLSearchParams(searchParams);
+    if (mode === "comparative") next.set("mode", "comparative");
+    else next.delete("mode");
+    setSearchParams(next, { replace: true });
+    setViewMode(mode);
+  };
 
   const handleChrClick = (chr: typeof chromosomes[0]) => {
     const endPos = Math.min(chr.length, 5000000);
@@ -162,8 +184,64 @@ export default function JBrowsePage() {
 
   return (
     <Stack gap="md">
-      <Title order={2}>JBrowse</Title>
-      <Text c="dimmed">GRCg6a 鸡基因组浏览器 - 使用本地基因组数据</Text>
+      <Group justify="space-between" align="flex-start" gap="md">
+        <div>
+          <Title order={2}>JBrowse</Title>
+          <Text c="dimmed" size="sm">
+            GRCg6a primary genome browser with optional GRCg6a vs GRCg7b comparison mode.
+          </Text>
+        </div>
+
+        <Group gap="xs">
+          <Button
+            variant={viewMode === "single" ? "filled" : "light"}
+            onClick={() => switchMode("single")}
+          >
+            GRCg6a
+          </Button>
+          <Button
+            variant={viewMode === "comparative" ? "filled" : "light"}
+            onClick={() => switchMode("comparative")}
+          >
+            GRCg6a vs GRCg7b
+          </Button>
+        </Group>
+      </Group>
+
+      <SimpleGrid cols={{ base: 1, md: 3 }}>
+        <Card withBorder radius="sm" p="md">
+          <Text size="xs" tt="uppercase" c="dimmed" fw={700}>Mode</Text>
+          <Text fw={700}>{currentMode.label}</Text>
+        </Card>
+        <Card withBorder radius="sm" p="md">
+          <Text size="xs" tt="uppercase" c="dimmed" fw={700}>Configuration</Text>
+          <Text fw={700}>{currentMode.config}</Text>
+        </Card>
+        <Card withBorder radius="sm" p="md">
+          <Text size="xs" tt="uppercase" c="dimmed" fw={700}>Tracks</Text>
+          <Group gap={6} mt={4}>
+            {currentMode.tracks.map((track) => (
+              <Badge key={track} variant="light">{track}</Badge>
+            ))}
+          </Group>
+        </Card>
+      </SimpleGrid>
+
+      {viewMode === "comparative" && (
+        <Card withBorder radius="sm" p="md" bg="blue.0">
+          <Group justify="space-between" align="flex-start" gap="md">
+            <Stack gap={4}>
+              <Text fw={700}>Comparison mode is using GRCg6a as the primary assembly.</Text>
+              <Text size="sm" c="dimmed">
+                The embedded browser loads GRCg6a and GRCg7b gene tracks; synteny blocks and dotplot are available in Comparative.
+              </Text>
+            </Stack>
+            <Button component={Link} to="/comparative" variant="light">
+              Open Comparative
+            </Button>
+          </Group>
+        </Card>
+      )}
 
       <SimpleGrid cols={{ base: 4, sm: 6, md: 8 }}>
         {chromosomes.map((chr) => (
@@ -172,14 +250,15 @@ export default function JBrowsePage() {
             variant="light"
             size="xs"
             onClick={() => handleChrClick(chr)}
+            title={`${chr.seqid} ${formatLength(chr.length)}`}
           >
             {chr.name} ({formatLength(chr.length)})
           </Button>
         ))}
       </SimpleGrid>
 
-      <Card withBorder radius="md" p="md">
-        <JBrowseLinearGenomeView viewState={viewState} />
+      <Card withBorder radius="sm" p={0} style={{ minHeight: 680, overflow: "hidden" }}>
+        <JBrowseLinearGenomeView key={viewMode} viewState={viewState} />
       </Card>
     </Stack>
   );

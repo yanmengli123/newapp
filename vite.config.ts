@@ -13,6 +13,9 @@ export default defineConfig({
           if (req.url === '/go-enrichment' || req.url === '/go-enrichment/') {
             req.url = '/';
           }
+          if (req.url === '/comparative' || req.url === '/comparative/') {
+            req.url = '/';
+          }
           next();
         });
       },
@@ -34,6 +37,7 @@ export default defineConfig({
       '/overview': 'http://localhost:8001',
       '/bwdata':  'http://localhost:8001',
       '/go-enrichment': 'http://localhost:8001',
+      '/comparative': 'http://localhost:8001',
     },
   },
 })

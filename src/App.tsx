@@ -23,6 +23,7 @@ import GenomeDownloadsPage from './pages/GenomeDownloadsPage';
 import DownloadsPage from './pages/DownloadsPage';
 import PictureMakerPage from './pages/PictureMakerPage';
 import GOEnrichmentPage from './pages/GOEnrichmentPage';
+import ComparativeGenomicsPage from './pages/ComparativeGenomicsPage';
 import ChatWidget from './components/chat/ChatWidget';
 
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
             <Route path="/query" element={<GeneQueryPage />} />
             <Route path="/browser" element={<BrowserPage />} />
             <Route path="/jbrowse" element={<JBrowsePage />} />
+            <Route path="/jbrowseh" element={<JBrowsePage />} />
             <Route path="/jbrowse/gene" element={<JBrowseGenePage />} />
             <Route path="/blast" element={<BlastPage />} />
             <Route path="/viz" element={<VizPage />} />
@@ -56,6 +58,7 @@ export default function App() {
             <Route path="/downloads" element={<DownloadsPage />} />
             <Route path="/picture-maker" element={<PictureMakerPage />} />
             <Route path="/go-enrichment" element={<GOEnrichmentPage />} />
+            <Route path="/comparative" element={<ComparativeGenomicsPage />} />
           </Routes>
 
           <Divider my="xl" />

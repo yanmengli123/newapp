@@ -248,6 +248,15 @@ async def lifespan(app: FastAPI):
     app.state.pg_getconn = pg_getconn
     app.state.pg_putconn = pg_putconn
     app.state.pg_available = pg_available
+
+    # Initialize comparative genomics service
+    if pg_available:
+        from backend.comparative_service import ComparativeService
+        from backend.api import comparative_routes
+        comp_service = ComparativeService(pg_pool)
+        comparative_routes.set_service(comp_service)
+        logger.info("Comparative genomics service initialized")
+
     app.state.gff = gff_db
     app.state.gff_conn = gff_conn
     app.state.sql = sql_conn
@@ -312,6 +321,7 @@ from backend.api.tool_routes import router as tool_router
 from backend.api.chat_router import router as chat_router
 from backend.api.genome_analysis_routes import router as genome_router
 from backend.api.overview_routes import router as overview_router
+from backend.api.comparative_routes import router as comparative_router
 
 app.include_router(kegg_image_router)
 app.include_router(tool_router)
@@ -319,6 +329,7 @@ app.include_router(chat_router)
 app.include_router(genome_router)
 app.include_router(overview_router)
 app.include_router(go_enrichment_router)
+app.include_router(comparative_router)
 
 # ─────────────────────────────────────────────
 # CORS（可配置来源）
