@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Group,
+  Loader,
   SimpleGrid,
   Stack,
   Text,
@@ -15,11 +16,12 @@ import {
 } from "@jbrowse/react-linear-genome-view2";
 import { Link, useSearchParams } from "react-router-dom";
 import {
-  comparativeConfig,
-  comparativeTrackIds,
   jbrowseConfig,
   jbrowseModes,
 } from "../jbrowseConfig";
+import { createLinearSyntenyViewState } from "../jbrowseSyntenyViewState";
+import { findMateLocation, loadPafSyntenyFeatures } from "../lib/pafSynteny";
+import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
 
 type JBrowseMode = "single" | "comparative";
 
@@ -103,12 +105,29 @@ function getInitialMode(searchParams: URLSearchParams): JBrowseMode {
 export default function JBrowsePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<JBrowseMode>(() => getInitialMode(searchParams));
+  const [syntenyFeatures, setSyntenyFeatures] = useState<SyntenyFeature[]>([]);
+  const [syntenyError, setSyntenyError] = useState("");
+  const [syntenyLoading, setSyntenyLoading] = useState(false);
 
   const locParam = searchParams.get("loc");
 
   useEffect(() => {
     setViewMode(getInitialMode(searchParams));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (syntenyFeatures.length || syntenyLoading) return;
+    setSyntenyLoading(true);
+    loadPafSyntenyFeatures()
+      .then((features) => {
+        setSyntenyFeatures(features);
+        setSyntenyError("");
+      })
+      .catch((error: unknown) => {
+        setSyntenyError(error instanceof Error ? error.message : "Failed to load synteny PAF data");
+      })
+      .finally(() => setSyntenyLoading(false));
+  }, [syntenyFeatures.length, syntenyLoading]);
 
   const initialLoc = useMemo(() => {
     if (!locParam) return "chr1:1..5000000";
@@ -125,37 +144,30 @@ export default function JBrowsePage() {
     location: initialLoc,
   }), [initialLoc]);
 
-  const comparativeViewState = useMemo(() => createViewState({
-    ...comparativeConfig,
-    location: initialLoc,
-    defaultSession: {
-      name: "GRCg6a vs GRCg7b",
-      view: {
-        id: "comparativeLinearGenomeView",
-        type: "LinearGenomeView",
-        init: {
-          assembly: "GRCg6a",
-          loc: initialLoc,
-          tracks: [comparativeTrackIds.grcg6aGenes],
-        },
-      },
-    },
-  }), [initialLoc]);
+  const comparativeViewState = useMemo(() => {
+    if (!syntenyFeatures.length) return undefined;
+    return createLinearSyntenyViewState({
+      features: syntenyFeatures,
+      location: initialLoc,
+      mateLocation: findMateLocation(syntenyFeatures, initialLoc),
+    });
+  }, [initialLoc, syntenyFeatures]);
 
   const viewState = viewMode === "single" ? singleViewState : comparativeViewState;
   const currentMode = jbrowseModes[viewMode];
   const navRef = useRef("");
 
   useEffect(() => {
+    if (viewMode !== "single") return;
     if (!geneLoc || navRef.current === `${viewMode}:${geneLoc}`) return;
     navRef.current = `${viewMode}:${geneLoc}`;
     const timer = setTimeout(() => {
       try {
-        viewState.session.view.navToLocString(geneLoc);
+        singleViewState.session.view.navToLocString(geneLoc);
         const locMatch = geneLoc.match(/^(.+?):(\d+)\.\.(\d+)$/);
         if (locMatch) {
           const [, refName, startStr, endStr] = locMatch;
-          viewState.session.view.setHighlight([{
+          singleViewState.session.view.setHighlight([{
             refName,
             start: parseInt(startStr, 10),
             end: parseInt(endStr, 10),
@@ -167,7 +179,7 @@ export default function JBrowsePage() {
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [geneLoc, viewMode, viewState]);
+  }, [geneLoc, singleViewState.session.view, viewMode]);
 
   const switchMode = (mode: JBrowseMode) => {
     const next = new URLSearchParams(searchParams);
@@ -179,7 +191,14 @@ export default function JBrowsePage() {
 
   const handleChrClick = (chr: typeof chromosomes[0]) => {
     const endPos = Math.min(chr.length, 5000000);
-    viewState.session.view.navToLocString(`${chr.id}:1..${endPos}`);
+    if (viewMode === "comparative") {
+      const next = new URLSearchParams(searchParams);
+      next.set("mode", "comparative");
+      next.set("loc", `${chr.id}:1..${endPos}`);
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    singleViewState.session.view.navToLocString(`${chr.id}:1..${endPos}`);
   };
 
   return (
@@ -231,9 +250,9 @@ export default function JBrowsePage() {
         <Card withBorder radius="sm" p="md" bg="blue.0">
           <Group justify="space-between" align="flex-start" gap="md">
             <Stack gap={4}>
-              <Text fw={700}>Comparison mode is using GRCg6a as the primary assembly.</Text>
+              <Text fw={700}>LinearSyntenyView is active: GRCg6a on top, GRCg7b below, ribbons in the middle.</Text>
               <Text size="sm" c="dimmed">
-                The embedded browser loads GRCg6a and GRCg7b gene tracks; synteny blocks and dotplot are available in Comparative.
+                The synteny layer is generated from /genome/synteny/grcg6a_vs_grcg7b.paf and rendered with JBrowse 2 ribbons.
               </Text>
             </Stack>
             <Button component={Link} to="/comparative" variant="light">
@@ -258,7 +277,21 @@ export default function JBrowsePage() {
       </SimpleGrid>
 
       <Card withBorder radius="sm" p={0} style={{ minHeight: 680, overflow: "hidden" }}>
-        <JBrowseLinearGenomeView key={viewMode} viewState={viewState} />
+        {viewMode === "comparative" && syntenyLoading && (
+          <Group justify="center" p="xl">
+            <Loader size="sm" />
+            <Text size="sm" c="dimmed">Loading GRCg6a vs GRCg7b synteny...</Text>
+          </Group>
+        )}
+        {viewMode === "comparative" && syntenyError && (
+          <Card p="xl" radius={0}>
+            <Text c="red" fw={700}>Unable to load synteny view</Text>
+            <Text size="sm" c="dimmed">{syntenyError}</Text>
+          </Card>
+        )}
+        {viewState && !(viewMode === "comparative" && (syntenyLoading || syntenyError)) && (
+          <JBrowseLinearGenomeView key={`${viewMode}-${initialLoc}`} viewState={viewState as never} />
+        )}
       </Card>
     </Stack>
   );

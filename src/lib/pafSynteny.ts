@@ -1,0 +1,134 @@
+import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
+
+const PAF_URL = "/genome/synteny/grcg6a_vs_grcg7b.paf";
+
+const CHR_TO_GRCG6A_REFSEQ: Record<string, string> = {
+  chr1: "NC_006088.5",
+  chr2: "NC_006089.5",
+  chr3: "NC_006090.5",
+  chr4: "NC_006091.5",
+  chr5: "NC_006092.5",
+  chr6: "NC_006093.5",
+  chr7: "NC_006094.5",
+  chr8: "NC_006095.5",
+  chr9: "NC_006096.5",
+  chr10: "NC_006097.5",
+  chr11: "NC_006098.5",
+  chr12: "NC_006099.5",
+  chr13: "NC_006100.5",
+  chr14: "NC_006101.5",
+  chr15: "NC_006102.5",
+  chr16: "NC_006103.5",
+  chr17: "NC_006104.5",
+  chr18: "NC_006105.5",
+  chr19: "NC_006106.5",
+  chr20: "NC_006107.5",
+  chr21: "NC_006108.5",
+  chr22: "NC_006109.5",
+  chr23: "NC_006110.5",
+  chr24: "NC_006111.5",
+  chr25: "NC_006112.4",
+  chr26: "NC_006113.5",
+  chr27: "NC_006114.5",
+  chr28: "NC_006115.5",
+  chr29: "NC_008465.4",
+  chr30: "NC_028739.2",
+  chr31: "NC_028740.2",
+  chr32: "NC_006119.4",
+  chrW: "NC_006126.5",
+  chrZ: "NC_006127.5",
+  chrMT: "NC_040902.1",
+};
+
+export async function loadPafSyntenyFeatures(): Promise<SyntenyFeature[]> {
+  const response = await fetch(PAF_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to load PAF synteny file: ${response.status}`);
+  }
+  return parsePaf(await response.text());
+}
+
+export function parsePaf(text: string): SyntenyFeature[] {
+  return text
+    .split(/\r?\n/)
+    .map((line, index) => parsePafLine(line, index))
+    .filter((feature): feature is SyntenyFeature => Boolean(feature));
+}
+
+export function findMateLocation(features: SyntenyFeature[], loc: string) {
+  const parsed = parseLoc(loc);
+  if (!parsed) return undefined;
+  const refName = CHR_TO_GRCG6A_REFSEQ[parsed.refName] ?? parsed.refName;
+  const hit = features.find((feature) => (
+    feature.refName === refName &&
+    feature.start < parsed.end &&
+    feature.end > parsed.start
+  ));
+  if (!hit) return undefined;
+  const mateStart = Math.max(1, hit.mate.start + 1);
+  const mateEnd = Math.max(mateStart + 1, hit.mate.end);
+  return `${hit.mate.refName}:${mateStart}..${mateEnd}`;
+}
+
+function parsePafLine(line: string, index: number): SyntenyFeature | undefined {
+  if (!line.trim()) return undefined;
+  const fields = line.split("\t");
+  if (fields.length < 12) return undefined;
+  const [
+    queryName,
+    ,
+    queryStartRaw,
+    queryEndRaw,
+    strandRaw,
+    targetName,
+    ,
+    targetStartRaw,
+    targetEndRaw,
+    matchesRaw,
+    alignmentLengthRaw,
+    mapqRaw,
+  ] = fields;
+  const queryStart = Number(queryStartRaw);
+  const queryEnd = Number(queryEndRaw);
+  const targetStart = Number(targetStartRaw);
+  const targetEnd = Number(targetEndRaw);
+  const alignmentLength = Number(alignmentLengthRaw);
+  const score = Number(matchesRaw || mapqRaw || 0);
+  if ([queryStart, queryEnd, targetStart, targetEnd, alignmentLength].some(Number.isNaN)) {
+    return undefined;
+  }
+
+  const strand = strandRaw === "-" ? -1 : 1;
+  const uniqueId = `grcg6a-grcg7b-paf-${index}`;
+  return {
+    uniqueId,
+    refName: queryName,
+    start: queryStart,
+    end: queryEnd,
+    type: "match",
+    name: `${queryName}:${queryStart + 1}-${queryEnd}`,
+    strand,
+    assemblyName: "GRCg6a",
+    CIGAR: `${Math.max(1, alignmentLength)}M`,
+    score,
+    mate: {
+      uniqueId: `${uniqueId}-mate`,
+      refName: targetName,
+      start: targetStart,
+      end: targetEnd,
+      type: "match",
+      strand,
+      assemblyName: "GRCg7b",
+    },
+  };
+}
+
+function parseLoc(loc: string) {
+  const match = loc.match(/^(.+?):(\d+)\.\.(\d+)$/);
+  if (!match) return undefined;
+  const [, refName, startRaw, endRaw] = match;
+  const start = Number(startRaw);
+  const end = Number(endRaw);
+  if (Number.isNaN(start) || Number.isNaN(end)) return undefined;
+  return { refName, start: Math.max(0, start - 1), end };
+}

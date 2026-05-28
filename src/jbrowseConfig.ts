@@ -47,7 +47,7 @@ export function buildBwTracks() {
 }
 
 // GRCg6a assembly definition
-const grcg6aAssembly = {
+export const grcg6aAssembly = {
   name: "GRCg6a",
   aliases: ["galGal6"],
   sequence: {
@@ -68,7 +68,7 @@ const grcg6aAssembly = {
 };
 
 // GRCg7b assembly definition
-const grcg7bAssembly = {
+export const grcg7bAssembly = {
   name: "GRCg7b",
   aliases: ["galGal7"],
   sequence: {
@@ -83,7 +83,7 @@ const grcg7bAssembly = {
 };
 
 // Gene tracks for both assemblies
-const geneTrackGRCg6a = {
+export const geneTrackGRCg6a = {
   type: "FeatureTrack",
   trackId: "genes-grcg6a",
   name: "GRCg6a Genes",
@@ -94,7 +94,7 @@ const geneTrackGRCg6a = {
   },
 };
 
-const geneTrackGRCg7b = {
+export const geneTrackGRCg7b = {
   type: "FeatureTrack",
   trackId: "genes-grcg7b",
   name: "GRCg7b Genes",
@@ -131,7 +131,7 @@ export const jbrowseModes = {
     tracks: [
       "GRCg6a Genes",
       "GRCg7b Genes",
-      "Synteny dataset",
+      "GRCg6a ↔ GRCg7b Synteny",
     ],
   },
 } as const;
