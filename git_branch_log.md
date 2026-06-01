@@ -36,6 +36,16 @@
 
 ---
 
+## 2026-05-29
+
+### Branch Created
+- **Branch**: 2026-05-29
+- **Action**: Created from 2026-05-25
+- **Time**: 2026-05-29
+- **Description**: Comparative genomics LinearSyntenyView、filtered chromosome assets、数据统计
+
+---
+
 ## Usage
 
 记录格式:
