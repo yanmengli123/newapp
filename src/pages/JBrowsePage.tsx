@@ -252,7 +252,7 @@ export default function JBrowsePage() {
             <Stack gap={4}>
               <Text fw={700}>LinearSyntenyView is active: GRCg6a on top, GRCg7b below, ribbons in the middle.</Text>
               <Text size="sm" c="dimmed">
-                The synteny layer is generated from /genome/synteny/grcg6a_vs_grcg7b.paf and rendered with JBrowse 2 ribbons.
+                The synteny layer uses /comparative/paf/file?mode=natural with mapQ &gt;= 30, identity &gt;= 85%, and length &gt;= 50 kb.
               </Text>
             </Stack>
             <Button component={Link} to="/comparative" variant="light">

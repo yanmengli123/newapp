@@ -249,13 +249,14 @@ async def lifespan(app: FastAPI):
     app.state.pg_putconn = pg_putconn
     app.state.pg_available = pg_available
 
-    # Initialize comparative genomics service
-    if pg_available:
-        from backend.comparative_service import ComparativeService
-        from backend.api import comparative_routes
-        comp_service = ComparativeService(pg_pool)
-        comparative_routes.set_service(comp_service)
-        logger.info("Comparative genomics service initialized")
+    # Initialize comparative genomics service. PAF-backed natural/windowed synteny
+    # endpoints work without PostgreSQL; DB-backed gene/ortholog endpoints still
+    # report their own unavailable state when PG is down.
+    from backend.comparative_service import ComparativeService
+    from backend.api import comparative_routes
+    comp_service = ComparativeService(pg_pool)
+    comparative_routes.set_service(comp_service)
+    logger.info("Comparative genomics service initialized")
 
     app.state.gff = gff_db
     app.state.gff_conn = gff_conn

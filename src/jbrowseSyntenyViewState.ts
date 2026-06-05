@@ -243,7 +243,7 @@ function buildSyntenyTrack(features: SyntenyFeature[]) {
   return {
     type: "SyntenyTrack",
     trackId: comparativeTrackIds.synteny,
-    name: "GRCg6a ↔ GRCg7b Synteny",
+    name: "GRCg6a -> GRCg7b Synteny",
     assemblyNames: ["GRCg6a", "GRCg7b"],
     adapter: {
       type: "FromConfigAdapter",

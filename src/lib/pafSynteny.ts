@@ -1,6 +1,7 @@
 import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
 
-const PAF_URL = "/genome/synteny/grcg6a_vs_grcg7b.paf";
+const PAF_URL = "/comparative/paf/file?mode=natural&min_quality=30&min_identity=85&min_alignment_length=50000";
+const WINDOWED_FALLBACK_PAF_URL = "/genome/synteny/grcg6a_vs_grcg7b.paf";
 
 const CHR_TO_GRCG6A_REFSEQ: Record<string, string> = {
   chr1: "NC_006088.5",
@@ -79,13 +80,18 @@ const GRCG7B_REFSEQ_TO_CHR: Record<string, string> = {
   "NC_052563.1": "chr32",
   "NC_052571.1": "chrW",
   "NC_052572.1": "chrZ",
+  "NC_024088.1": "chrMT",
   "NC_053523.1": "chrMT",
 };
 
 export async function loadPafSyntenyFeatures(): Promise<SyntenyFeature[]> {
   const response = await fetch(PAF_URL);
   if (!response.ok) {
-    throw new Error(`Failed to load PAF synteny file: ${response.status}`);
+    const fallback = await fetch(WINDOWED_FALLBACK_PAF_URL);
+    if (!fallback.ok) {
+      throw new Error(`Failed to load PAF synteny file: ${response.status}`);
+    }
+    return parsePaf(await fallback.text());
   }
   return parsePaf(await response.text());
 }

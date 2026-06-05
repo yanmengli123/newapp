@@ -79,6 +79,101 @@ export interface PafAlignment {
   score: number;
 }
 
+export type AlignmentMode = "natural" | "windowed";
+
+export interface AlignmentBlock {
+  block_id: string;
+  query_name: string;
+  query_length: number;
+  query_start: number;
+  query_end: number;
+  strand: string;
+  target_name: string;
+  target_length: number;
+  target_start: number;
+  target_end: number;
+  residue_matches: number;
+  alignment_length: number;
+  mapping_quality: number;
+  identity: number;
+  chr_1: string;
+  start_1: number;
+  end_1: number;
+  chr_2: string;
+  start_2: number;
+  end_2: number;
+  score: number;
+  is_primary_chromosome_pair: boolean;
+  is_same_chromosome: boolean;
+  is_windowed_1mb: boolean;
+}
+
+export interface AlignmentStats {
+  dataset: AlignmentMode;
+  source_path: string;
+  source_exists: boolean;
+  file_size_bytes: number;
+  block_count: number;
+  dataset_classification: string;
+  coordinate_system: string;
+  total_alignment_bases?: number;
+  residue_matches?: number;
+  weighted_identity?: number;
+  avg_identity?: number;
+  min_identity?: number;
+  max_identity?: number;
+  avg_mapq?: number;
+  chromosomes_1?: number;
+  chromosomes_2?: number;
+  same_chromosome_blocks?: number;
+  off_diagonal_blocks?: number;
+  reverse_strand_blocks?: number;
+  primary_chromosome_blocks?: number;
+  one_mb_windowed_blocks?: number;
+  rounded_query_start_fraction?: number;
+  query_covered_bases?: number;
+  target_covered_bases?: number;
+  query_total_bases?: number;
+  target_total_bases?: number;
+  query_coverage_fraction?: number;
+  target_coverage_fraction?: number;
+  query_coverage_by_chr?: Record<string, number>;
+  target_coverage_by_chr?: Record<string, number>;
+  filters?: {
+    min_quality: number;
+    min_identity: number;
+    min_alignment_length: number;
+  };
+}
+
+export interface ComparativeMethods {
+  primary_dataset: AlignmentMode;
+  assemblies: {
+    assembly_1: string;
+    assembly_2: string;
+    species: string;
+  };
+  natural_alignment: {
+    status: string;
+    path: string;
+    provenance_path: string;
+    provenance: Record<string, string | number | undefined>;
+    default_filters: Record<string, string | number>;
+    interpretation: string;
+  };
+  windowed_alignment_qc: {
+    status: string;
+    path: string;
+    interpretation: string;
+  };
+  coordinate_system: string;
+  jbrowse2: {
+    compatible_input: string;
+    view: string;
+    note: string;
+  };
+}
+
 export interface ComparisonStats {
   synteny: {
     block_count: number;
@@ -183,6 +278,61 @@ export async function getDotplotData(params: {
   return data.data;
 }
 
+export async function getAlignmentBlocks(params: {
+  assembly_1?: string;
+  assembly_2?: string;
+  mode?: AlignmentMode;
+  chr_1?: string;
+  chr_2?: string;
+  min_quality?: number;
+  min_identity?: number;
+  min_alignment_length?: number;
+  limit?: number;
+  order?: "coordinate" | "score";
+} = {}): Promise<AlignmentBlock[]> {
+  const searchParams = new URLSearchParams();
+  if (params.assembly_1) searchParams.set("assembly_1", params.assembly_1);
+  if (params.assembly_2) searchParams.set("assembly_2", params.assembly_2);
+  if (params.mode) searchParams.set("mode", params.mode);
+  if (params.chr_1) searchParams.set("chr_1", params.chr_1);
+  if (params.chr_2) searchParams.set("chr_2", params.chr_2);
+  if (params.min_quality !== undefined) searchParams.set("min_quality", String(params.min_quality));
+  if (params.min_identity !== undefined) searchParams.set("min_identity", String(params.min_identity));
+  if (params.min_alignment_length !== undefined) searchParams.set("min_alignment_length", String(params.min_alignment_length));
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
+  if (params.order) searchParams.set("order", params.order);
+
+  const data = await apiFetch<{ blocks: AlignmentBlock[] }>(
+    `/comparative/alignment-blocks?${searchParams.toString()}`
+  );
+  return data.blocks;
+}
+
+export async function getAlignmentStats(params: {
+  assembly_1?: string;
+  assembly_2?: string;
+  mode?: AlignmentMode;
+  min_quality?: number;
+  min_identity?: number;
+  min_alignment_length?: number;
+} = {}): Promise<AlignmentStats> {
+  const searchParams = new URLSearchParams();
+  if (params.assembly_1) searchParams.set("assembly_1", params.assembly_1);
+  if (params.assembly_2) searchParams.set("assembly_2", params.assembly_2);
+  if (params.mode) searchParams.set("mode", params.mode);
+  if (params.min_quality !== undefined) searchParams.set("min_quality", String(params.min_quality));
+  if (params.min_identity !== undefined) searchParams.set("min_identity", String(params.min_identity));
+  if (params.min_alignment_length !== undefined) searchParams.set("min_alignment_length", String(params.min_alignment_length));
+
+  return apiFetch<AlignmentStats>(
+    `/comparative/alignment-stats?${searchParams.toString()}`
+  );
+}
+
+export async function getComparativeMethods(): Promise<ComparativeMethods> {
+  return apiFetch<ComparativeMethods>("/comparative/methods");
+}
+
 export async function getComparisonStats(
   assembly1 = "GRCg6a",
   assembly2 = "GRCg7b"
@@ -214,17 +364,21 @@ export async function getOrthologTable(params: {
 export async function getPafAlignments(params: {
   assembly_1?: string;
   assembly_2?: string;
+  mode?: AlignmentMode;
   query_chr?: string;
   target_chr?: string;
   min_quality?: number;
+  min_alignment_length?: number;
   limit?: number;
 } = {}): Promise<PafAlignment[]> {
   const searchParams = new URLSearchParams();
   if (params.assembly_1) searchParams.set("assembly_1", params.assembly_1);
   if (params.assembly_2) searchParams.set("assembly_2", params.assembly_2);
+  if (params.mode) searchParams.set("mode", params.mode);
   if (params.query_chr) searchParams.set("query_chr", params.query_chr);
   if (params.target_chr) searchParams.set("target_chr", params.target_chr);
   if (params.min_quality !== undefined) searchParams.set("min_quality", String(params.min_quality));
+  if (params.min_alignment_length !== undefined) searchParams.set("min_alignment_length", String(params.min_alignment_length));
   if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
 
   const data = await apiFetch<{ alignments: PafAlignment[] }>(

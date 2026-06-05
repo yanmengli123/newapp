@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Badge,
   Button,
   Card,
   Container,
+  Divider,
   Group,
   LoadingOverlay,
   Paper,
+  Progress,
   ScrollArea,
+  SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
@@ -17,30 +20,33 @@ import {
   Text,
   TextInput,
   Title,
+  Tooltip,
 } from "@mantine/core";
 import {
   IconChartBar,
   IconChartDots,
+  IconDatabase,
   IconDna,
   IconExternalLink,
+  IconInfoCircle,
   IconRefresh,
   IconTable,
   IconTransform,
 } from "@tabler/icons-react";
 import { Link } from "react-router-dom";
 import {
-  getAssemblies,
+  getAlignmentBlocks,
+  getAlignmentStats,
   getChromosomeMapping,
-  getComparisonStats,
-  getDotplotData,
+  getComparativeMethods,
   getOrthologTable,
-  getSyntenyBlocks,
   mapCoordinates,
-  type Assembly,
+  type AlignmentBlock,
+  type AlignmentMode,
+  type AlignmentStats,
   type ChromosomeMapping,
-  type ComparisonStats,
+  type ComparativeMethods,
   type GeneCoordinateMapping,
-  type SyntenyBlock,
 } from "../lib/comparativeApi";
 
 const CHROMOSOMES = [
@@ -51,6 +57,18 @@ const CHROMOSOMES = [
 ];
 
 const PAGE_SIZE = 50;
+const NATURAL_FILTERS = {
+  min_quality: 30,
+  min_identity: 85,
+  min_alignment_length: 50_000,
+  limit: 5000,
+};
+const WINDOWED_FILTERS = {
+  min_quality: 30,
+  min_identity: 0,
+  min_alignment_length: 0,
+  limit: 5000,
+};
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Request failed";
@@ -61,88 +79,84 @@ function dash(value: number | undefined | null, digits?: number) {
   return digits === undefined ? value.toLocaleString() : value.toFixed(digits);
 }
 
+function pct(value: number | undefined | null, digits = 1) {
+  if (value === undefined || value === null || Number.isNaN(value)) return "-";
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function bp(value: number | undefined | null) {
+  if (value === undefined || value === null || Number.isNaN(value)) return "-";
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)} Mb`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)} kb`;
+  return `${value.toLocaleString()} bp`;
+}
+
+function displayStart(value: number) {
+  return (value + 1).toLocaleString();
+}
+
+function displayEnd(value: number) {
+  return value.toLocaleString();
+}
+
 export default function ComparativeGenomicsPage() {
   const [activeTab, setActiveTab] = useState<string | null>("overview");
-  const [assembly1, setAssembly1] = useState("GRCg6a");
-  const [assembly2, setAssembly2] = useState("GRCg7b");
+  const [plotMode, setPlotMode] = useState<AlignmentMode>("natural");
   const [chrFilter, setChrFilter] = useState<string | null>(null);
 
-  const [assemblies, setAssemblies] = useState<Assembly[]>([]);
+  const [naturalBlocks, setNaturalBlocks] = useState<AlignmentBlock[]>([]);
+  const [windowedBlocks, setWindowedBlocks] = useState<AlignmentBlock[]>([]);
+  const [naturalStats, setNaturalStats] = useState<AlignmentStats | null>(null);
+  const [windowedStats, setWindowedStats] = useState<AlignmentStats | null>(null);
+  const [methods, setMethods] = useState<ComparativeMethods | null>(null);
   const [chrMapping, setChrMapping] = useState<ChromosomeMapping[]>([]);
-  const [syntenyBlocks, setSyntenyBlocks] = useState<SyntenyBlock[]>([]);
-  const [dotplotData, setDotplotData] = useState<SyntenyBlock[]>([]);
-  const [stats, setStats] = useState<ComparisonStats | null>(null);
   const [orthologs, setOrthologs] = useState<GeneCoordinateMapping[]>([]);
   const [orthologTotal, setOrthologTotal] = useState(0);
   const [orthologPage, setOrthologPage] = useState(0);
 
   const [loading, setLoading] = useState(false);
+  const [orthologLoading, setOrthologLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const assemblyOptions = assemblies.length
-    ? assemblies.map((a) => a.assembly_name)
-    : ["GRCg6a", "GRCg7b"];
-
-  const loadCore = useCallback(async () => {
+  const loadAlignmentData = useCallback(async () => {
+    setLoading(true);
     setError("");
     try {
-      const [assemblyRows, mappingRows, statRows] = await Promise.all([
-        getAssemblies(),
-        getChromosomeMapping(assembly1, assembly2),
-        getComparisonStats(assembly1, assembly2),
+      const chrParam = chrFilter || undefined;
+      const [
+        naturalStatsRow,
+        windowedStatsRow,
+        naturalRows,
+        windowedRows,
+        methodRows,
+        mappingRows,
+      ] = await Promise.all([
+        getAlignmentStats({ mode: "natural", ...NATURAL_FILTERS }),
+        getAlignmentStats({ mode: "windowed", ...WINDOWED_FILTERS }),
+        getAlignmentBlocks({ mode: "natural", chr_1: chrParam, order: "coordinate", ...NATURAL_FILTERS }),
+        getAlignmentBlocks({ mode: "windowed", chr_1: chrParam, order: "coordinate", ...WINDOWED_FILTERS }),
+        getComparativeMethods(),
+        getChromosomeMapping("GRCg6a", "GRCg7b").catch(() => []),
       ]);
-      setAssemblies(assemblyRows);
+      setNaturalStats(naturalStatsRow);
+      setWindowedStats(windowedStatsRow);
+      setNaturalBlocks(naturalRows);
+      setWindowedBlocks(windowedRows);
+      setMethods(methodRows);
       setChrMapping(mappingRows);
-      setStats(statRows);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    }
-  }, [assembly1, assembly2]);
-
-  const loadSynteny = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const blocks = await getSyntenyBlocks({
-        assembly_1: assembly1,
-        assembly_2: assembly2,
-        chr_1: chrFilter || undefined,
-        min_score: 0,
-        limit: 5000,
-      });
-      setSyntenyBlocks(blocks);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [assembly1, assembly2, chrFilter]);
-
-  const loadDotplot = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getDotplotData({
-        assembly_1: assembly1,
-        assembly_2: assembly2,
-        chr_1: chrFilter || undefined,
-        min_score: 0,
-      });
-      setDotplotData(data);
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [assembly1, assembly2, chrFilter]);
+  }, [chrFilter]);
 
   const loadOrthologs = useCallback(async (page = 0) => {
-    setLoading(true);
-    setError("");
+    setOrthologLoading(true);
     try {
       const result = await getOrthologTable({
-        assembly_1: assembly1,
-        assembly_2: assembly2,
+        assembly_1: "GRCg6a",
+        assembly_2: "GRCg7b",
         chr: chrFilter || undefined,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
@@ -150,104 +164,107 @@ export default function ComparativeGenomicsPage() {
       setOrthologs(result.data);
       setOrthologTotal(result.total);
       setOrthologPage(page);
-    } catch (err) {
-      setError(getErrorMessage(err));
+    } catch {
+      setOrthologs([]);
+      setOrthologTotal(0);
+      setOrthologPage(0);
     } finally {
-      setLoading(false);
+      setOrthologLoading(false);
     }
-  }, [assembly1, assembly2, chrFilter]);
+  }, [chrFilter]);
 
   useEffect(() => {
-    loadCore();
-  }, [loadCore]);
+    loadAlignmentData();
+  }, [loadAlignmentData]);
 
   useEffect(() => {
-    if (activeTab === "synteny") loadSynteny();
-    if (activeTab === "dotplot") loadDotplot();
-    if (activeTab === "orthologs") loadOrthologs(0);
-  }, [activeTab, loadDotplot, loadOrthologs, loadSynteny]);
+    if (activeTab === "genes") loadOrthologs(0);
+  }, [activeTab, loadOrthologs]);
 
-  const refreshActiveTab = () => {
-    loadCore();
-    if (activeTab === "synteny") loadSynteny();
-    if (activeTab === "dotplot") loadDotplot();
-    if (activeTab === "orthologs") loadOrthologs(orthologPage);
+  const refresh = () => {
+    loadAlignmentData();
+    if (activeTab === "genes") loadOrthologs(orthologPage);
   };
+
+  const plotBlocks = plotMode === "natural" ? naturalBlocks : windowedBlocks;
+  const plotStats = plotMode === "natural" ? naturalStats : windowedStats;
 
   return (
     <Container size="xl" py="md">
       <Stack gap="lg">
         <Group justify="space-between" align="flex-start" gap="md">
           <div>
-            <Title order={2}>Comparative Genomics</Title>
+            <Title order={2}>Comparative Synteny: GRCg6a vs GRCg7b</Title>
             <Text c="dimmed" size="sm">
-              GRCg6a to GRCg7b chromosome mapping, synteny blocks, dotplot, and gene coordinate lookup.
+              Natural-breakpoint whole-genome alignment is the primary synteny layer; fixed 1 Mb PAF windows are retained as QC.
             </Text>
           </div>
           <Group gap="xs">
             <Button component={Link} to="/jbrowse?mode=comparative" leftSection={<IconExternalLink size={16} />} variant="light">
               Open JBrowse
             </Button>
-            <Button leftSection={<IconRefresh size={16} />} variant="light" onClick={refreshActiveTab}>
+            <Button leftSection={<IconRefresh size={16} />} variant="light" onClick={refresh} loading={loading}>
               Refresh
             </Button>
           </Group>
         </Group>
 
-        <SimpleGrid cols={{ base: 1, md: 3 }}>
-          <Card withBorder radius="sm" p="md">
-            <Text size="xs" tt="uppercase" c="dimmed" fw={700}>Mode</Text>
-            <Text fw={700}>{assembly1} vs {assembly2}</Text>
-          </Card>
-          <Card withBorder radius="sm" p="md">
-            <Text size="xs" tt="uppercase" c="dimmed" fw={700}>Configuration</Text>
-            <Text fw={700}>Dual assembly</Text>
-          </Card>
-          <Card withBorder radius="sm" p="md">
-            <Text size="xs" tt="uppercase" c="dimmed" fw={700}>JBrowse tracks</Text>
-            <Group gap={6} mt={4}>
-              <Badge variant="light">GRCg6a Genes</Badge>
-              <Badge variant="light">GRCg7b Genes</Badge>
-              <Badge variant="light">Synteny</Badge>
-            </Group>
-          </Card>
+        <SimpleGrid cols={{ base: 1, md: 4 }}>
+          <MetricCard
+            label="Primary Dataset"
+            value={naturalStats?.block_count}
+            detail={naturalStats?.dataset_classification || "Natural PAF"}
+          />
+          <MetricCard
+            label="Weighted Identity"
+            value={naturalStats?.weighted_identity}
+            suffix="%"
+            digits={1}
+            detail={`mapQ >= ${NATURAL_FILTERS.min_quality}, identity >= ${NATURAL_FILTERS.min_identity}%, length >= ${bp(NATURAL_FILTERS.min_alignment_length)}`}
+          />
+          <MetricCard
+            label="Query Coverage"
+            value={naturalStats?.query_coverage_fraction ? naturalStats.query_coverage_fraction * 100 : undefined}
+            suffix="%"
+            digits={1}
+            detail={`${bp(naturalStats?.query_covered_bases)} covered in GRCg6a`}
+          />
+          <MetricCard
+            label="Window QC"
+            value={windowedStats?.rounded_query_start_fraction ? windowedStats.rounded_query_start_fraction * 100 : undefined}
+            suffix="%"
+            digits={0}
+            detail="Rounded 1 Mb query starts"
+          />
         </SimpleGrid>
 
         <Card withBorder radius="sm" p="md">
           <Group justify="space-between" align="end" gap="md">
             <Group align="end" gap="md">
-              <Select
-                label="Assembly 1"
-                value={assembly1}
-                onChange={(v) => setAssembly1(v || "GRCg6a")}
-                data={assemblyOptions}
-                w={150}
-              />
-              <Select
-                label="Assembly 2"
-                value={assembly2}
-                onChange={(v) => setAssembly2(v || "GRCg7b")}
-                data={assemblyOptions}
-                w={150}
-              />
+              <Select label="Assembly 1" value="GRCg6a" data={["GRCg6a"]} disabled w={140} />
+              <Select label="Assembly 2" value="GRCg7b" data={["GRCg7b"]} disabled w={140} />
               <Select
                 label="Chromosome"
                 value={chrFilter}
                 onChange={setChrFilter}
                 data={CHROMOSOMES}
                 clearable
-                placeholder="All"
-                w={130}
+                placeholder="All primary"
+                w={150}
               />
             </Group>
-            <Text size="sm" c="dimmed">
-              Primary reference genome: GRCg6a
-            </Text>
+            <Group gap="xs">
+              <Badge variant="light" color="green">Natural PAF primary</Badge>
+              <Badge variant="light" color="gray">PAF 0-based source</Badge>
+              <Tooltip label="Displayed table intervals use start + 1 and PAF end as the inclusive label.">
+                <Badge leftSection={<IconInfoCircle size={12} />} variant="light" color="blue">1-based display</Badge>
+              </Tooltip>
+            </Group>
           </Group>
         </Card>
 
         {error && (
-          <Alert color="red" title="Comparative data is unavailable">
+          <Alert color="red" title="Comparative alignment data is unavailable">
             {error}
           </Alert>
         )}
@@ -255,81 +272,69 @@ export default function ComparativeGenomicsPage() {
         <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="overview" leftSection={<IconChartBar size={16} />}>Overview</Tabs.Tab>
-            <Tabs.Tab value="synteny" leftSection={<IconDna size={16} />}>Synteny</Tabs.Tab>
+            <Tabs.Tab value="natural" leftSection={<IconDna size={16} />}>Natural Synteny</Tabs.Tab>
             <Tabs.Tab value="dotplot" leftSection={<IconChartDots size={16} />}>Dotplot</Tabs.Tab>
-            <Tabs.Tab value="orthologs" leftSection={<IconTable size={16} />}>Gene Orthologs</Tabs.Tab>
+            <Tabs.Tab value="windowed" leftSection={<IconDatabase size={16} />}>Window QC</Tabs.Tab>
+            <Tabs.Tab value="genes" leftSection={<IconTable size={16} />}>Gene Layer</Tabs.Tab>
+            <Tabs.Tab value="methods" leftSection={<IconInfoCircle size={16} />}>Methods</Tabs.Tab>
             <Tabs.Tab value="mapper" leftSection={<IconTransform size={16} />}>Coordinate Mapper</Tabs.Tab>
           </Tabs.List>
 
           <Tabs.Panel value="overview" pt="md">
-            <OverviewPanel assembly1={assembly1} assembly2={assembly2} stats={stats} chrMapping={chrMapping} />
+            <OverviewPanel
+              naturalStats={naturalStats}
+              windowedStats={windowedStats}
+              methods={methods}
+              chrMapping={chrMapping}
+              loading={loading}
+            />
           </Tabs.Panel>
-          <Tabs.Panel value="synteny" pt="md">
-            <SyntenyPanel syntenyBlocks={syntenyBlocks} loading={loading} assembly1={assembly1} assembly2={assembly2} />
+          <Tabs.Panel value="natural" pt="md">
+            <AlignmentPanel
+              title="Natural-Breakpoint Alignment Blocks"
+              mode="natural"
+              blocks={naturalBlocks}
+              stats={naturalStats}
+              loading={loading}
+            />
           </Tabs.Panel>
           <Tabs.Panel value="dotplot" pt="md">
-            <DotplotPanel data={dotplotData} loading={loading} assembly1={assembly1} assembly2={assembly2} />
+            <Stack gap="md">
+              <Group justify="space-between">
+                <SegmentedControl
+                  value={plotMode}
+                  onChange={(value) => setPlotMode(value as AlignmentMode)}
+                  data={[
+                    { label: "Natural", value: "natural" },
+                    { label: "Window QC", value: "windowed" },
+                  ]}
+                />
+                <Badge variant="light">{plotStats?.dataset_classification || plotMode}</Badge>
+              </Group>
+              <DotplotPanel data={plotBlocks} loading={loading} mode={plotMode} stats={plotStats} />
+            </Stack>
           </Tabs.Panel>
-          <Tabs.Panel value="orthologs" pt="md">
-            <OrthologPanel orthologs={orthologs} total={orthologTotal} page={orthologPage} loading={loading} onPageChange={loadOrthologs} />
+          <Tabs.Panel value="windowed" pt="md">
+            <WindowQcPanel blocks={windowedBlocks} stats={windowedStats} loading={loading} />
+          </Tabs.Panel>
+          <Tabs.Panel value="genes" pt="md">
+            <GeneLayerPanel
+              orthologs={orthologs}
+              total={orthologTotal}
+              page={orthologPage}
+              loading={orthologLoading}
+              onPageChange={loadOrthologs}
+            />
+          </Tabs.Panel>
+          <Tabs.Panel value="methods" pt="md">
+            <MethodsPanel methods={methods} naturalStats={naturalStats} windowedStats={windowedStats} />
           </Tabs.Panel>
           <Tabs.Panel value="mapper" pt="md">
-            <CoordinateMapperPanel assembly1={assembly1} assembly2={assembly2} />
+            <CoordinateMapperPanel />
           </Tabs.Panel>
         </Tabs>
       </Stack>
     </Container>
-  );
-}
-
-function OverviewPanel({
-  assembly1,
-  assembly2,
-  stats,
-  chrMapping,
-}: {
-  assembly1: string;
-  assembly2: string;
-  stats: ComparisonStats | null;
-  chrMapping: ChromosomeMapping[];
-}) {
-  return (
-    <Stack gap="md">
-      <SimpleGrid cols={{ base: 1, md: 3 }}>
-        <MetricCard label="Synteny Blocks" value={stats?.synteny?.block_count} detail={`${dash(stats?.synteny?.chromosomes_1)} chromosomes aligned`} />
-        <MetricCard label="Gene Orthologs" value={stats?.gene_mapping?.mapped_genes} detail={`${dash(stats?.gene_mapping?.chr_from_count)} chromosomes mapped`} />
-        <MetricCard label="Avg Identity" value={stats?.synteny?.avg_identity} suffix="%" detail="Alignment quality" digits={1} />
-      </SimpleGrid>
-
-      <Card withBorder radius="sm">
-        <Group justify="space-between" mb="md">
-          <Text fw={700}>Chromosome Mapping</Text>
-          <Badge variant="light">{assembly1} ↔ {assembly2}</Badge>
-        </Group>
-        <ScrollArea h={400}>
-          <Table striped highlightOnHover>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>Chr</Table.Th>
-                <Table.Th>{assembly1} RefSeq</Table.Th>
-                <Table.Th>{assembly2} RefSeq</Table.Th>
-                <Table.Th>Strand</Table.Th>
-              </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {chrMapping.map((m) => (
-                <Table.Tr key={m.mapping_id}>
-                  <Table.Td><Badge variant="light">chr{m.chr_from}</Badge></Table.Td>
-                  <Table.Td><Text size="sm" ff="monospace">{m.refseq_from}</Text></Table.Td>
-                  <Table.Td><Text size="sm" ff="monospace">{m.refseq_to}</Text></Table.Td>
-                  <Table.Td>{m.strand}</Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </ScrollArea>
-      </Card>
-    </Stack>
   );
 }
 
@@ -342,130 +347,315 @@ function MetricCard({ label, value, detail, suffix = "", digits }: {
 }) {
   return (
     <Card withBorder radius="sm">
-      <Text size="sm" c="dimmed">{label}</Text>
+      <Text size="xs" tt="uppercase" c="dimmed" fw={700}>{label}</Text>
       <Text size="xl" fw={700}>{dash(value, digits)}{value === undefined ? "" : suffix}</Text>
       <Text size="xs" c="dimmed">{detail}</Text>
     </Card>
   );
 }
 
-function SyntenyPanel({ syntenyBlocks, loading, assembly1, assembly2 }: {
-  syntenyBlocks: SyntenyBlock[];
+function OverviewPanel({
+  naturalStats,
+  windowedStats,
+  methods,
+  chrMapping,
+  loading,
+}: {
+  naturalStats: AlignmentStats | null;
+  windowedStats: AlignmentStats | null;
+  methods: ComparativeMethods | null;
+  chrMapping: ChromosomeMapping[];
   loading: boolean;
-  assembly1: string;
-  assembly2: string;
+}) {
+  return (
+    <Stack gap="md">
+      <Card withBorder radius="sm" pos="relative">
+        <LoadingOverlay visible={loading} />
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>Dataset Separation</Text>
+          <Badge color="green" variant="light">{methods?.primary_dataset || "natural"} primary</Badge>
+        </Group>
+        <SimpleGrid cols={{ base: 1, md: 2 }}>
+          <DatasetSummary title="Natural synteny" stats={naturalStats} color="green" />
+          <DatasetSummary title="1 Mb window QC" stats={windowedStats} color="gray" />
+        </SimpleGrid>
+      </Card>
+
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>Primary Chromosome Mapping</Text>
+          <Badge variant="light">{"GRCg6a -> GRCg7b"}</Badge>
+        </Group>
+        {chrMapping.length ? (
+          <ScrollArea h={340}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Chr</Table.Th>
+                  <Table.Th>GRCg6a RefSeq</Table.Th>
+                  <Table.Th>GRCg7b RefSeq</Table.Th>
+                  <Table.Th>Strand</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {chrMapping.map((m) => (
+                  <Table.Tr key={m.mapping_id}>
+                    <Table.Td><Badge variant="light">chr{m.chr_from}</Badge></Table.Td>
+                    <Table.Td><Text size="sm" ff="monospace">{m.refseq_from}</Text></Table.Td>
+                    <Table.Td><Text size="sm" ff="monospace">{m.refseq_to}</Text></Table.Td>
+                    <Table.Td>{m.strand}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        ) : (
+          <Alert color="gray">Chromosome mapping table is not loaded from the database, but PAF-based synteny remains available.</Alert>
+        )}
+      </Card>
+    </Stack>
+  );
+}
+
+function DatasetSummary({ title, stats, color }: { title: string; stats: AlignmentStats | null; color: string }) {
+  const queryCoverage = stats?.query_coverage_fraction ?? 0;
+  const targetCoverage = stats?.target_coverage_fraction ?? 0;
+
+  return (
+    <Paper withBorder radius="sm" p="md">
+      <Group justify="space-between" mb="xs">
+        <Text fw={700}>{title}</Text>
+        <Badge color={color} variant="light">{stats?.dataset_classification || "unavailable"}</Badge>
+      </Group>
+      <SimpleGrid cols={2} spacing="xs">
+        <SmallStat label="Blocks" value={dash(stats?.block_count)} />
+        <SmallStat label="Identity" value={`${dash(stats?.weighted_identity, 1)}%`} />
+        <SmallStat label="Reverse blocks" value={dash(stats?.reverse_strand_blocks)} />
+        <SmallStat label="Off diagonal" value={dash(stats?.off_diagonal_blocks)} />
+      </SimpleGrid>
+      <Divider my="sm" />
+      <Stack gap={6}>
+        <CoverageRow label="GRCg6a coverage" value={queryCoverage} />
+        <CoverageRow label="GRCg7b coverage" value={targetCoverage} />
+      </Stack>
+    </Paper>
+  );
+}
+
+function SmallStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed">{label}</Text>
+      <Text fw={700}>{value}</Text>
+    </div>
+  );
+}
+
+function CoverageRow({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <Group justify="space-between">
+        <Text size="xs" c="dimmed">{label}</Text>
+        <Text size="xs" fw={700}>{pct(value)}</Text>
+      </Group>
+      <Progress value={Math.max(0, Math.min(100, value * 100))} size="sm" radius="xs" />
+    </div>
+  );
+}
+
+function AlignmentPanel({
+  title,
+  mode,
+  blocks,
+  stats,
+  loading,
+}: {
+  title: string;
+  mode: AlignmentMode;
+  blocks: AlignmentBlock[];
+  stats: AlignmentStats | null;
+  loading: boolean;
 }) {
   return (
     <Card withBorder radius="sm" pos="relative">
       <LoadingOverlay visible={loading} />
       <Group justify="space-between" mb="md">
-        <Text fw={700}>Synteny Blocks ({syntenyBlocks.length.toLocaleString()})</Text>
-        <Badge>{assembly1} ↔ {assembly2}</Badge>
+        <div>
+          <Text fw={700}>{title}</Text>
+          <Text size="xs" c="dimmed">
+            {mode === "natural"
+              ? "minimap2 asm5 natural chain breakpoints, filtered for high-confidence display"
+              : "legacy fixed-width alignment windows for QC"}
+          </Text>
+        </div>
+        <Group gap="xs">
+          <Badge color={mode === "natural" ? "green" : "gray"}>{blocks.length.toLocaleString()} rows</Badge>
+          <Badge variant="light">{stats?.dataset_classification || mode}</Badge>
+        </Group>
       </Group>
-      <ScrollArea h={500}>
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Chr</Table.Th><Table.Th>Start</Table.Th><Table.Th>End</Table.Th>
-              <Table.Th>Target Chr</Table.Th><Table.Th>Start</Table.Th><Table.Th>End</Table.Th>
-              <Table.Th>Strand</Table.Th><Table.Th>Score</Table.Th><Table.Th>Identity</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {syntenyBlocks.slice(0, 200).map((b, index) => (
-              <Table.Tr key={b.block_id ?? `${b.chr_1}-${b.start_1}-${index}`}>
-                <Table.Td><Badge size="sm">{b.chr_1}</Badge></Table.Td>
-                <Table.Td>{b.start_1.toLocaleString()}</Table.Td>
-                <Table.Td>{b.end_1.toLocaleString()}</Table.Td>
-                <Table.Td><Badge size="sm">{b.chr_2}</Badge></Table.Td>
-                <Table.Td>{b.start_2.toLocaleString()}</Table.Td>
-                <Table.Td>{b.end_2.toLocaleString()}</Table.Td>
-                <Table.Td>{b.strand}</Table.Td>
-                <Table.Td>{dash(b.score, 0)}</Table.Td>
-                <Table.Td>{dash(b.identity, 1)}%</Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </ScrollArea>
+      <AlignmentTable blocks={blocks} />
     </Card>
   );
 }
 
-function DotplotPanel({ data, loading, assembly1, assembly2 }: {
-  data: SyntenyBlock[];
+function AlignmentTable({ blocks }: { blocks: AlignmentBlock[] }) {
+  if (!blocks.length) {
+    return <Alert color="gray">No alignment blocks are available for the selected filters.</Alert>;
+  }
+
+  return (
+    <ScrollArea h={520}>
+      <Table striped highlightOnHover>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Chr</Table.Th>
+            <Table.Th>Start</Table.Th>
+            <Table.Th>End</Table.Th>
+            <Table.Th>Target Chr</Table.Th>
+            <Table.Th>Start</Table.Th>
+            <Table.Th>End</Table.Th>
+            <Table.Th>Strand</Table.Th>
+            <Table.Th>Length</Table.Th>
+            <Table.Th>MapQ</Table.Th>
+            <Table.Th>Identity</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {blocks.slice(0, 500).map((b) => (
+            <Table.Tr key={b.block_id}>
+              <Table.Td><Badge size="sm" variant="light">{b.chr_1}</Badge></Table.Td>
+              <Table.Td>{displayStart(b.start_1)}</Table.Td>
+              <Table.Td>{displayEnd(b.end_1)}</Table.Td>
+              <Table.Td><Badge size="sm" variant="light">{b.chr_2}</Badge></Table.Td>
+              <Table.Td>{displayStart(b.start_2)}</Table.Td>
+              <Table.Td>{displayEnd(b.end_2)}</Table.Td>
+              <Table.Td><Badge color={b.strand === "+" ? "green" : "red"} variant="light">{b.strand}</Badge></Table.Td>
+              <Table.Td>{bp(b.alignment_length)}</Table.Td>
+              <Table.Td>{b.mapping_quality}</Table.Td>
+              <Table.Td>{dash(b.identity, 1)}%</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </ScrollArea>
+  );
+}
+
+function DotplotPanel({
+  data,
+  loading,
+  mode,
+  stats,
+}: {
+  data: AlignmentBlock[];
   loading: boolean;
-  assembly1: string;
-  assembly2: string;
+  mode: AlignmentMode;
+  stats: AlignmentStats | null;
 }) {
-  if (loading) return <Paper withBorder p="xl" pos="relative" h={300}><LoadingOverlay visible /></Paper>;
+  if (loading) return <Paper withBorder p="xl" pos="relative" h={420}><LoadingOverlay visible /></Paper>;
   if (!data.length) return <Alert color="gray">No dotplot records are available for the selected filters.</Alert>;
 
-  const chrLengths6a: Record<string, number> = {};
-  const chrLengths7b: Record<string, number> = {};
+  const queryLengths: Record<string, number> = {};
+  const targetLengths: Record<string, number> = {};
   data.forEach((d) => {
-    chrLengths6a[d.chr_1] = Math.max(chrLengths6a[d.chr_1] || 0, d.end_1);
-    chrLengths7b[d.chr_2] = Math.max(chrLengths7b[d.chr_2] || 0, d.end_2);
+    queryLengths[d.chr_1] = Math.max(queryLengths[d.chr_1] || 0, d.query_length);
+    targetLengths[d.chr_2] = Math.max(targetLengths[d.chr_2] || 0, d.target_length);
   });
 
-  const cumPos6a: Record<string, number> = {};
-  const cumPos7b: Record<string, number> = {};
-  let total6a = 0;
-  let total7b = 0;
+  const queryOffsets: Record<string, number> = {};
+  const targetOffsets: Record<string, number> = {};
+  let totalQuery = 0;
+  let totalTarget = 0;
   CHROMOSOMES.forEach((chr) => {
-    if (chrLengths6a[chr]) {
-      cumPos6a[chr] = total6a;
-      total6a += chrLengths6a[chr];
+    if (queryLengths[chr]) {
+      queryOffsets[chr] = totalQuery;
+      totalQuery += queryLengths[chr];
     }
-    if (chrLengths7b[chr]) {
-      cumPos7b[chr] = total7b;
-      total7b += chrLengths7b[chr];
+    if (targetLengths[chr]) {
+      targetOffsets[chr] = totalTarget;
+      totalTarget += targetLengths[chr];
     }
   });
 
-  if (!total6a || !total7b) return <Alert color="gray">Dotplot coordinates are incomplete for this selection.</Alert>;
+  if (!totalQuery || !totalTarget) return <Alert color="gray">Dotplot coordinates are incomplete for this selection.</Alert>;
 
-  const width = 800;
-  const height = 800;
-  const margin = 50;
-  const has6a = (chr: string) => Object.prototype.hasOwnProperty.call(cumPos6a, chr);
-  const has7b = (chr: string) => Object.prototype.hasOwnProperty.call(cumPos7b, chr);
-  const scaleX = (chr: string, pos: number) => margin + ((cumPos6a[chr] + pos) / total6a) * (width - 2 * margin);
-  const scaleY = (chr: string, pos: number) => height - margin - ((cumPos7b[chr] + pos) / total7b) * (height - 2 * margin);
+  const width = 900;
+  const height = 760;
+  const margin = 56;
+  const plotWidth = width - 2 * margin;
+  const plotHeight = height - 2 * margin;
+  const hasQuery = (chr: string) => Object.prototype.hasOwnProperty.call(queryOffsets, chr);
+  const hasTarget = (chr: string) => Object.prototype.hasOwnProperty.call(targetOffsets, chr);
+  const scaleX = (chr: string, pos: number) => margin + ((queryOffsets[chr] + pos) / totalQuery) * plotWidth;
+  const scaleY = (chr: string, pos: number) => height - margin - ((targetOffsets[chr] + pos) / totalTarget) * plotHeight;
 
   return (
     <Card withBorder radius="sm">
       <Group justify="space-between" mb="md">
-        <Text fw={700}>Dotplot ({data.length.toLocaleString()} blocks)</Text>
-        <Group gap="xs"><Badge color="green">+ strand</Badge><Badge color="red">- strand</Badge></Group>
+        <div>
+          <Text fw={700}>Whole-Genome Dotplot</Text>
+          <Text size="xs" c="dimmed">Scaled by PAF sequence lengths, not by visible block maxima.</Text>
+        </div>
+        <Group gap="xs">
+          <Badge color={mode === "natural" ? "green" : "gray"}>{mode}</Badge>
+          <Badge variant="light">{data.length.toLocaleString()} blocks</Badge>
+          <Badge variant="light">{dash(stats?.weighted_identity, 1)}% weighted identity</Badge>
+        </Group>
       </Group>
       <ScrollArea>
-        <svg width={width} height={height} style={{ border: "1px solid #dee2e6", display: "block" }}>
-          {CHROMOSOMES.map((chr) => has6a(chr) ? (
+        <svg width={width} height={height} style={{ border: "1px solid #dee2e6", display: "block", background: "#fff" }}>
+          <rect x={margin} y={margin} width={plotWidth} height={plotHeight} fill="#fbfcfe" stroke="#ced4da" />
+          {CHROMOSOMES.map((chr) => hasQuery(chr) ? (
             <line key={`v-${chr}`} x1={scaleX(chr, 0)} y1={margin} x2={scaleX(chr, 0)} y2={height - margin} stroke="#e9ecef" />
           ) : null)}
-          {CHROMOSOMES.map((chr) => has7b(chr) ? (
+          {CHROMOSOMES.map((chr) => hasTarget(chr) ? (
             <line key={`h-${chr}`} x1={margin} y1={scaleY(chr, 0)} x2={width - margin} y2={scaleY(chr, 0)} stroke="#e9ecef" />
           ) : null)}
-          {data.map((d, i) => {
-            if (!has6a(d.chr_1) || !has7b(d.chr_2)) return null;
-            const x1 = scaleX(d.chr_1, d.start_1);
-            const x2 = scaleX(d.chr_1, d.end_1);
-            const y1 = scaleY(d.chr_2, d.start_2);
-            const y2 = scaleY(d.chr_2, d.end_2);
+          {data.map((d) => {
+            if (!hasQuery(d.chr_1) || !hasTarget(d.chr_2)) return null;
             return (
-              <rect key={`${d.chr_1}-${d.start_1}-${i}`} x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(x2 - x1) || 1} height={Math.abs(y2 - y1) || 1} fill={d.strand === "+" ? "#2f9e44" : "#e03131"} opacity={0.65} />
+              <line
+                key={d.block_id}
+                x1={scaleX(d.chr_1, d.start_1)}
+                y1={scaleY(d.chr_2, d.start_2)}
+                x2={scaleX(d.chr_1, d.end_1)}
+                y2={scaleY(d.chr_2, d.end_2)}
+                stroke={d.strand === "+" ? "#2f9e44" : "#c92a2a"}
+                strokeWidth={mode === "natural" ? 1.6 : 1}
+                opacity={mode === "natural" ? 0.72 : 0.45}
+              />
             );
           })}
-          <text x={width / 2} y={height - 12} textAnchor="middle" fontSize={12}>{assembly1}</text>
-          <text x={16} y={height / 2} textAnchor="middle" fontSize={12} transform={`rotate(-90, 16, ${height / 2})`}>{assembly2}</text>
+          <text x={width / 2} y={height - 14} textAnchor="middle" fontSize={13}>GRCg6a query chromosomes</text>
+          <text x={18} y={height / 2} textAnchor="middle" fontSize={13} transform={`rotate(-90, 18, ${height / 2})`}>GRCg7b target chromosomes</text>
         </svg>
       </ScrollArea>
     </Card>
   );
 }
 
-function OrthologPanel({ orthologs, total, page, loading, onPageChange }: {
+function WindowQcPanel({ blocks, stats, loading }: {
+  blocks: AlignmentBlock[];
+  stats: AlignmentStats | null;
+  loading: boolean;
+}) {
+  return (
+    <Stack gap="md">
+      <Alert color="gray" title="The regular 1 Mb coordinates are expected in this QC dataset">
+        These records were created by fixed genomic windows, so starts such as 127,000,000 and 144,000,000 are processing boundaries, not biological breakpoints.
+      </Alert>
+      <SimpleGrid cols={{ base: 1, md: 4 }}>
+        <MetricCard label="Window Blocks" value={stats?.block_count} detail="Fixed window PAF records" />
+        <MetricCard label="Rounded Starts" value={stats?.rounded_query_start_fraction ? stats.rounded_query_start_fraction * 100 : undefined} suffix="%" digits={0} detail="Expected for 1 Mb windows" />
+        <MetricCard label="Weighted Identity" value={stats?.weighted_identity} suffix="%" digits={1} detail="Window-level alignment signal" />
+        <MetricCard label="Windowed Blocks" value={stats?.one_mb_windowed_blocks} detail="Detected by query span/start" />
+      </SimpleGrid>
+      <AlignmentPanel title="Windowed Alignment QC Table" mode="windowed" blocks={blocks} stats={stats} loading={loading} />
+    </Stack>
+  );
+}
+
+function GeneLayerPanel({ orthologs, total, page, loading, onPageChange }: {
   orthologs: GeneCoordinateMapping[];
   total: number;
   page: number;
@@ -475,43 +665,102 @@ function OrthologPanel({ orthologs, total, page, loading, onPageChange }: {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <Card withBorder radius="sm" pos="relative">
-      <LoadingOverlay visible={loading} />
-      <Group justify="space-between" mb="md">
-        <Text fw={700}>Gene Orthologs ({total.toLocaleString()})</Text>
-        <Group>
-          <Button size="xs" variant="light" disabled={page === 0} onClick={() => onPageChange(page - 1)}>Previous</Button>
-          <Text size="sm">Page {Math.min(page + 1, totalPages)} of {totalPages}</Text>
-          <Button size="xs" variant="light" disabled={page >= totalPages - 1} onClick={() => onPageChange(page + 1)}>Next</Button>
+    <Stack gap="md">
+      <Alert color="blue" title="Gene-level collinearity is a separate evidence layer">
+        Natural PAF is DNA alignment synteny. MCScanX/JCVI-style gene collinearity should be interpreted separately from nucleotide alignment blocks.
+      </Alert>
+      <Card withBorder radius="sm" pos="relative">
+        <LoadingOverlay visible={loading} />
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>Gene Coordinate Mappings ({total.toLocaleString()})</Text>
+          <Group>
+            <Button size="xs" variant="light" disabled={page === 0} onClick={() => onPageChange(page - 1)}>Previous</Button>
+            <Text size="sm">Page {Math.min(page + 1, totalPages)} of {totalPages}</Text>
+            <Button size="xs" variant="light" disabled={page >= totalPages - 1} onClick={() => onPageChange(page + 1)}>Next</Button>
+          </Group>
         </Group>
-      </Group>
-      <ScrollArea h={500}>
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Gene ID</Table.Th><Table.Th>Symbol</Table.Th><Table.Th>Chr 6a</Table.Th>
-              <Table.Th>Start</Table.Th><Table.Th>End</Table.Th><Table.Th>Chr 7b</Table.Th>
-              <Table.Th>Start</Table.Th><Table.Th>End</Table.Th><Table.Th>Method</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {orthologs.map((o) => (
-              <Table.Tr key={o.mapping_id}>
-                <Table.Td><Text size="xs" ff="monospace">{o.gene_id}</Text></Table.Td>
-                <Table.Td><Badge size="sm">{o.gene_symbol || "-"}</Badge></Table.Td>
-                <Table.Td>{o.chr_from}</Table.Td><Table.Td>{o.start_from.toLocaleString()}</Table.Td><Table.Td>{o.end_from.toLocaleString()}</Table.Td>
-                <Table.Td>{o.chr_to}</Table.Td><Table.Td>{o.start_to.toLocaleString()}</Table.Td><Table.Td>{o.end_to.toLocaleString()}</Table.Td>
-                <Table.Td><Badge size="xs" variant="light">{o.mapping_method}</Badge></Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
-      </ScrollArea>
-    </Card>
+        {orthologs.length ? (
+          <ScrollArea h={500}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Gene ID</Table.Th><Table.Th>Symbol</Table.Th><Table.Th>Chr 6a</Table.Th>
+                  <Table.Th>Start</Table.Th><Table.Th>End</Table.Th><Table.Th>Chr 7b</Table.Th>
+                  <Table.Th>Start</Table.Th><Table.Th>End</Table.Th><Table.Th>Method</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {orthologs.map((o) => (
+                  <Table.Tr key={o.mapping_id}>
+                    <Table.Td><Text size="xs" ff="monospace">{o.gene_id}</Text></Table.Td>
+                    <Table.Td><Badge size="sm" variant="light">{o.gene_symbol || "-"}</Badge></Table.Td>
+                    <Table.Td>{o.chr_from}</Table.Td><Table.Td>{o.start_from.toLocaleString()}</Table.Td><Table.Td>{o.end_from.toLocaleString()}</Table.Td>
+                    <Table.Td>{o.chr_to}</Table.Td><Table.Td>{o.start_to.toLocaleString()}</Table.Td><Table.Td>{o.end_to.toLocaleString()}</Table.Td>
+                    <Table.Td><Badge size="xs" variant="light">{o.mapping_method}</Badge></Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        ) : (
+          <Alert color="gray">Gene mapping rows are not available from the comparative database in this session.</Alert>
+        )}
+      </Card>
+    </Stack>
   );
 }
 
-function CoordinateMapperPanel({ assembly1, assembly2 }: { assembly1: string; assembly2: string }) {
+function MethodsPanel({ methods, naturalStats, windowedStats }: {
+  methods: ComparativeMethods | null;
+  naturalStats: AlignmentStats | null;
+  windowedStats: AlignmentStats | null;
+}) {
+  if (!methods) return <Alert color="gray">Methods metadata is not loaded.</Alert>;
+  const provenance = methods.natural_alignment.provenance;
+
+  return (
+    <Stack gap="md">
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>Natural Alignment Provenance</Text>
+          <Badge color={methods.natural_alignment.status === "available" ? "green" : "red"}>{methods.natural_alignment.status}</Badge>
+        </Group>
+        <SimpleGrid cols={{ base: 1, md: 2 }}>
+          <KeyValue label="Tool" value={`${provenance.tool || "minimap2"} ${provenance.preset || "asm5"}`} />
+          <KeyValue label="Generated" value={String(provenance.generated_at || "-")} />
+          <KeyValue label="Command" value={String(provenance.output_paf ? "minimap2 -x asm5 --secondary=no" : "-")} mono />
+          <KeyValue label="JBrowse2 input" value={`${methods.jbrowse2.compatible_input} / ${methods.jbrowse2.view}`} />
+          <KeyValue label="Natural PAF" value={methods.natural_alignment.path} mono />
+          <KeyValue label="Window QC PAF" value={methods.windowed_alignment_qc.path} mono />
+        </SimpleGrid>
+      </Card>
+
+      <Card withBorder radius="sm">
+        <Text fw={700} mb="sm">Interpretation Rules</Text>
+        <Stack gap="xs">
+          <Text size="sm">{methods.natural_alignment.interpretation}</Text>
+          <Text size="sm">{methods.windowed_alignment_qc.interpretation}</Text>
+          <Text size="sm">{methods.jbrowse2.note}</Text>
+          <Text size="sm">
+            Natural display filters: mapQ {">="} {NATURAL_FILTERS.min_quality}, identity {">="} {NATURAL_FILTERS.min_identity}%, alignment length {">="} {bp(NATURAL_FILTERS.min_alignment_length)}.
+          </Text>
+          <Text size="sm">Natural blocks shown: {dash(naturalStats?.block_count)}; window QC blocks: {dash(windowedStats?.block_count)}.</Text>
+        </Stack>
+      </Card>
+    </Stack>
+  );
+}
+
+function KeyValue({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <Text size="xs" c="dimmed" tt="uppercase" fw={700}>{label}</Text>
+      <Text size="sm" ff={mono ? "monospace" : undefined} style={{ wordBreak: "break-word" }}>{value}</Text>
+    </div>
+  );
+}
+
+function CoordinateMapperPanel() {
   const [geneId, setGeneId] = useState("");
   const [result, setResult] = useState<GeneCoordinateMapping | null>(null);
   const [error, setError] = useState("");
@@ -523,7 +772,7 @@ function CoordinateMapperPanel({ assembly1, assembly2 }: { assembly1: string; as
     setError("");
     setResult(null);
     try {
-      setResult(await mapCoordinates(geneId.trim(), assembly1, assembly2));
+      setResult(await mapCoordinates(geneId.trim(), "GRCg6a", "GRCg7b"));
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -536,9 +785,8 @@ function CoordinateMapperPanel({ assembly1, assembly2 }: { assembly1: string; as
       <Card withBorder radius="sm">
         <Text fw={700} mb="md">Map Gene Coordinates</Text>
         <Group align="end">
-          <Select label="From" value={assembly1} data={[assembly1]} disabled w={120} />
-          <Text mb={8}>→</Text>
-          <Select label="To" value={assembly2} data={[assembly2]} disabled w={120} />
+          <Select label="From" value="GRCg6a" data={["GRCg6a"]} disabled w={120} />
+          <Select label="To" value="GRCg7b" data={["GRCg7b"]} disabled w={120} />
           <TextInput
             label="Gene ID"
             value={geneId}
@@ -558,14 +806,14 @@ function CoordinateMapperPanel({ assembly1, assembly2 }: { assembly1: string; as
           <Text fw={700} mb="md">Mapping Result</Text>
           <SimpleGrid cols={{ base: 1, md: 2 }}>
             <div>
-              <Text size="sm" c="dimmed">{assembly1} Coordinates</Text>
+              <Text size="sm" c="dimmed">GRCg6a Coordinates</Text>
               <Text>Chr: {result.chr_from}</Text>
               <Text>Start: {result.start_from.toLocaleString()}</Text>
               <Text>End: {result.end_from.toLocaleString()}</Text>
               <Text>Strand: {result.strand_from}</Text>
             </div>
             <div>
-              <Text size="sm" c="dimmed">{assembly2} Coordinates</Text>
+              <Text size="sm" c="dimmed">GRCg7b Coordinates</Text>
               <Text>Chr: {result.chr_to}</Text>
               <Text>Start: {result.start_to.toLocaleString()}</Text>
               <Text>End: {result.end_to.toLocaleString()}</Text>

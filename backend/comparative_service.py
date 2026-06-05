@@ -3,9 +3,20 @@ Comparative Genomics Service
 Provides synteny, coordinate mapping, and cross-assembly analysis
 """
 
-from typing import Optional, Any
+from pathlib import Path
+from typing import Optional, Any, Literal
+import json
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
+from backend.comparative_paf import (
+    AlignmentMode,
+    read_paf_records,
+    records_to_dicts,
+    summarize_paf_records,
+)
+from backend.config import GRCG6A_RAWDATA_ROOT
 
 
 class ComparativeService:
@@ -20,6 +31,192 @@ class ComparativeService:
 
     def _release(self, conn):
         self.pg_pool.putconn(conn)
+
+    def _project_root(self) -> Path:
+        return GRCG6A_RAWDATA_ROOT.parent
+
+    def get_alignment_paf_path(self, mode: AlignmentMode = "natural") -> Path:
+        """Return the source PAF file for a comparative alignment layer."""
+        base = self._project_root() / "synteny"
+        if mode == "natural":
+            return base / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf"
+        return base / "grcg6a_vs_grcg7b.paf"
+
+    def get_alignment_provenance_path(self) -> Path:
+        return (
+            self._project_root()
+            / "synteny"
+            / "natural"
+            / "grcg6a_vs_grcg7b.natural.asm5.provenance.json"
+        )
+
+    def get_alignment_blocks(
+        self,
+        assembly_1: str = "GRCg6a",
+        assembly_2: str = "GRCg7b",
+        mode: AlignmentMode = "natural",
+        chr_1: Optional[str] = None,
+        chr_2: Optional[str] = None,
+        min_quality: int = 30,
+        min_identity: float = 85.0,
+        min_alignment_length: int = 50_000,
+        limit: int = 5000,
+        order: Literal["coordinate", "score"] = "coordinate",
+    ) -> list[dict]:
+        """Read normalized PAF alignment blocks from the natural/windowed file layer."""
+        if {assembly_1, assembly_2} != {"GRCg6a", "GRCg7b"}:
+            return []
+
+        path = self.get_alignment_paf_path(mode)
+        records = read_paf_records(
+            path,
+            assembly_1=assembly_1,
+            assembly_2=assembly_2,
+            chr_1=chr_1,
+            chr_2=chr_2,
+            min_mapq=min_quality,
+            min_identity=min_identity,
+            min_alignment_length=min_alignment_length,
+            limit=limit,
+            order=order,
+        )
+        return records_to_dicts(records)
+
+    def get_alignment_stats(
+        self,
+        assembly_1: str = "GRCg6a",
+        assembly_2: str = "GRCg7b",
+        mode: AlignmentMode = "natural",
+        min_quality: int = 30,
+        min_identity: float = 85.0,
+        min_alignment_length: int = 50_000,
+    ) -> dict:
+        """Summarize a comparative PAF alignment layer."""
+        if {assembly_1, assembly_2} != {"GRCg6a", "GRCg7b"}:
+            return {
+                "dataset": mode,
+                "source_exists": False,
+                "block_count": 0,
+                "dataset_classification": "unsupported assembly pair",
+            }
+
+        path = self.get_alignment_paf_path(mode)
+        records = read_paf_records(
+            path,
+            assembly_1=assembly_1,
+            assembly_2=assembly_2,
+            min_mapq=min_quality,
+            min_identity=min_identity,
+            min_alignment_length=min_alignment_length,
+            limit=None,
+            order="coordinate",
+        )
+        summary = summarize_paf_records(records, dataset=mode, source_path=path)
+        summary["filters"] = {
+            "min_quality": min_quality,
+            "min_identity": min_identity,
+            "min_alignment_length": min_alignment_length,
+        }
+        return summary
+
+    def get_comparative_methods(self) -> dict:
+        """Return provenance and interpretation metadata for the comparative view."""
+        natural_path = self.get_alignment_paf_path("natural")
+        windowed_path = self.get_alignment_paf_path("windowed")
+        provenance_path = self.get_alignment_provenance_path()
+        provenance: dict[str, Any] = {}
+        if provenance_path.exists():
+            try:
+                provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                provenance = {"error": "Natural PAF provenance JSON could not be parsed."}
+
+        return {
+            "primary_dataset": "natural",
+            "assemblies": {
+                "assembly_1": "GRCg6a",
+                "assembly_2": "GRCg7b",
+                "species": "Gallus gallus",
+            },
+            "natural_alignment": {
+                "status": "available" if natural_path.exists() else "missing",
+                "path": str(natural_path),
+                "provenance_path": str(provenance_path),
+                "provenance": provenance,
+                "default_filters": {
+                    "min_quality": 30,
+                    "min_identity": 85,
+                    "min_alignment_length": 50_000,
+                    "secondary_alignments": "disabled",
+                },
+                "interpretation": (
+                    "Primary synteny layer. Breakpoints are produced by minimap2 chaining "
+                    "from whole-genome alignment instead of fixed genomic windows."
+                ),
+            },
+            "windowed_alignment_qc": {
+                "status": "available" if windowed_path.exists() else "missing",
+                "path": str(windowed_path),
+                "interpretation": (
+                    "Legacy 1 Mb windowed PAF retained for continuity and QC. "
+                    "Its rounded starts are expected and should not be interpreted as biological breakpoints."
+                ),
+            },
+            "coordinate_system": "PAF 0-based half-open coordinates; table labels are displayed as genomic intervals.",
+            "jbrowse2": {
+                "compatible_input": "PAF",
+                "view": "LinearSyntenyView / SyntenyTrack",
+                "note": "JBrowse2 visualizes the PAF; natural breakpoints are generated upstream by minimap2.",
+            },
+        }
+
+    def get_paf_file_content(
+        self,
+        assembly_1: str = "GRCg6a",
+        assembly_2: str = "GRCg7b",
+        mode: AlignmentMode = "natural",
+        min_quality: int = 30,
+        min_identity: float = 85.0,
+        min_alignment_length: int = 50_000,
+        limit: int = 100_000,
+    ) -> str:
+        """Return filtered PAF text for JBrowse2 or direct download."""
+        path = self.get_alignment_paf_path(mode)
+        if mode == "natural" and not path.exists():
+            path = self.get_alignment_paf_path("windowed")
+            min_alignment_length = max(min_alignment_length, 1_000_000)
+            min_quality = max(min_quality, 30)
+
+        records = read_paf_records(
+            path,
+            assembly_1=assembly_1,
+            assembly_2=assembly_2,
+            min_mapq=min_quality,
+            min_identity=min_identity,
+            min_alignment_length=min_alignment_length,
+            limit=limit,
+            order="coordinate",
+        )
+        lines = [
+            "\t".join(
+                [
+                    record.query_name,
+                    str(record.query_length),
+                    str(record.query_start),
+                    str(record.query_end),
+                    record.strand,
+                    record.target_name,
+                    str(record.target_length),
+                    str(record.target_start),
+                    str(record.target_end),
+                    str(record.residue_matches),
+                    str(record.alignment_length),
+                    str(record.mapping_quality),
+                ]
+            )
+            for record in records
+        ]
+        return "\n".join(lines) + ("\n" if lines else "")
 
     def list_assemblies(self) -> list[dict]:
         """List all registered genome assemblies"""

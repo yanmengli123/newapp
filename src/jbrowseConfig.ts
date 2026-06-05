@@ -115,13 +115,13 @@ export const geneTrackGRCg7b = {
 export const syntenyTrackConfig = {
   type: "SyntenyTrack",
   trackId: "synteny-grcg6a-grcg7b",
-  name: "GRCg6a ↔ GRCg7b Synteny",
+  name: "GRCg6a -> GRCg7b Natural Synteny",
   assemblyNames: ["GRCg6a", "GRCg7b"],
   adapter: {
     type: "PAFAdapter",
-    pafLocation: { uri: "/comparative/paf/file?assembly_1=GRCg6a&assembly_2=GRCg7b" },
-    queryAssembly: "GRCg7b",
-    targetAssembly: "GRCg6a",
+    pafLocation: { uri: "/comparative/paf/file?assembly_1=GRCg6a&assembly_2=GRCg7b&mode=natural&min_quality=30&min_identity=85&min_alignment_length=50000" },
+    queryAssembly: "GRCg6a",
+    targetAssembly: "GRCg7b",
   },
 };
 
@@ -137,7 +137,7 @@ export const jbrowseModes = {
     tracks: [
       "GRCg6a Genes",
       "GRCg7b Genes",
-      "GRCg6a ↔ GRCg7b Synteny",
+      "GRCg6a -> GRCg7b Natural Synteny",
     ],
   },
 } as const;

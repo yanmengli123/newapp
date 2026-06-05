@@ -5,7 +5,7 @@ Provides endpoints for synteny, coordinate mapping, and cross-assembly analysis
 
 from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import PlainTextResponse
-from typing import Optional
+from typing import Optional, Literal
 
 from backend.config import GRCG6A_RAWDATA_ROOT
 
@@ -76,6 +76,74 @@ async def get_synteny_blocks(
     return {"blocks": blocks, "count": len(blocks)}
 
 
+@router.get("/alignment-blocks")
+async def get_alignment_blocks(
+    assembly_1: str = Query("GRCg6a"),
+    assembly_2: str = Query("GRCg7b"),
+    mode: Literal["natural", "windowed"] = Query("natural"),
+    chr_1: Optional[str] = Query(None),
+    chr_2: Optional[str] = Query(None),
+    min_quality: int = Query(30, ge=0, le=255),
+    min_identity: float = Query(85.0, ge=0.0, le=100.0),
+    min_alignment_length: int = Query(50000, ge=0),
+    limit: int = Query(5000, le=20000),
+    order: Literal["coordinate", "score"] = Query("coordinate")
+):
+    """Get natural/windowed PAF alignment blocks for scientific synteny views."""
+    service = get_service()
+    blocks = service.get_alignment_blocks(
+        assembly_1=assembly_1,
+        assembly_2=assembly_2,
+        mode=mode,
+        chr_1=chr_1,
+        chr_2=chr_2,
+        min_quality=min_quality,
+        min_identity=min_identity,
+        min_alignment_length=min_alignment_length,
+        limit=limit,
+        order=order,
+    )
+    return {
+        "mode": mode,
+        "blocks": blocks,
+        "count": len(blocks),
+        "filters": {
+            "min_quality": min_quality,
+            "min_identity": min_identity,
+            "min_alignment_length": min_alignment_length,
+            "order": order,
+        },
+    }
+
+
+@router.get("/alignment-stats")
+async def get_alignment_stats(
+    assembly_1: str = Query("GRCg6a"),
+    assembly_2: str = Query("GRCg7b"),
+    mode: Literal["natural", "windowed"] = Query("natural"),
+    min_quality: int = Query(30, ge=0, le=255),
+    min_identity: float = Query(85.0, ge=0.0, le=100.0),
+    min_alignment_length: int = Query(50000, ge=0)
+):
+    """Get QC/statistics for a natural or windowed PAF alignment layer."""
+    service = get_service()
+    return service.get_alignment_stats(
+        assembly_1=assembly_1,
+        assembly_2=assembly_2,
+        mode=mode,
+        min_quality=min_quality,
+        min_identity=min_identity,
+        min_alignment_length=min_alignment_length,
+    )
+
+
+@router.get("/methods")
+async def get_comparative_methods():
+    """Get comparative synteny methods and provenance metadata."""
+    service = get_service()
+    return service.get_comparative_methods()
+
+
 @router.get("/map")
 async def map_coordinates(
     gene_id: str = Query(..., description="Gene ID"),
@@ -121,13 +189,29 @@ async def get_dotplot_data(
 async def get_paf_alignments(
     assembly_1: str = Query("GRCg6a"),
     assembly_2: str = Query("GRCg7b"),
+    mode: Literal["natural", "windowed"] = Query("natural"),
     query_chr: Optional[str] = Query(None),
     target_chr: Optional[str] = Query(None),
     min_quality: int = Query(30),
+    min_alignment_length: int = Query(50000, ge=0),
     limit: int = Query(5000, le=20000)
 ):
     """Get PAF alignments for JBrowse2 SyntenyTrack"""
     service = get_service()
+    if {assembly_1, assembly_2} == {"GRCg6a", "GRCg7b"}:
+        alignments = service.get_alignment_blocks(
+            assembly_1=assembly_1,
+            assembly_2=assembly_2,
+            mode=mode,
+            chr_1=query_chr,
+            chr_2=target_chr,
+            min_quality=min_quality,
+            min_alignment_length=min_alignment_length,
+            limit=limit,
+            order="coordinate",
+        )
+        return {"alignments": alignments, "count": len(alignments), "mode": mode}
+
     alignments = service.get_paf_alignments(
         assembly_1, assembly_2, query_chr, target_chr, min_quality, limit
     )
@@ -138,10 +222,24 @@ async def get_paf_alignments(
 async def get_paf_file(
     assembly_1: str = Query("GRCg6a"),
     assembly_2: str = Query("GRCg7b"),
-    min_quality: int = Query(30)
+    mode: Literal["natural", "windowed"] = Query("natural"),
+    min_quality: int = Query(30),
+    min_identity: float = Query(85.0, ge=0.0, le=100.0),
+    min_alignment_length: int = Query(50000, ge=0)
 ):
     """Get PAF file content for JBrowse2"""
     service = get_service()
+    if {assembly_1, assembly_2} == {"GRCg6a", "GRCg7b"}:
+        content = service.get_paf_file_content(
+            assembly_1=assembly_1,
+            assembly_2=assembly_2,
+            mode=mode,
+            min_quality=min_quality,
+            min_identity=min_identity,
+            min_alignment_length=min_alignment_length,
+        )
+        return PlainTextResponse(content, media_type="text/plain")
+
     alignments = service.get_paf_alignments(
         assembly_1, assembly_2, min_quality=min_quality, limit=100000
     )
