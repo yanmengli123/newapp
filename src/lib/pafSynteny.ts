@@ -3,6 +3,14 @@ import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
 const PAF_URL = "/comparative/paf/file?mode=natural&min_quality=30&min_identity=85&min_alignment_length=50000";
 const WINDOWED_FALLBACK_PAF_URL = "/genome/synteny/grcg6a_vs_grcg7b.paf";
 
+export interface LoadedPafSynteny {
+  features: SyntenyFeature[];
+  status: string;
+  source: string;
+  warning: string;
+  isFallback: boolean;
+}
+
 const CHR_TO_GRCG6A_REFSEQ: Record<string, string> = {
   chr1: "NC_006088.5",
   chr2: "NC_006089.5",
@@ -84,16 +92,31 @@ const GRCG7B_REFSEQ_TO_CHR: Record<string, string> = {
   "NC_053523.1": "chrMT",
 };
 
-export async function loadPafSyntenyFeatures(): Promise<SyntenyFeature[]> {
+export async function loadPafSyntenyFeatures(): Promise<LoadedPafSynteny> {
   const response = await fetch(PAF_URL);
   if (!response.ok) {
     const fallback = await fetch(WINDOWED_FALLBACK_PAF_URL);
     if (!fallback.ok) {
       throw new Error(`Failed to load PAF synteny file: ${response.status}`);
     }
-    return parsePaf(await fallback.text());
+    return {
+      features: parsePaf(await fallback.text()),
+      status: "fallback_windowed_qc",
+      source: WINDOWED_FALLBACK_PAF_URL,
+      warning: "Natural PAF endpoint is unavailable. Showing 1 Mb windowed QC fallback only.",
+      isFallback: true,
+    };
   }
-  return parsePaf(await response.text());
+  const status = response.headers.get("X-Synteny-Layer-Status") || "primary";
+  const source = response.headers.get("X-Synteny-Source-Path") || PAF_URL;
+  const warning = response.headers.get("X-Synteny-Warning") || "";
+  return {
+    features: parsePaf(await response.text()),
+    status,
+    source,
+    warning,
+    isFallback: status.includes("fallback"),
+  };
 }
 
 export function parsePaf(text: string): SyntenyFeature[] {

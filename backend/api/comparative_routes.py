@@ -144,6 +144,53 @@ async def get_comparative_methods():
     return service.get_comparative_methods()
 
 
+@router.get("/gold-standard")
+async def get_gold_standard_status():
+    """Get gold-standard evidence layer status for the comparative system."""
+    service = get_service()
+    return service.get_gold_standard_status()
+
+
+@router.get("/base-level")
+async def get_base_level_records(
+    side: Literal["query", "target"] = Query("query"),
+    chr: str = Query("1", description="Normalized chromosome name, e.g. 1, Z, W"),
+    start: int = Query(0, ge=0, description="0-based start coordinate"),
+    end: int = Query(5_000_000, ge=1, description="0-based half-open end coordinate"),
+    limit: int = Query(50, ge=1, le=500)
+):
+    """Get local --cs/-c PAF records for a region without streaming the full file."""
+    if end <= start:
+        raise HTTPException(status_code=400, detail="end must be greater than start")
+    service = get_service()
+    return service.get_base_level_records(
+        side=side,
+        chr_name=chr,
+        start=start,
+        end=end,
+        limit=limit,
+    )
+
+
+@router.get("/gene-collinearity")
+async def get_gene_collinearity(
+    chr: Optional[str] = Query(None, description="Optional normalized chromosome filter"),
+    limit: int = Query(100, ge=1, le=1000)
+):
+    """Get gene-level collinearity evidence if JCVI/MCScanX outputs exist."""
+    service = get_service()
+    return service.get_gene_collinearity(chr_name=chr, limit=limit)
+
+
+@router.get("/paf/status")
+async def get_paf_layer_status(
+    mode: Literal["natural", "windowed"] = Query("natural")
+):
+    """Get the serving status for the PAF file endpoint."""
+    service = get_service()
+    return service.get_paf_file_layer_status(mode=mode)
+
+
 @router.get("/map")
 async def map_coordinates(
     gene_id: str = Query(..., description="Gene ID"),
@@ -230,6 +277,7 @@ async def get_paf_file(
     """Get PAF file content for JBrowse2"""
     service = get_service()
     if {assembly_1, assembly_2} == {"GRCg6a", "GRCg7b"}:
+        layer_status = service.get_paf_file_layer_status(mode=mode)
         content = service.get_paf_file_content(
             assembly_1=assembly_1,
             assembly_2=assembly_2,
@@ -238,7 +286,15 @@ async def get_paf_file(
             min_identity=min_identity,
             min_alignment_length=min_alignment_length,
         )
-        return PlainTextResponse(content, media_type="text/plain")
+        return PlainTextResponse(
+            content,
+            media_type="text/plain",
+            headers={
+                "X-Synteny-Layer-Status": layer_status["status"],
+                "X-Synteny-Source-Path": layer_status["source_path"],
+                "X-Synteny-Warning": layer_status["warning"],
+            },
+        )
 
     alignments = service.get_paf_alignments(
         assembly_1, assembly_2, min_quality=min_quality, limit=100000

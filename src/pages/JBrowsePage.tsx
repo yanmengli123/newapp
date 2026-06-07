@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -21,6 +22,7 @@ import {
 } from "../jbrowseConfig";
 import { createLinearSyntenyViewState } from "../jbrowseSyntenyViewState";
 import { findMateLocation, loadPafSyntenyFeatures } from "../lib/pafSynteny";
+import type { LoadedPafSynteny } from "../lib/pafSynteny";
 import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
 
 type JBrowseMode = "single" | "comparative";
@@ -106,6 +108,7 @@ export default function JBrowsePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<JBrowseMode>(() => getInitialMode(searchParams));
   const [syntenyFeatures, setSyntenyFeatures] = useState<SyntenyFeature[]>([]);
+  const [syntenyLayer, setSyntenyLayer] = useState<LoadedPafSynteny | null>(null);
   const [syntenyError, setSyntenyError] = useState("");
   const [syntenyLoading, setSyntenyLoading] = useState(false);
 
@@ -119,8 +122,9 @@ export default function JBrowsePage() {
     if (syntenyFeatures.length || syntenyLoading) return;
     setSyntenyLoading(true);
     loadPafSyntenyFeatures()
-      .then((features) => {
-        setSyntenyFeatures(features);
+      .then((loaded) => {
+        setSyntenyFeatures(loaded.features);
+        setSyntenyLayer(loaded);
         setSyntenyError("");
       })
       .catch((error: unknown) => {
@@ -247,19 +251,34 @@ export default function JBrowsePage() {
       </SimpleGrid>
 
       {viewMode === "comparative" && (
-        <Card withBorder radius="sm" p="md" bg="blue.0">
-          <Group justify="space-between" align="flex-start" gap="md">
-            <Stack gap={4}>
-              <Text fw={700}>LinearSyntenyView is active: GRCg6a on top, GRCg7b below, ribbons in the middle.</Text>
-              <Text size="sm" c="dimmed">
-                The synteny layer uses /comparative/paf/file?mode=natural with mapQ &gt;= 30, identity &gt;= 85%, and length &gt;= 50 kb.
-              </Text>
-            </Stack>
-            <Button component={Link} to="/comparative" variant="light">
-              Open Comparative
-            </Button>
-          </Group>
-        </Card>
+        <Stack gap="sm">
+          <Card withBorder radius="sm" p="md" bg={syntenyLayer?.isFallback ? "yellow.0" : "blue.0"}>
+            <Group justify="space-between" align="flex-start" gap="md">
+              <Stack gap={4}>
+                <Group gap="xs">
+                  <Text fw={700}>LinearSyntenyView is active: GRCg6a on top, GRCg7b below, ribbons in the middle.</Text>
+                  <Badge color={syntenyLayer?.isFallback ? "yellow" : "green"} variant="light">
+                    {syntenyLayer?.status || "loading"}
+                  </Badge>
+                </Group>
+                <Text size="sm" c="dimmed">
+                  The synteny layer uses /comparative/paf/file?mode=natural with mapQ &gt;= 30, identity &gt;= 85%, and length &gt;= 50 kb.
+                </Text>
+                {syntenyLayer?.source && (
+                  <Text size="xs" c="dimmed" ff="monospace">{syntenyLayer.source}</Text>
+                )}
+              </Stack>
+              <Button component={Link} to="/comparative" variant="light">
+                Open Comparative
+              </Button>
+            </Group>
+          </Card>
+          {syntenyLayer?.isFallback && (
+            <Alert color="yellow" title="Windowed QC fallback is displayed">
+              {syntenyLayer.warning || "Natural synteny is unavailable. Do not interpret fallback records as biological breakpoints."}
+            </Alert>
+          )}
+        </Stack>
       )}
 
       <SimpleGrid cols={{ base: 4, sm: 6, md: 8 }}>

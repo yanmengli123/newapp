@@ -174,6 +174,83 @@ export interface ComparativeMethods {
   };
 }
 
+export interface EvidenceFile {
+  role: string;
+  path: string;
+  exists: boolean;
+  size_bytes: number;
+}
+
+export interface GoldStandardLayer {
+  status: "available" | "missing" | "not_indexed" | "fallback_qc" | string;
+  role: string;
+  files: EvidenceFile[];
+  best_practice: string;
+}
+
+export interface GoldStandardStatus {
+  pair: {
+    assembly_1: string;
+    assembly_2: string;
+    species: string;
+    comparison_id: string;
+  };
+  assemblies: Record<string, Record<string, EvidenceFile>>;
+  layers: {
+    dna_natural_synteny: GoldStandardLayer;
+    base_level_alignment: GoldStandardLayer;
+    gene_collinearity: GoldStandardLayer;
+    windowed_qc: GoldStandardLayer;
+  };
+  fallback_policy: {
+    natural_endpoint: string;
+    fallback_allowed: boolean;
+    fallback_dataset: string;
+    ui_requirement: string;
+  };
+  recommended_pipeline: string[];
+  tool_status: Record<string, { available: boolean; path?: string | null }>;
+}
+
+export interface BaseLevelRecord extends AlignmentBlock {
+  has_cs: boolean;
+  has_cigar: boolean;
+  cs_preview: string;
+  cigar_preview: string;
+}
+
+export interface BaseLevelResponse {
+  status: string;
+  query: {
+    side: "query" | "target";
+    chr: string;
+    start: number;
+    end: number;
+    limit: number;
+  };
+  records: BaseLevelRecord[];
+  count: number;
+  scanned_records?: number;
+  message: string;
+}
+
+export interface GeneCollinearityResponse {
+  status: string;
+  files: EvidenceFile[];
+  pairs: Record<string, string>[];
+  blocks: Record<string, string>[];
+  pair_count: number;
+  block_count: number;
+  message: string;
+}
+
+export interface PafLayerStatus {
+  status: string;
+  mode: AlignmentMode;
+  source_path: string;
+  warning: string;
+}
+
 export interface ComparisonStats {
   synteny: {
     block_count: number;
@@ -331,6 +408,40 @@ export async function getAlignmentStats(params: {
 
 export async function getComparativeMethods(): Promise<ComparativeMethods> {
   return apiFetch<ComparativeMethods>("/comparative/methods");
+}
+
+export async function getGoldStandardStatus(): Promise<GoldStandardStatus> {
+  return apiFetch<GoldStandardStatus>("/comparative/gold-standard");
+}
+
+export async function getBaseLevelRecords(params: {
+  side?: "query" | "target";
+  chr?: string;
+  start?: number;
+  end?: number;
+  limit?: number;
+} = {}): Promise<BaseLevelResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.side) searchParams.set("side", params.side);
+  if (params.chr) searchParams.set("chr", params.chr);
+  if (params.start !== undefined) searchParams.set("start", String(params.start));
+  if (params.end !== undefined) searchParams.set("end", String(params.end));
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
+  return apiFetch<BaseLevelResponse>(`/comparative/base-level?${searchParams.toString()}`);
+}
+
+export async function getGeneCollinearity(params: {
+  chr?: string;
+  limit?: number;
+} = {}): Promise<GeneCollinearityResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.chr) searchParams.set("chr", params.chr);
+  if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
+  return apiFetch<GeneCollinearityResponse>(`/comparative/gene-collinearity?${searchParams.toString()}`);
+}
+
+export async function getPafLayerStatus(mode: AlignmentMode = "natural"): Promise<PafLayerStatus> {
+  return apiFetch<PafLayerStatus>(`/comparative/paf/status?mode=${mode}`);
 }
 
 export async function getComparisonStats(

@@ -37,16 +37,23 @@ import { Link } from "react-router-dom";
 import {
   getAlignmentBlocks,
   getAlignmentStats,
+  getBaseLevelRecords,
   getChromosomeMapping,
   getComparativeMethods,
+  getGeneCollinearity,
+  getGoldStandardStatus,
   getOrthologTable,
   mapCoordinates,
   type AlignmentBlock,
   type AlignmentMode,
   type AlignmentStats,
+  type BaseLevelResponse,
   type ChromosomeMapping,
   type ComparativeMethods,
   type GeneCoordinateMapping,
+  type GeneCollinearityResponse,
+  type GoldStandardLayer,
+  type GoldStandardStatus,
 } from "../lib/comparativeApi";
 
 const CHROMOSOMES = [
@@ -109,10 +116,18 @@ export default function ComparativeGenomicsPage() {
   const [naturalStats, setNaturalStats] = useState<AlignmentStats | null>(null);
   const [windowedStats, setWindowedStats] = useState<AlignmentStats | null>(null);
   const [methods, setMethods] = useState<ComparativeMethods | null>(null);
+  const [goldStatus, setGoldStatus] = useState<GoldStandardStatus | null>(null);
+  const [baseLevel, setBaseLevel] = useState<BaseLevelResponse | null>(null);
+  const [geneCollinearity, setGeneCollinearity] = useState<GeneCollinearityResponse | null>(null);
   const [chrMapping, setChrMapping] = useState<ChromosomeMapping[]>([]);
   const [orthologs, setOrthologs] = useState<GeneCoordinateMapping[]>([]);
   const [orthologTotal, setOrthologTotal] = useState(0);
   const [orthologPage, setOrthologPage] = useState(0);
+  const [baseSide, setBaseSide] = useState<"query" | "target">("query");
+  const [baseChr, setBaseChr] = useState("1");
+  const [baseStart, setBaseStart] = useState("1");
+  const [baseEnd, setBaseEnd] = useState("5000000");
+  const [baseLoading, setBaseLoading] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [orthologLoading, setOrthologLoading] = useState(false);
@@ -129,6 +144,8 @@ export default function ComparativeGenomicsPage() {
         naturalRows,
         windowedRows,
         methodRows,
+        goldRows,
+        geneCollinearityRows,
         mappingRows,
       ] = await Promise.all([
         getAlignmentStats({ mode: "natural", ...NATURAL_FILTERS }),
@@ -136,6 +153,8 @@ export default function ComparativeGenomicsPage() {
         getAlignmentBlocks({ mode: "natural", chr_1: chrParam, order: "coordinate", ...NATURAL_FILTERS }),
         getAlignmentBlocks({ mode: "windowed", chr_1: chrParam, order: "coordinate", ...WINDOWED_FILTERS }),
         getComparativeMethods(),
+        getGoldStandardStatus(),
+        getGeneCollinearity({ chr: chrParam, limit: 100 }).catch(() => null),
         getChromosomeMapping("GRCg6a", "GRCg7b").catch(() => []),
       ]);
       setNaturalStats(naturalStatsRow);
@@ -143,6 +162,8 @@ export default function ComparativeGenomicsPage() {
       setNaturalBlocks(naturalRows);
       setWindowedBlocks(windowedRows);
       setMethods(methodRows);
+      setGoldStatus(goldRows);
+      setGeneCollinearity(geneCollinearityRows);
       setChrMapping(mappingRows);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -184,6 +205,30 @@ export default function ComparativeGenomicsPage() {
   const refresh = () => {
     loadAlignmentData();
     if (activeTab === "genes") loadOrthologs(orthologPage);
+  };
+
+  const loadBaseLevel = async () => {
+    const start = Math.max(0, Number(baseStart.replace(/,/g, "")) - 1);
+    const end = Number(baseEnd.replace(/,/g, ""));
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+      setError("Base-level region must have a valid start/end interval.");
+      return;
+    }
+    setBaseLoading(true);
+    setError("");
+    try {
+      setBaseLevel(await getBaseLevelRecords({
+        side: baseSide,
+        chr: baseChr,
+        start,
+        end,
+        limit: 50,
+      }));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBaseLoading(false);
+    }
   };
 
   const plotBlocks = plotMode === "natural" ? naturalBlocks : windowedBlocks;
@@ -272,9 +317,12 @@ export default function ComparativeGenomicsPage() {
         <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="overview" leftSection={<IconChartBar size={16} />}>Overview</Tabs.Tab>
+            <Tabs.Tab value="gold" leftSection={<IconInfoCircle size={16} />}>Gold Standard</Tabs.Tab>
             <Tabs.Tab value="natural" leftSection={<IconDna size={16} />}>Natural Synteny</Tabs.Tab>
             <Tabs.Tab value="dotplot" leftSection={<IconChartDots size={16} />}>Dotplot</Tabs.Tab>
+            <Tabs.Tab value="baselevel" leftSection={<IconTable size={16} />}>Base-Level</Tabs.Tab>
             <Tabs.Tab value="windowed" leftSection={<IconDatabase size={16} />}>Window QC</Tabs.Tab>
+            <Tabs.Tab value="collinearity" leftSection={<IconTable size={16} />}>Gene Collinearity</Tabs.Tab>
             <Tabs.Tab value="genes" leftSection={<IconTable size={16} />}>Gene Layer</Tabs.Tab>
             <Tabs.Tab value="methods" leftSection={<IconInfoCircle size={16} />}>Methods</Tabs.Tab>
             <Tabs.Tab value="mapper" leftSection={<IconTransform size={16} />}>Coordinate Mapper</Tabs.Tab>
@@ -288,6 +336,9 @@ export default function ComparativeGenomicsPage() {
               chrMapping={chrMapping}
               loading={loading}
             />
+          </Tabs.Panel>
+          <Tabs.Panel value="gold" pt="md">
+            <GoldStandardPanel status={goldStatus} loading={loading} />
           </Tabs.Panel>
           <Tabs.Panel value="natural" pt="md">
             <AlignmentPanel
@@ -314,8 +365,27 @@ export default function ComparativeGenomicsPage() {
               <DotplotPanel data={plotBlocks} loading={loading} mode={plotMode} stats={plotStats} />
             </Stack>
           </Tabs.Panel>
+          <Tabs.Panel value="baselevel" pt="md">
+            <BaseLevelPanel
+              result={baseLevel}
+              side={baseSide}
+              chr={baseChr}
+              start={baseStart}
+              end={baseEnd}
+              loading={baseLoading}
+              onSideChange={setBaseSide}
+              onChrChange={setBaseChr}
+              onStartChange={setBaseStart}
+              onEndChange={setBaseEnd}
+              onRun={loadBaseLevel}
+              layer={goldStatus?.layers.base_level_alignment || null}
+            />
+          </Tabs.Panel>
           <Tabs.Panel value="windowed" pt="md">
             <WindowQcPanel blocks={windowedBlocks} stats={windowedStats} loading={loading} />
+          </Tabs.Panel>
+          <Tabs.Panel value="collinearity" pt="md">
+            <GeneCollinearityPanel result={geneCollinearity} layer={goldStatus?.layers.gene_collinearity || null} />
           </Tabs.Panel>
           <Tabs.Panel value="genes" pt="md">
             <GeneLayerPanel
@@ -439,6 +509,209 @@ function DatasetSummary({ title, stats, color }: { title: string; stats: Alignme
         <CoverageRow label="GRCg7b coverage" value={targetCoverage} />
       </Stack>
     </Paper>
+  );
+}
+
+function layerColor(status: string | undefined) {
+  if (status === "available") return "green";
+  if (status === "not_indexed") return "yellow";
+  if (status?.includes("fallback")) return "orange";
+  return "red";
+}
+
+function GoldStandardPanel({ status, loading }: {
+  status: GoldStandardStatus | null;
+  loading: boolean;
+}) {
+  if (!status) return <Paper withBorder p="xl" pos="relative"><LoadingOverlay visible={loading} /><Alert color="gray">Gold-standard evidence status is not loaded.</Alert></Paper>;
+  const layers = Object.entries(status.layers) as Array<[string, GoldStandardLayer]>;
+
+  return (
+    <Stack gap="md">
+      <Alert color="blue" title="Gold-standard interpretation">
+        DNA natural PAF is the primary visualization layer. Base-level PAF and gene collinearity are separate evidence layers and must not be silently substituted by 1 Mb window QC.
+      </Alert>
+      <SimpleGrid cols={{ base: 1, md: 4 }}>
+        {layers.map(([key, layer]) => (
+          <Card key={key} withBorder radius="sm">
+            <Group justify="space-between" mb="xs">
+              <Text fw={700}>{key.replace(/_/g, " ")}</Text>
+              <Badge color={layerColor(layer.status)} variant="light">{layer.status}</Badge>
+            </Group>
+            <Text size="xs" c="dimmed" mb="sm">{layer.best_practice}</Text>
+            <Stack gap={4}>
+              {layer.files.map((file) => (
+                <Group key={`${key}-${file.role}`} justify="space-between" gap="xs" wrap="nowrap">
+                  <Text size="xs" c="dimmed">{file.role}</Text>
+                  <Badge size="xs" color={file.exists ? "green" : "red"} variant="light">
+                    {file.exists ? bp(file.size_bytes) : "missing"}
+                  </Badge>
+                </Group>
+              ))}
+            </Stack>
+          </Card>
+        ))}
+      </SimpleGrid>
+      <Card withBorder radius="sm">
+        <Text fw={700} mb="sm">Fallback Governance</Text>
+        <SimpleGrid cols={{ base: 1, md: 2 }}>
+          <KeyValue label="Natural endpoint" value={status.fallback_policy.natural_endpoint} mono />
+          <KeyValue label="Fallback dataset" value={status.fallback_policy.fallback_dataset} />
+          <KeyValue label="Fallback allowed" value={String(status.fallback_policy.fallback_allowed)} />
+          <KeyValue label="UI requirement" value={status.fallback_policy.ui_requirement} />
+        </SimpleGrid>
+      </Card>
+      <Card withBorder radius="sm">
+        <Text fw={700} mb="sm">Tool Availability on Backend Host</Text>
+        <SimpleGrid cols={{ base: 2, md: 5 }}>
+          {Object.entries(status.tool_status).map(([tool, row]) => (
+            <Group key={tool} gap="xs">
+              <Badge color={row.available ? "green" : "gray"} variant="light">{tool}</Badge>
+              <Text size="xs" c="dimmed">{row.available ? "available" : "not in PATH"}</Text>
+            </Group>
+          ))}
+        </SimpleGrid>
+      </Card>
+    </Stack>
+  );
+}
+
+function BaseLevelPanel({
+  result,
+  side,
+  chr,
+  start,
+  end,
+  loading,
+  layer,
+  onSideChange,
+  onChrChange,
+  onStartChange,
+  onEndChange,
+  onRun,
+}: {
+  result: BaseLevelResponse | null;
+  side: "query" | "target";
+  chr: string;
+  start: string;
+  end: string;
+  loading: boolean;
+  layer: GoldStandardLayer | null;
+  onSideChange: (value: "query" | "target") => void;
+  onChrChange: (value: string) => void;
+  onStartChange: (value: string) => void;
+  onEndChange: (value: string) => void;
+  onRun: () => void;
+}) {
+  return (
+    <Stack gap="md">
+      <Alert color={layer?.status === "available" ? "green" : "yellow"} title="Base-level PAF is a local details layer">
+        Do not load full --cs/-c PAF into the browser. Query only the clicked block or a small region. Current layer status: {layer?.status || "unknown"}.
+      </Alert>
+      <Card withBorder radius="sm">
+        <Group align="end">
+          <Select
+            label="Coordinate side"
+            value={side}
+            onChange={(value) => value && onSideChange(value as "query" | "target")}
+            data={[
+              { value: "query", label: "GRCg6a query" },
+              { value: "target", label: "GRCg7b target" },
+            ]}
+            w={180}
+          />
+          <Select label="Chr" value={chr} onChange={(value) => value && onChrChange(value)} data={CHROMOSOMES} w={120} />
+          <TextInput label="Start (1-based)" value={start} onChange={(event) => onStartChange(event.currentTarget.value)} w={150} />
+          <TextInput label="End" value={end} onChange={(event) => onEndChange(event.currentTarget.value)} w={150} />
+          <Button onClick={onRun} loading={loading}>Query Details</Button>
+        </Group>
+      </Card>
+      {result && (
+        <Card withBorder radius="sm">
+          <Group justify="space-between" mb="md">
+            <div>
+              <Text fw={700}>Base-Level Query Result</Text>
+              <Text size="xs" c="dimmed">{result.message}</Text>
+            </div>
+            <Badge color={layerColor(result.status)}>{result.status}</Badge>
+          </Group>
+          {result.records.length ? (
+            <ScrollArea h={360}>
+              <Table striped highlightOnHover>
+                <Table.Thead>
+                  <Table.Tr>
+                    <Table.Th>Chr</Table.Th><Table.Th>Interval</Table.Th><Table.Th>Target</Table.Th>
+                    <Table.Th>Strand</Table.Th><Table.Th>Identity</Table.Th><Table.Th>cs</Table.Th><Table.Th>CIGAR</Table.Th>
+                  </Table.Tr>
+                </Table.Thead>
+                <Table.Tbody>
+                  {result.records.map((record) => (
+                    <Table.Tr key={record.block_id}>
+                      <Table.Td>{record.chr_1}</Table.Td>
+                      <Table.Td>{displayStart(record.start_1)}-{displayEnd(record.end_1)}</Table.Td>
+                      <Table.Td>{record.chr_2}:{displayStart(record.start_2)}-{displayEnd(record.end_2)}</Table.Td>
+                      <Table.Td>{record.strand}</Table.Td>
+                      <Table.Td>{dash(record.identity, 2)}%</Table.Td>
+                      <Table.Td><Badge color={record.has_cs ? "green" : "gray"} variant="light">{record.has_cs ? "yes" : "no"}</Badge></Table.Td>
+                      <Table.Td><Badge color={record.has_cigar ? "green" : "gray"} variant="light">{record.has_cigar ? "yes" : "no"}</Badge></Table.Td>
+                    </Table.Tr>
+                  ))}
+                </Table.Tbody>
+              </Table>
+            </ScrollArea>
+          ) : (
+            <Alert color="gray">No base-level records are available for this region.</Alert>
+          )}
+        </Card>
+      )}
+    </Stack>
+  );
+}
+
+function GeneCollinearityPanel({ result, layer }: {
+  result: GeneCollinearityResponse | null;
+  layer: GoldStandardLayer | null;
+}) {
+  return (
+    <Stack gap="md">
+      <Alert color={layer?.status === "available" ? "green" : "yellow"} title="Gene collinearity is functional evidence">
+        DNA PAF answers sequence alignment; method-labeled gene anchors answer conserved gene order. Current layer status: {layer?.status || result?.status || "unknown"}.
+      </Alert>
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>Required Gene Collinearity Files</Text>
+          <Badge color={layerColor(layer?.status || result?.status)}>{layer?.status || result?.status || "unknown"}</Badge>
+        </Group>
+        <SimpleGrid cols={{ base: 1, md: 2 }}>
+          {(layer?.files || result?.files || []).map((file) => (
+            <KeyValue key={file.role} label={`${file.role} ${file.exists ? `(${bp(file.size_bytes)})` : "(missing)"}`} value={file.path} mono />
+          ))}
+        </SimpleGrid>
+      </Card>
+      {result?.blocks.length ? (
+        <Card withBorder radius="sm">
+          <Text fw={700} mb="sm">Gene Collinearity Blocks</Text>
+          <ScrollArea h={320}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  {Object.keys(result.blocks[0]).map((key) => <Table.Th key={key}>{key}</Table.Th>)}
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {result.blocks.map((row, idx) => (
+                  <Table.Tr key={idx}>
+                    {Object.keys(result.blocks[0]).map((key) => <Table.Td key={key}>{row[key]}</Table.Td>)}
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        </Card>
+      ) : (
+        <Alert color="gray">{result?.message || "Gene collinearity outputs are not generated yet."}</Alert>
+      )}
+    </Stack>
   );
 }
 
@@ -667,7 +940,7 @@ function GeneLayerPanel({ orthologs, total, page, loading, onPageChange }: {
   return (
     <Stack gap="md">
       <Alert color="blue" title="Gene-level collinearity is a separate evidence layer">
-        Natural PAF is DNA alignment synteny. MCScanX/JCVI-style gene collinearity should be interpreted separately from nucleotide alignment blocks.
+        Natural PAF is DNA alignment synteny. Gene collinearity should be interpreted separately from nucleotide alignment blocks and labeled by its generating method.
       </Alert>
       <Card withBorder radius="sm" pos="relative">
         <LoadingOverlay visible={loading} />

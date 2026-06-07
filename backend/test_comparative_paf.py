@@ -7,6 +7,7 @@ from backend.comparative_paf import (
     read_paf_records,
     summarize_paf_records,
 )
+from backend.comparative_gold import GoldStandardComparativeStore
 
 
 def test_parse_paf_line_normalizes_refseq_chromosomes():
@@ -74,6 +75,42 @@ def test_summarize_paf_records_identifies_natural_dataset(tmp_path: Path):
     assert summary["chromosomes_2"] == 2
 
 
+def test_gold_standard_status_keeps_missing_layers_explicit(tmp_path: Path):
+    natural_dir = tmp_path / "synteny" / "natural"
+    natural_dir.mkdir(parents=True)
+    (natural_dir / "grcg6a_vs_grcg7b.natural.asm5.paf").write_text(
+        "NC_006088.5\t197608386\t127045112\t128112455\t+\tNC_052532.1\t196449156\t126254979\t127249113\t993000\t1000000\t60\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "synteny" / "grcg6a_vs_grcg7b.paf").write_text(
+        "NC_006088.5\t197608386\t0\t1000000\t+\tNC_052532.1\t196449156\t0\t994133\t996000\t1000000\t60\n",
+        encoding="utf-8",
+    )
+
+    store = GoldStandardComparativeStore(tmp_path)
+    status = store.get_status()
+
+    assert status["layers"]["dna_natural_synteny"]["status"] == "available"
+    assert status["layers"]["base_level_alignment"]["status"] == "missing"
+    assert status["layers"]["gene_collinearity"]["status"] == "missing"
+    assert status["layers"]["windowed_qc"]["status"] == "available"
+
+    base_level = store.get_base_level_records(chr_name="1", start=0, end=1000)
+    assert base_level["status"] == "missing"
+    assert base_level["records"] == []
+
+
+def test_gold_standard_tabix_seqid_mapping(tmp_path: Path):
+    store = GoldStandardComparativeStore(tmp_path)
+
+    assert store._tabix_seqid("query", "1") == "NC_006088.5"
+    assert store._tabix_seqid("query", "chr1") == "NC_006088.5"
+    assert store._tabix_seqid("query", "Z") == "NC_006127.5"
+    assert store._tabix_seqid("target", "1") == "chr1"
+    assert store._tabix_seqid("target", "chr1") == "chr1"
+    assert store._tabix_seqid("target", "MT") == "chrMT"
+
+
 if __name__ == "__main__":
     import tempfile
 
@@ -82,4 +119,8 @@ if __name__ == "__main__":
         test_summarize_paf_records_identifies_windowed_dataset(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_summarize_paf_records_identifies_natural_dataset(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_gold_standard_status_keeps_missing_layers_explicit(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_gold_standard_tabix_seqid_mapping(Path(tmp))
     print("All comparative PAF tests passed.")

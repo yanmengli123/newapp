@@ -16,6 +16,7 @@ from backend.comparative_paf import (
     records_to_dicts,
     summarize_paf_records,
 )
+from backend.comparative_gold import CoordinateSide, GoldStandardComparativeStore
 from backend.config import GRCG6A_RAWDATA_ROOT
 
 
@@ -24,6 +25,7 @@ class ComparativeService:
 
     def __init__(self, pg_pool):
         self.pg_pool = pg_pool
+        self.gold_store = GoldStandardComparativeStore(self._project_root())
 
     def _get_cursor(self):
         conn = self.pg_pool.getconn()
@@ -168,6 +170,63 @@ class ComparativeService:
                 "view": "LinearSyntenyView / SyntenyTrack",
                 "note": "JBrowse2 visualizes the PAF; natural breakpoints are generated upstream by minimap2.",
             },
+        }
+
+    def get_gold_standard_status(self) -> dict:
+        """Return file-backed status for all gold-standard evidence layers."""
+        return self.gold_store.get_status()
+
+    def get_base_level_records(
+        self,
+        side: CoordinateSide = "query",
+        chr_name: str = "1",
+        start: int = 0,
+        end: int = 5_000_000,
+        limit: int = 50,
+    ) -> dict:
+        """Return local base-level --cs/-c PAF records when available."""
+        return self.gold_store.get_base_level_records(
+            side=side,
+            chr_name=chr_name,
+            start=start,
+            end=end,
+            limit=limit,
+        )
+
+    def get_gene_collinearity(
+        self,
+        chr_name: Optional[str] = None,
+        limit: int = 100,
+    ) -> dict:
+        """Return JCVI/MCScanX-style gene collinearity rows when available."""
+        return self.gold_store.get_gene_collinearity(chr_name=chr_name, limit=limit)
+
+    def get_paf_file_layer_status(self, mode: AlignmentMode = "natural") -> dict:
+        """Report whether /paf/file will serve primary data or QC fallback."""
+        requested = self.get_alignment_paf_path(mode)
+        if requested.exists():
+            return {
+                "status": "primary" if mode == "natural" else "qc",
+                "mode": mode,
+                "source_path": str(requested),
+                "warning": "",
+            }
+        if mode == "natural" and self.get_alignment_paf_path("windowed").exists():
+            fallback = self.get_alignment_paf_path("windowed")
+            return {
+                "status": "fallback_windowed_qc",
+                "mode": "windowed",
+                "source_path": str(fallback),
+                "warning": (
+                    "Natural PAF is unavailable. Serving 1 Mb windowed QC fallback; "
+                    "do not interpret these records as biological breakpoints."
+                ),
+            }
+        return {
+            "status": "missing",
+            "mode": mode,
+            "source_path": str(requested),
+            "warning": "Requested PAF layer is missing.",
         }
 
     def get_paf_file_content(
