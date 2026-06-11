@@ -7,8 +7,6 @@ from fastapi import APIRouter, Query, HTTPException
 from fastapi.responses import PlainTextResponse
 from typing import Optional, Literal
 
-from backend.config import GRCG6A_RAWDATA_ROOT
-
 router = APIRouter(prefix="/comparative", tags=["Comparative Genomics"])
 
 # Service instance (set during app startup)
@@ -80,7 +78,7 @@ async def get_synteny_blocks(
 async def get_alignment_blocks(
     assembly_1: str = Query("GRCg6a"),
     assembly_2: str = Query("GRCg7b"),
-    mode: Literal["natural", "windowed"] = Query("natural"),
+    mode: Literal["natural"] = Query("natural"),
     chr_1: Optional[str] = Query(None),
     chr_2: Optional[str] = Query(None),
     min_quality: int = Query(30, ge=0, le=255),
@@ -89,7 +87,7 @@ async def get_alignment_blocks(
     limit: int = Query(5000, le=20000),
     order: Literal["coordinate", "score"] = Query("coordinate")
 ):
-    """Get natural/windowed PAF alignment blocks for scientific synteny views."""
+    """Get natural-breakpoint PAF alignment blocks for scientific synteny views."""
     service = get_service()
     blocks = service.get_alignment_blocks(
         assembly_1=assembly_1,
@@ -120,12 +118,12 @@ async def get_alignment_blocks(
 async def get_alignment_stats(
     assembly_1: str = Query("GRCg6a"),
     assembly_2: str = Query("GRCg7b"),
-    mode: Literal["natural", "windowed"] = Query("natural"),
+    mode: Literal["natural"] = Query("natural"),
     min_quality: int = Query(30, ge=0, le=255),
     min_identity: float = Query(85.0, ge=0.0, le=100.0),
     min_alignment_length: int = Query(50000, ge=0)
 ):
-    """Get QC/statistics for a natural or windowed PAF alignment layer."""
+    """Get QC/statistics for the natural-breakpoint PAF alignment layer."""
     service = get_service()
     return service.get_alignment_stats(
         assembly_1=assembly_1,
@@ -184,7 +182,7 @@ async def get_gene_collinearity(
 
 @router.get("/paf/status")
 async def get_paf_layer_status(
-    mode: Literal["natural", "windowed"] = Query("natural")
+    mode: Literal["natural"] = Query("natural")
 ):
     """Get the serving status for the PAF file endpoint."""
     service = get_service()
@@ -236,7 +234,7 @@ async def get_dotplot_data(
 async def get_paf_alignments(
     assembly_1: str = Query("GRCg6a"),
     assembly_2: str = Query("GRCg7b"),
-    mode: Literal["natural", "windowed"] = Query("natural"),
+    mode: Literal["natural"] = Query("natural"),
     query_chr: Optional[str] = Query(None),
     target_chr: Optional[str] = Query(None),
     min_quality: int = Query(30),
@@ -269,7 +267,7 @@ async def get_paf_alignments(
 async def get_paf_file(
     assembly_1: str = Query("GRCg6a"),
     assembly_2: str = Query("GRCg7b"),
-    mode: Literal["natural", "windowed"] = Query("natural"),
+    mode: Literal["natural"] = Query("natural"),
     min_quality: int = Query(30),
     min_identity: float = Query(85.0, ge=0.0, le=100.0),
     min_alignment_length: int = Query(50000, ge=0)
@@ -299,14 +297,6 @@ async def get_paf_file(
     alignments = service.get_paf_alignments(
         assembly_1, assembly_2, min_quality=min_quality, limit=100000
     )
-
-    if not alignments and {assembly_1, assembly_2} == {"GRCg6a", "GRCg7b"}:
-        fallback_paf = GRCG6A_RAWDATA_ROOT.parent / "synteny" / "grcg6a_vs_grcg7b.paf"
-        if fallback_paf.exists():
-            return PlainTextResponse(
-                fallback_paf.read_text(encoding="utf-8", errors="replace"),
-                media_type="text/plain",
-            )
 
     # Convert to PAF format
     paf_lines = []

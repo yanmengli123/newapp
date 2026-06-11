@@ -26,7 +26,7 @@ import subprocess
 from backend.comparative_paf import GRCG6A_REFSEQ_TO_CHR, normalize_chr, parse_paf_line
 
 
-EvidenceStatus = Literal["available", "missing", "not_indexed", "fallback_qc"]
+EvidenceStatus = Literal["available", "missing", "not_indexed"]
 CoordinateSide = Literal["query", "target"]
 
 
@@ -66,10 +66,6 @@ class GoldStandardComparativeStore:
     @property
     def primary_provenance(self) -> Path:
         return self.synteny_root / "natural" / "grcg6a_vs_grcg7b.natural.asm5.provenance.json"
-
-    @property
-    def windowed_qc_paf(self) -> Path:
-        return self.synteny_root / "grcg6a_vs_grcg7b.paf"
 
     @property
     def dna_alignment_root(self) -> Path:
@@ -276,19 +272,13 @@ class GoldStandardComparativeStore:
                         "Native JCVI/MCScanX anchors can replace or complement this layer later."
                     ),
                 },
-                "windowed_qc": {
-                    "status": "available" if self.windowed_qc_paf.exists() else "missing",
-                    "role": "qc_only_not_primary",
-                    "files": [EvidenceFile.from_path("windowed_qc_paf", self.windowed_qc_paf).to_dict()],
-                    "best_practice": "May be shown as QC/fallback only with an explicit warning.",
-                },
             },
             "fallback_policy": {
                 "natural_endpoint": "/comparative/paf/file?mode=natural",
-                "fallback_allowed": True,
-                "fallback_dataset": "windowed_qc",
+                "fallback_allowed": False,
+                "fallback_dataset": None,
                 "ui_requirement": (
-                    "If fallback is used, label it as Windowed QC fallback and disable high-confidence claims."
+                    "Natural-breakpoint PAF is required for synteny display. Missing primary evidence must be reported, not replaced."
                 ),
             },
             "recommended_pipeline": [

@@ -11,7 +11,6 @@ import {
   Paper,
   Progress,
   ScrollArea,
-  SegmentedControl,
   Select,
   SimpleGrid,
   Stack,
@@ -25,7 +24,6 @@ import {
 import {
   IconChartBar,
   IconChartDots,
-  IconDatabase,
   IconDna,
   IconExternalLink,
   IconInfoCircle,
@@ -70,12 +68,6 @@ const NATURAL_FILTERS = {
   min_alignment_length: 50_000,
   limit: 5000,
 };
-const WINDOWED_FILTERS = {
-  min_quality: 30,
-  min_identity: 0,
-  min_alignment_length: 0,
-  limit: 5000,
-};
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Request failed";
@@ -108,13 +100,10 @@ function displayEnd(value: number) {
 
 export default function ComparativeGenomicsPage() {
   const [activeTab, setActiveTab] = useState<string | null>("overview");
-  const [plotMode, setPlotMode] = useState<AlignmentMode>("natural");
   const [chrFilter, setChrFilter] = useState<string | null>(null);
 
   const [naturalBlocks, setNaturalBlocks] = useState<AlignmentBlock[]>([]);
-  const [windowedBlocks, setWindowedBlocks] = useState<AlignmentBlock[]>([]);
   const [naturalStats, setNaturalStats] = useState<AlignmentStats | null>(null);
-  const [windowedStats, setWindowedStats] = useState<AlignmentStats | null>(null);
   const [methods, setMethods] = useState<ComparativeMethods | null>(null);
   const [goldStatus, setGoldStatus] = useState<GoldStandardStatus | null>(null);
   const [baseLevel, setBaseLevel] = useState<BaseLevelResponse | null>(null);
@@ -140,27 +129,21 @@ export default function ComparativeGenomicsPage() {
       const chrParam = chrFilter || undefined;
       const [
         naturalStatsRow,
-        windowedStatsRow,
         naturalRows,
-        windowedRows,
         methodRows,
         goldRows,
         geneCollinearityRows,
         mappingRows,
       ] = await Promise.all([
         getAlignmentStats({ mode: "natural", ...NATURAL_FILTERS }),
-        getAlignmentStats({ mode: "windowed", ...WINDOWED_FILTERS }),
         getAlignmentBlocks({ mode: "natural", chr_1: chrParam, order: "coordinate", ...NATURAL_FILTERS }),
-        getAlignmentBlocks({ mode: "windowed", chr_1: chrParam, order: "coordinate", ...WINDOWED_FILTERS }),
         getComparativeMethods(),
         getGoldStandardStatus(),
         getGeneCollinearity({ chr: chrParam, limit: 100 }).catch(() => null),
         getChromosomeMapping("GRCg6a", "GRCg7b").catch(() => []),
       ]);
       setNaturalStats(naturalStatsRow);
-      setWindowedStats(windowedStatsRow);
       setNaturalBlocks(naturalRows);
-      setWindowedBlocks(windowedRows);
       setMethods(methodRows);
       setGoldStatus(goldRows);
       setGeneCollinearity(geneCollinearityRows);
@@ -231,9 +214,6 @@ export default function ComparativeGenomicsPage() {
     }
   };
 
-  const plotBlocks = plotMode === "natural" ? naturalBlocks : windowedBlocks;
-  const plotStats = plotMode === "natural" ? naturalStats : windowedStats;
-
   return (
     <Container size="xl" py="md">
       <Stack gap="lg">
@@ -241,7 +221,7 @@ export default function ComparativeGenomicsPage() {
           <div>
             <Title order={2}>Comparative Synteny: GRCg6a vs GRCg7b</Title>
             <Text c="dimmed" size="sm">
-              Natural-breakpoint whole-genome alignment is the primary synteny layer; fixed 1 Mb PAF windows are retained as QC.
+              Natural-breakpoint whole-genome alignment is the primary synteny layer, with base-level PAF and gene collinearity as separate evidence layers.
             </Text>
           </div>
           <Group gap="xs">
@@ -275,11 +255,9 @@ export default function ComparativeGenomicsPage() {
             detail={`${bp(naturalStats?.query_covered_bases)} covered in GRCg6a`}
           />
           <MetricCard
-            label="Window QC"
-            value={windowedStats?.rounded_query_start_fraction ? windowedStats.rounded_query_start_fraction * 100 : undefined}
-            suffix="%"
-            digits={0}
-            detail="Rounded 1 Mb query starts"
+            label="Reverse Blocks"
+            value={naturalStats?.reverse_strand_blocks}
+            detail="Natural PAF inversion-orientation evidence"
           />
         </SimpleGrid>
 
@@ -321,7 +299,6 @@ export default function ComparativeGenomicsPage() {
             <Tabs.Tab value="natural" leftSection={<IconDna size={16} />}>Natural Synteny</Tabs.Tab>
             <Tabs.Tab value="dotplot" leftSection={<IconChartDots size={16} />}>Dotplot</Tabs.Tab>
             <Tabs.Tab value="baselevel" leftSection={<IconTable size={16} />}>Base-Level</Tabs.Tab>
-            <Tabs.Tab value="windowed" leftSection={<IconDatabase size={16} />}>Window QC</Tabs.Tab>
             <Tabs.Tab value="collinearity" leftSection={<IconTable size={16} />}>Gene Collinearity</Tabs.Tab>
             <Tabs.Tab value="genes" leftSection={<IconTable size={16} />}>Gene Layer</Tabs.Tab>
             <Tabs.Tab value="methods" leftSection={<IconInfoCircle size={16} />}>Methods</Tabs.Tab>
@@ -331,7 +308,6 @@ export default function ComparativeGenomicsPage() {
           <Tabs.Panel value="overview" pt="md">
             <OverviewPanel
               naturalStats={naturalStats}
-              windowedStats={windowedStats}
               methods={methods}
               chrMapping={chrMapping}
               loading={loading}
@@ -352,17 +328,10 @@ export default function ComparativeGenomicsPage() {
           <Tabs.Panel value="dotplot" pt="md">
             <Stack gap="md">
               <Group justify="space-between">
-                <SegmentedControl
-                  value={plotMode}
-                  onChange={(value) => setPlotMode(value as AlignmentMode)}
-                  data={[
-                    { label: "Natural", value: "natural" },
-                    { label: "Window QC", value: "windowed" },
-                  ]}
-                />
-                <Badge variant="light">{plotStats?.dataset_classification || plotMode}</Badge>
+                <Badge color="green" variant="light">Natural PAF primary</Badge>
+                <Badge variant="light">{naturalStats?.dataset_classification || "natural"}</Badge>
               </Group>
-              <DotplotPanel data={plotBlocks} loading={loading} mode={plotMode} stats={plotStats} />
+              <DotplotPanel data={naturalBlocks} loading={loading} mode="natural" stats={naturalStats} />
             </Stack>
           </Tabs.Panel>
           <Tabs.Panel value="baselevel" pt="md">
@@ -381,9 +350,6 @@ export default function ComparativeGenomicsPage() {
               layer={goldStatus?.layers.base_level_alignment || null}
             />
           </Tabs.Panel>
-          <Tabs.Panel value="windowed" pt="md">
-            <WindowQcPanel blocks={windowedBlocks} stats={windowedStats} loading={loading} />
-          </Tabs.Panel>
           <Tabs.Panel value="collinearity" pt="md">
             <GeneCollinearityPanel result={geneCollinearity} layer={goldStatus?.layers.gene_collinearity || null} />
           </Tabs.Panel>
@@ -397,7 +363,7 @@ export default function ComparativeGenomicsPage() {
             />
           </Tabs.Panel>
           <Tabs.Panel value="methods" pt="md">
-            <MethodsPanel methods={methods} naturalStats={naturalStats} windowedStats={windowedStats} />
+            <MethodsPanel methods={methods} naturalStats={naturalStats} />
           </Tabs.Panel>
           <Tabs.Panel value="mapper" pt="md">
             <CoordinateMapperPanel />
@@ -426,13 +392,11 @@ function MetricCard({ label, value, detail, suffix = "", digits }: {
 
 function OverviewPanel({
   naturalStats,
-  windowedStats,
   methods,
   chrMapping,
   loading,
 }: {
   naturalStats: AlignmentStats | null;
-  windowedStats: AlignmentStats | null;
   methods: ComparativeMethods | null;
   chrMapping: ChromosomeMapping[];
   loading: boolean;
@@ -446,8 +410,23 @@ function OverviewPanel({
           <Badge color="green" variant="light">{methods?.primary_dataset || "natural"} primary</Badge>
         </Group>
         <SimpleGrid cols={{ base: 1, md: 2 }}>
-          <DatasetSummary title="Natural synteny" stats={naturalStats} color="green" />
-          <DatasetSummary title="1 Mb window QC" stats={windowedStats} color="gray" />
+          <DatasetSummary title="Natural DNA synteny" stats={naturalStats} color="green" />
+          <Paper withBorder radius="sm" p="md">
+            <Group justify="space-between" mb="xs">
+              <Text fw={700}>Gold-standard evidence chain</Text>
+              <Badge color="blue" variant="light">natural-only</Badge>
+            </Group>
+            <SimpleGrid cols={2} spacing="xs">
+              <SmallStat label="Primary layer" value="minimap2 PAF" />
+              <SmallStat label="Base-level" value="--cs + tabix" />
+              <SmallStat label="Gene layer" value="anchors" />
+              <SmallStat label="Fallback" value="disabled" />
+            </SimpleGrid>
+            <Divider my="sm" />
+            <Text size="sm" c="dimmed">
+              Fixed-width window alignments are not shown as comparative evidence in this view.
+            </Text>
+          </Paper>
         </SimpleGrid>
       </Card>
 
@@ -529,7 +508,7 @@ function GoldStandardPanel({ status, loading }: {
   return (
     <Stack gap="md">
       <Alert color="blue" title="Gold-standard interpretation">
-        DNA natural PAF is the primary visualization layer. Base-level PAF and gene collinearity are separate evidence layers and must not be silently substituted by 1 Mb window QC.
+        DNA natural PAF is the primary visualization layer. Base-level PAF and gene collinearity are separate evidence layers, and fixed-width window fallback is disabled.
       </Alert>
       <SimpleGrid cols={{ base: 1, md: 4 }}>
         {layers.map(([key, layer]) => (
@@ -556,7 +535,7 @@ function GoldStandardPanel({ status, loading }: {
         <Text fw={700} mb="sm">Fallback Governance</Text>
         <SimpleGrid cols={{ base: 1, md: 2 }}>
           <KeyValue label="Natural endpoint" value={status.fallback_policy.natural_endpoint} mono />
-          <KeyValue label="Fallback dataset" value={status.fallback_policy.fallback_dataset} />
+          <KeyValue label="Fallback dataset" value={status.fallback_policy.fallback_dataset || "disabled"} />
           <KeyValue label="Fallback allowed" value={String(status.fallback_policy.fallback_allowed)} />
           <KeyValue label="UI requirement" value={status.fallback_policy.ui_requirement} />
         </SimpleGrid>
@@ -756,13 +735,11 @@ function AlignmentPanel({
         <div>
           <Text fw={700}>{title}</Text>
           <Text size="xs" c="dimmed">
-            {mode === "natural"
-              ? "minimap2 asm5 natural chain breakpoints, filtered for high-confidence display"
-              : "legacy fixed-width alignment windows for QC"}
+            minimap2 asm5 natural chain breakpoints, filtered for high-confidence display
           </Text>
         </div>
         <Group gap="xs">
-          <Badge color={mode === "natural" ? "green" : "gray"}>{blocks.length.toLocaleString()} rows</Badge>
+          <Badge color="green">{blocks.length.toLocaleString()} rows</Badge>
           <Badge variant="light">{stats?.dataset_classification || mode}</Badge>
         </Group>
       </Group>
@@ -870,7 +847,7 @@ function DotplotPanel({
           <Text size="xs" c="dimmed">Scaled by PAF sequence lengths, not by visible block maxima.</Text>
         </div>
         <Group gap="xs">
-          <Badge color={mode === "natural" ? "green" : "gray"}>{mode}</Badge>
+          <Badge color="green">{mode}</Badge>
           <Badge variant="light">{data.length.toLocaleString()} blocks</Badge>
           <Badge variant="light">{dash(stats?.weighted_identity, 1)}% weighted identity</Badge>
         </Group>
@@ -894,8 +871,8 @@ function DotplotPanel({
                 x2={scaleX(d.chr_1, d.end_1)}
                 y2={scaleY(d.chr_2, d.end_2)}
                 stroke={d.strand === "+" ? "#2f9e44" : "#c92a2a"}
-                strokeWidth={mode === "natural" ? 1.6 : 1}
-                opacity={mode === "natural" ? 0.72 : 0.45}
+                strokeWidth={1.6}
+                opacity={0.72}
               />
             );
           })}
@@ -904,27 +881,6 @@ function DotplotPanel({
         </svg>
       </ScrollArea>
     </Card>
-  );
-}
-
-function WindowQcPanel({ blocks, stats, loading }: {
-  blocks: AlignmentBlock[];
-  stats: AlignmentStats | null;
-  loading: boolean;
-}) {
-  return (
-    <Stack gap="md">
-      <Alert color="gray" title="The regular 1 Mb coordinates are expected in this QC dataset">
-        These records were created by fixed genomic windows, so starts such as 127,000,000 and 144,000,000 are processing boundaries, not biological breakpoints.
-      </Alert>
-      <SimpleGrid cols={{ base: 1, md: 4 }}>
-        <MetricCard label="Window Blocks" value={stats?.block_count} detail="Fixed window PAF records" />
-        <MetricCard label="Rounded Starts" value={stats?.rounded_query_start_fraction ? stats.rounded_query_start_fraction * 100 : undefined} suffix="%" digits={0} detail="Expected for 1 Mb windows" />
-        <MetricCard label="Weighted Identity" value={stats?.weighted_identity} suffix="%" digits={1} detail="Window-level alignment signal" />
-        <MetricCard label="Windowed Blocks" value={stats?.one_mb_windowed_blocks} detail="Detected by query span/start" />
-      </SimpleGrid>
-      <AlignmentPanel title="Windowed Alignment QC Table" mode="windowed" blocks={blocks} stats={stats} loading={loading} />
-    </Stack>
   );
 }
 
@@ -983,10 +939,9 @@ function GeneLayerPanel({ orthologs, total, page, loading, onPageChange }: {
   );
 }
 
-function MethodsPanel({ methods, naturalStats, windowedStats }: {
+function MethodsPanel({ methods, naturalStats }: {
   methods: ComparativeMethods | null;
   naturalStats: AlignmentStats | null;
-  windowedStats: AlignmentStats | null;
 }) {
   if (!methods) return <Alert color="gray">Methods metadata is not loaded.</Alert>;
   const provenance = methods.natural_alignment.provenance;
@@ -1004,7 +959,6 @@ function MethodsPanel({ methods, naturalStats, windowedStats }: {
           <KeyValue label="Command" value={String(provenance.output_paf ? "minimap2 -x asm5 --secondary=no" : "-")} mono />
           <KeyValue label="JBrowse2 input" value={`${methods.jbrowse2.compatible_input} / ${methods.jbrowse2.view}`} />
           <KeyValue label="Natural PAF" value={methods.natural_alignment.path} mono />
-          <KeyValue label="Window QC PAF" value={methods.windowed_alignment_qc.path} mono />
         </SimpleGrid>
       </Card>
 
@@ -1012,12 +966,11 @@ function MethodsPanel({ methods, naturalStats, windowedStats }: {
         <Text fw={700} mb="sm">Interpretation Rules</Text>
         <Stack gap="xs">
           <Text size="sm">{methods.natural_alignment.interpretation}</Text>
-          <Text size="sm">{methods.windowed_alignment_qc.interpretation}</Text>
           <Text size="sm">{methods.jbrowse2.note}</Text>
           <Text size="sm">
             Natural display filters: mapQ {">="} {NATURAL_FILTERS.min_quality}, identity {">="} {NATURAL_FILTERS.min_identity}%, alignment length {">="} {bp(NATURAL_FILTERS.min_alignment_length)}.
           </Text>
-          <Text size="sm">Natural blocks shown: {dash(naturalStats?.block_count)}; window QC blocks: {dash(windowedStats?.block_count)}.</Text>
+          <Text size="sm">Natural blocks shown: {dash(naturalStats?.block_count)}. Fixed-width window fallback is disabled for this gold-standard view.</Text>
         </Stack>
       </Card>
     </Stack>

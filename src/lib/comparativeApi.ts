@@ -79,7 +79,7 @@ export interface PafAlignment {
   score: number;
 }
 
-export type AlignmentMode = "natural" | "windowed";
+export type AlignmentMode = "natural";
 
 export interface AlignmentBlock {
   block_id: string;
@@ -105,7 +105,6 @@ export interface AlignmentBlock {
   score: number;
   is_primary_chromosome_pair: boolean;
   is_same_chromosome: boolean;
-  is_windowed_1mb: boolean;
 }
 
 export interface AlignmentStats {
@@ -129,8 +128,6 @@ export interface AlignmentStats {
   off_diagonal_blocks?: number;
   reverse_strand_blocks?: number;
   primary_chromosome_blocks?: number;
-  one_mb_windowed_blocks?: number;
-  rounded_query_start_fraction?: number;
   query_covered_bases?: number;
   target_covered_bases?: number;
   query_total_bases?: number;
@@ -159,11 +156,6 @@ export interface ComparativeMethods {
     provenance_path: string;
     provenance: Record<string, string | number | undefined>;
     default_filters: Record<string, string | number>;
-    interpretation: string;
-  };
-  windowed_alignment_qc: {
-    status: string;
-    path: string;
     interpretation: string;
   };
   coordinate_system: string;
@@ -200,12 +192,11 @@ export interface GoldStandardStatus {
     dna_natural_synteny: GoldStandardLayer;
     base_level_alignment: GoldStandardLayer;
     gene_collinearity: GoldStandardLayer;
-    windowed_qc: GoldStandardLayer;
   };
   fallback_policy: {
     natural_endpoint: string;
     fallback_allowed: boolean;
-    fallback_dataset: string;
+    fallback_dataset: string | null;
     ui_requirement: string;
   };
   recommended_pipeline: string[];

@@ -1,9 +1,4 @@
-"""PAF parsing helpers for comparative synteny datasets.
-
-The comparative page uses two related but different alignment layers:
-natural-breakpoint whole-genome alignments from minimap2 and the older
-1 Mb windowed PAF as a QC layer. This module keeps those semantics explicit.
-"""
+"""PAF parsing helpers for natural-breakpoint comparative synteny datasets."""
 
 from __future__ import annotations
 
@@ -12,7 +7,7 @@ from pathlib import Path
 from typing import Iterable, Literal, Optional
 
 
-AlignmentMode = Literal["natural", "windowed"]
+AlignmentMode = Literal["natural"]
 
 PRIMARY_CHROMOSOMES = [
     "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
@@ -124,7 +119,6 @@ class PafRecord:
     score: int
     is_primary_chromosome_pair: bool
     is_same_chromosome: bool
-    is_windowed_1mb: bool
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -191,12 +185,6 @@ def parse_paf_line(
     chr_1 = normalize_chr(assembly_1, query_name)
     chr_2 = normalize_chr(assembly_2, target_name)
     identity = round((residue_matches / alignment_length) * 100, 4)
-    query_span = query_end - query_start
-    is_windowed = (
-        query_start % 1_000_000 == 0
-        and (query_span == 1_000_000 or query_end % 1_000_000 == 0)
-    )
-
     return PafRecord(
         block_id=f"paf-{index}",
         query_name=query_name,
@@ -221,7 +209,6 @@ def parse_paf_line(
         score=residue_matches,
         is_primary_chromosome_pair=chr_1 in PRIMARY_CHROMOSOMES and chr_2 in PRIMARY_CHROMOSOMES,
         is_same_chromosome=chr_1 == chr_2,
-        is_windowed_1mb=is_windowed,
     )
 
 
@@ -330,14 +317,7 @@ def summarize_paf_records(
     target_covered_bases, target_coverage_by_chr = _coverage_by_chromosome(records, "target")
     query_total_bases = sum({record.query_name: record.query_length for record in records}.values())
     target_total_bases = sum({record.target_name: record.target_length for record in records}.values())
-    rounded_count = sum(1 for record in records if record.query_start % 1_000_000 == 0)
-    windowed_count = sum(1 for record in records if record.is_windowed_1mb)
-    rounded_fraction = rounded_count / block_count
-    classification = (
-        "1 Mb windowed alignment QC"
-        if rounded_fraction >= 0.9 and windowed_count / block_count >= 0.9
-        else "natural-breakpoint whole-genome alignment"
-    )
+    classification = "natural-breakpoint whole-genome alignment"
 
     identities = [record.identity for record in records]
     mapqs = [record.mapping_quality for record in records]
@@ -363,8 +343,6 @@ def summarize_paf_records(
         "off_diagonal_blocks": sum(1 for record in records if not record.is_same_chromosome),
         "reverse_strand_blocks": sum(1 for record in records if record.strand == "-"),
         "primary_chromosome_blocks": sum(1 for record in records if record.is_primary_chromosome_pair),
-        "one_mb_windowed_blocks": windowed_count,
-        "rounded_query_start_fraction": round(rounded_fraction, 6),
         "query_covered_bases": query_covered_bases,
         "target_covered_bases": target_covered_bases,
         "query_total_bases": query_total_bases,

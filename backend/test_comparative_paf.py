@@ -25,30 +25,6 @@ def test_parse_paf_line_normalizes_refseq_chromosomes():
     assert record.start_1 == 127045112
     assert record.end_1 == 128112455
     assert record.identity == 99.3
-    assert record.is_windowed_1mb is False
-
-
-def test_summarize_paf_records_identifies_windowed_dataset(tmp_path: Path):
-    paf = tmp_path / "windowed.paf"
-    paf.write_text(
-        "\n".join(
-            [
-                "NC_006088.5\t197608386\t0\t1000000\t+\tNC_052532.1\t196449156\t0\t994133\t996000\t1000000\t60",
-                "NC_006088.5\t197608386\t1000000\t2000000\t+\tNC_052532.1\t196449156\t994133\t1988267\t986000\t1000000\t60",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    records = read_paf_records(paf)
-    summary = summarize_paf_records(records, dataset="windowed", source_path=paf)
-
-    assert summary["block_count"] == 2
-    assert summary["rounded_query_start_fraction"] == 1.0
-    assert summary["dataset_classification"] == "1 Mb windowed alignment QC"
-    assert summary["query_covered_bases"] == 2000000
-    assert summary["target_covered_bases"] == 1988267
 
 
 def test_summarize_paf_records_identifies_natural_dataset(tmp_path: Path):
@@ -68,11 +44,12 @@ def test_summarize_paf_records_identifies_natural_dataset(tmp_path: Path):
     summary = summarize_paf_records(records, dataset="natural", source_path=paf)
 
     assert summary["block_count"] == 2
-    assert summary["rounded_query_start_fraction"] == 0.0
     assert summary["dataset_classification"] == "natural-breakpoint whole-genome alignment"
     assert summary["reverse_strand_blocks"] == 1
     assert summary["chromosomes_1"] == 2
     assert summary["chromosomes_2"] == 2
+    assert "rounded_query_start_fraction" not in summary
+    assert "one_mb_windowed_blocks" not in summary
 
 
 def test_gold_standard_status_keeps_missing_layers_explicit(tmp_path: Path):
@@ -93,7 +70,9 @@ def test_gold_standard_status_keeps_missing_layers_explicit(tmp_path: Path):
     assert status["layers"]["dna_natural_synteny"]["status"] == "available"
     assert status["layers"]["base_level_alignment"]["status"] == "missing"
     assert status["layers"]["gene_collinearity"]["status"] == "missing"
-    assert status["layers"]["windowed_qc"]["status"] == "available"
+    assert "windowed_qc" not in status["layers"]
+    assert status["fallback_policy"]["fallback_allowed"] is False
+    assert status["fallback_policy"]["fallback_dataset"] is None
 
     base_level = store.get_base_level_records(chr_name="1", start=0, end=1000)
     assert base_level["status"] == "missing"
@@ -115,8 +94,6 @@ if __name__ == "__main__":
     import tempfile
 
     test_parse_paf_line_normalizes_refseq_chromosomes()
-    with tempfile.TemporaryDirectory() as tmp:
-        test_summarize_paf_records_identifies_windowed_dataset(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_summarize_paf_records_identifies_natural_dataset(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:

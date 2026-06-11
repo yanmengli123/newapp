@@ -246,7 +246,7 @@ GOEnrichmentPage
 
 ### 5.1 页面作用
 
-**GRCg6a vs GRCg7b 比较基因组学** 主分析页面，使用 **natural-breakpoint whole-genome alignment** 作为主分析层，**1 Mb windowed PAF** 作为 QC 对照。
+**GRCg6a vs GRCg7b 比较基因组学** 主分析页面，使用 **natural-breakpoint whole-genome alignment** 作为主分析层，配合 **base-level PAF** 与 **gene-level collinearity** 形成金标准证据链。固定 1 Mb windowed PAF 不再作为页面证据层或 fallback。
 
 ### 5.2 核心功能
 
@@ -261,7 +261,7 @@ GOEnrichmentPage
 | **Methods Provenance** | 方法学和来源 | API |
 | **Gold Standard** | 标准证据层状态 | API |
 
-### 5.3 双层数据架构
+### 5.3 金标准数据架构
 
 ```
 Natural PAF (主分析)
@@ -270,10 +270,15 @@ Natural PAF (主分析)
   ↓ 59 条 high-confidence blocks
   ↓ 95%+ coverage, 89.7% identity
 
-Windowed PAF (QC 对照)
-  ↓ 1 Mb 固定窗口
-  ↓ 1,068 条
-  ↓ 100% rounded starts (用于 QC)
+Base-level PAF (局部碱基层证据)
+  ↓ minimap2 -x asm5 --cs=long --secondary=no
+  ↓ bgzip + tabix
+  ↓ 按 query/target 区间抽取
+
+Gene collinearity (功能层证据)
+  ↓ normalized GFF/protein IDs
+  ↓ BLASTP reciprocal-best-hit
+  ↓ genomic chaining blocks
 ```
 
 ### 5.4 关键统计
@@ -286,13 +291,10 @@ Windowed PAF (QC 对照)
 | GRCg7b coverage | 95.5% |
 | Off-diagonal blocks | 0 |
 | Reverse blocks | 7 |
-| Window QC rounded starts | 100% |
 
-### 5.5 双模式切换
+### 5.5 显示策略
 
-页面顶部有 **SegmentedControl** 切换 natural/windowed：
-- **Natural** - 真正的 synteny breakpoint
-- **Windowed** - 1 Mb 固定窗口 (QC 用)
+页面只展示 natural-breakpoint PAF 作为 DNA synteny 主层；固定窗口 PAF 不再作为可见 tab、统计项或 fallback。若 natural PAF 缺失，系统应显式报错，而不是静默替换为固定窗口数据。
 
 ### 5.6 过滤参数
 
@@ -326,9 +328,7 @@ ComparativeGenomicsPage (1104 行)
 - `GET /comparative/assemblies` - 基因组列表
 - `GET /comparative/chromosome-mapping` - 染色体映射
 - `GET /comparative/alignment-blocks?mode=natural` - natural 对齐块
-- `GET /comparative/alignment-blocks?mode=windowed` - windowed 对齐块
 - `GET /comparative/alignment-stats?mode=natural` - natural 统计
-- `GET /comparative/alignment-stats?mode=windowed` - windowed 统计
 - `GET /comparative/methods` - 方法学
 - `GET /comparative/gold-standard` - gold standard 状态
 - `GET /comparative/base-level?side=query&chr=1&start=0&end=5000000` - 局部 PAF

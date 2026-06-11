@@ -40,9 +40,7 @@ class ComparativeService:
     def get_alignment_paf_path(self, mode: AlignmentMode = "natural") -> Path:
         """Return the source PAF file for a comparative alignment layer."""
         base = self._project_root() / "synteny"
-        if mode == "natural":
-            return base / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf"
-        return base / "grcg6a_vs_grcg7b.paf"
+        return base / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf"
 
     def get_alignment_provenance_path(self) -> Path:
         return (
@@ -65,7 +63,7 @@ class ComparativeService:
         limit: int = 5000,
         order: Literal["coordinate", "score"] = "coordinate",
     ) -> list[dict]:
-        """Read normalized PAF alignment blocks from the natural/windowed file layer."""
+        """Read normalized natural-breakpoint PAF alignment blocks."""
         if {assembly_1, assembly_2} != {"GRCg6a", "GRCg7b"}:
             return []
 
@@ -124,7 +122,6 @@ class ComparativeService:
     def get_comparative_methods(self) -> dict:
         """Return provenance and interpretation metadata for the comparative view."""
         natural_path = self.get_alignment_paf_path("natural")
-        windowed_path = self.get_alignment_paf_path("windowed")
         provenance_path = self.get_alignment_provenance_path()
         provenance: dict[str, Any] = {}
         if provenance_path.exists():
@@ -154,14 +151,6 @@ class ComparativeService:
                 "interpretation": (
                     "Primary synteny layer. Breakpoints are produced by minimap2 chaining "
                     "from whole-genome alignment instead of fixed genomic windows."
-                ),
-            },
-            "windowed_alignment_qc": {
-                "status": "available" if windowed_path.exists() else "missing",
-                "path": str(windowed_path),
-                "interpretation": (
-                    "Legacy 1 Mb windowed PAF retained for continuity and QC. "
-                    "Its rounded starts are expected and should not be interpreted as biological breakpoints."
                 ),
             },
             "coordinate_system": "PAF 0-based half-open coordinates; table labels are displayed as genomic intervals.",
@@ -202,31 +191,20 @@ class ComparativeService:
         return self.gold_store.get_gene_collinearity(chr_name=chr_name, limit=limit)
 
     def get_paf_file_layer_status(self, mode: AlignmentMode = "natural") -> dict:
-        """Report whether /paf/file will serve primary data or QC fallback."""
+        """Report whether /paf/file can serve primary natural-breakpoint data."""
         requested = self.get_alignment_paf_path(mode)
         if requested.exists():
             return {
-                "status": "primary" if mode == "natural" else "qc",
-                "mode": mode,
+                "status": "primary",
+                "mode": "natural",
                 "source_path": str(requested),
                 "warning": "",
             }
-        if mode == "natural" and self.get_alignment_paf_path("windowed").exists():
-            fallback = self.get_alignment_paf_path("windowed")
-            return {
-                "status": "fallback_windowed_qc",
-                "mode": "windowed",
-                "source_path": str(fallback),
-                "warning": (
-                    "Natural PAF is unavailable. Serving 1 Mb windowed QC fallback; "
-                    "do not interpret these records as biological breakpoints."
-                ),
-            }
         return {
             "status": "missing",
-            "mode": mode,
+            "mode": "natural",
             "source_path": str(requested),
-            "warning": "Requested PAF layer is missing.",
+            "warning": "Natural-breakpoint PAF is missing; no fixed-window fallback is allowed.",
         }
 
     def get_paf_file_content(
@@ -241,10 +219,6 @@ class ComparativeService:
     ) -> str:
         """Return filtered PAF text for JBrowse2 or direct download."""
         path = self.get_alignment_paf_path(mode)
-        if mode == "natural" and not path.exists():
-            path = self.get_alignment_paf_path("windowed")
-            min_alignment_length = max(min_alignment_length, 1_000_000)
-            min_quality = max(min_quality, 30)
 
         records = read_paf_records(
             path,

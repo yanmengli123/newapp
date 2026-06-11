@@ -1,6 +1,5 @@
 import { useMemo, useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Badge,
   Button,
   Card,
@@ -252,12 +251,12 @@ export default function JBrowsePage() {
 
       {viewMode === "comparative" && (
         <Stack gap="sm">
-          <Card withBorder radius="sm" p="md" bg={syntenyLayer?.isFallback ? "yellow.0" : "blue.0"}>
+          <Card withBorder radius="sm" p="md" bg="blue.0">
             <Group justify="space-between" align="flex-start" gap="md">
               <Stack gap={4}>
                 <Group gap="xs">
                   <Text fw={700}>LinearSyntenyView is active: GRCg6a on top, GRCg7b below, ribbons in the middle.</Text>
-                  <Badge color={syntenyLayer?.isFallback ? "yellow" : "green"} variant="light">
+                  <Badge color="green" variant="light">
                     {syntenyLayer?.status || "loading"}
                   </Badge>
                 </Group>
@@ -273,11 +272,6 @@ export default function JBrowsePage() {
               </Button>
             </Group>
           </Card>
-          {syntenyLayer?.isFallback && (
-            <Alert color="yellow" title="Windowed QC fallback is displayed">
-              {syntenyLayer.warning || "Natural synteny is unavailable. Do not interpret fallback records as biological breakpoints."}
-            </Alert>
-          )}
         </Stack>
       )}
 
