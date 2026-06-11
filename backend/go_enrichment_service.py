@@ -42,6 +42,9 @@ CORRECTION_MAP = {
     "none": "none",
 }
 
+GO_ANNOTATION_SOURCE = "ensembl_biomart"
+GO_ANNOTATION_SOURCE_SQL = "AND gg.source = 'ensembl_biomart'"
+
 
 def _compute_enrichment_for_namespace(
     query_go_hits: dict[str, list[str]],
@@ -362,7 +365,7 @@ class GOBackgroundBuilder:
                     FROM gene_go gg
                     JOIN gene_xref gx ON gx.gene_id = gg.gene_id
                     {alt_join}
-                    WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
+                    WHERE gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} {ev_where}
                 """, ev_args)
             else:
                 cur.execute(f"""
@@ -371,7 +374,7 @@ class GOBackgroundBuilder:
                     JOIN gene_xref gx ON gx.gene_id = gg.gene_id
                     {alt_join}
                     JOIN go_term gt ON gt.go_id = {go_id_expr}
-                    WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s {ev_where}
+                    WHERE gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} AND gt.go_namespace = %s {ev_where}
                 """, (namespace,) + tuple(ev_args))
 
             background_gene_ids = {r[0] for r in cur.fetchall()}
@@ -385,7 +388,7 @@ class GOBackgroundBuilder:
                         FROM gene_go gg
                         JOIN gene_xref gx ON gx.gene_id = gg.gene_id
                         {alt_join}
-                        WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
+                        WHERE gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} {ev_where}
                         GROUP BY {go_id_expr}
                     """, ev_args)
                 else:
@@ -396,7 +399,7 @@ class GOBackgroundBuilder:
                         JOIN gene_xref gx ON gx.gene_id = gg.gene_id
                         {alt_join}
                         JOIN go_term gt ON gt.go_id = {go_id_expr}
-                        WHERE gx.ncbi_gene_id IS NOT NULL AND gt.go_namespace = %s {ev_where}
+                        WHERE gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} AND gt.go_namespace = %s {ev_where}
                         GROUP BY {go_id_expr}
                     """, (namespace,) + tuple(ev_args))
                 bg_go_counts = {r[0]: r[1] for r in cur.fetchall()}
@@ -415,7 +418,7 @@ class GOBackgroundBuilder:
                             JOIN go_alt_id galt ON galt.alt_go_id = gg.go_id
                             JOIN go_closure gc ON gc.descendant_go_id = galt.primary_go_id
                             JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
-                            WHERE gx.ncbi_gene_id IS NOT NULL {ev_where}
+                            WHERE gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} {ev_where}
                             UNION
                             SELECT DISTINCT gg.gene_id, gc.ancestor_go_id
                             FROM gene_go gg
@@ -423,6 +426,7 @@ class GOBackgroundBuilder:
                             JOIN go_closure gc ON gc.descendant_go_id = gg.go_id
                             JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
                             WHERE gx.ncbi_gene_id IS NOT NULL
+                              AND gg.source = '{GO_ANNOTATION_SOURCE}'
                               AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
                               {ev_where}
                         ) combined
@@ -443,6 +447,7 @@ class GOBackgroundBuilder:
                             JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
                             JOIN go_term gt_ann ON gt_ann.go_id = galt.primary_go_id
                             WHERE gx.ncbi_gene_id IS NOT NULL
+                              AND gg.source = '{GO_ANNOTATION_SOURCE}'
                               AND gt.go_namespace = %s
                               AND gt_ann.go_namespace = %s
                               {ev_where}
@@ -454,6 +459,7 @@ class GOBackgroundBuilder:
                             JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
                             JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
                             WHERE gx.ncbi_gene_id IS NOT NULL
+                              AND gg.source = '{GO_ANNOTATION_SOURCE}'
                               AND gt.go_namespace = %s
                               AND gt_ann.go_namespace = %s
                               AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
@@ -564,7 +570,7 @@ class GOEnrichmentAnalyzer:
                                   ARRAY_AGG(DISTINCT gg.gene_id)
                            FROM gene_go gg
                            {alt_join}
-                           WHERE gg.gene_id = ANY(%s) {ev_where}
+                           WHERE gg.gene_id = ANY(%s) {GO_ANNOTATION_SOURCE_SQL} {ev_where}
                            GROUP BY {go_id_expr}""",
                         (annotated_gene_ids,) + tuple(ev_args)
                     )
@@ -582,6 +588,7 @@ class GOEnrichmentAnalyzer:
                         JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
                         JOIN go_term gt_ann ON gt_ann.go_id = galt.primary_go_id
                         WHERE gg.gene_id = ANY(%s)
+                          AND gg.source = '{GO_ANNOTATION_SOURCE}'
                           AND gt.go_namespace = %s
                           AND gt_ann.go_namespace = %s
                           {ev_where}
@@ -600,6 +607,7 @@ class GOEnrichmentAnalyzer:
                         JOIN go_term gt ON gt.go_id = gc.ancestor_go_id
                         JOIN go_term gt_ann ON gt_ann.go_id = gg.go_id
                         WHERE gg.gene_id = ANY(%s)
+                          AND gg.source = '{GO_ANNOTATION_SOURCE}'
                           AND gt.go_namespace = %s
                           AND gt_ann.go_namespace = %s
                           AND gg.go_id NOT IN (SELECT alt_go_id FROM go_alt_id)
@@ -673,7 +681,7 @@ class GOEnrichmentAnalyzer:
                     f"SELECT COUNT(DISTINCT gg.gene_id) FROM gene_go gg "
                     f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
                     f"{alt_join} "
-                    f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {ev_where}",
+                    f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} {ev_where}",
                     (mapped_gene_ids_unique,) + tuple(ev_args)
                 )
             else:
@@ -683,7 +691,7 @@ class GOEnrichmentAnalyzer:
                     f"{alt_join} "
                     f"JOIN go_term gt ON gt.go_id = {go_id_expr} "
                     f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL "
-                    f"AND gt.go_namespace = %s {ev_where}",
+                    f"{GO_ANNOTATION_SOURCE_SQL} AND gt.go_namespace = %s {ev_where}",
                     (mapped_gene_ids_unique, params.namespace) + tuple(ev_args)
                 )
             annotated_count = cur.fetchone()[0]
@@ -703,7 +711,7 @@ class GOEnrichmentAnalyzer:
                     f"SELECT DISTINCT gg.gene_id FROM gene_go gg "
                     f"JOIN gene_xref gx ON gx.gene_id = gg.gene_id "
                     f"{alt_join} "
-                    f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {ev_where_map}"
+                    f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL {GO_ANNOTATION_SOURCE_SQL} {ev_where_map}"
                 )
                 cur_annotated_args = (mapped_gene_ids_unique,) + tuple(ev_args_map)
             else:
@@ -713,7 +721,7 @@ class GOEnrichmentAnalyzer:
                     f"{alt_join} "
                     f"JOIN go_term gt ON gt.go_id = {go_id_expr} "
                     f"WHERE gg.gene_id = ANY(%s) AND gx.ncbi_gene_id IS NOT NULL "
-                    f"AND gt.go_namespace = %s {ev_where_map}"
+                    f"{GO_ANNOTATION_SOURCE_SQL} AND gt.go_namespace = %s {ev_where_map}"
                 )
                 cur_annotated_args = (mapped_gene_ids_unique, params.namespace) + tuple(ev_args_map)
 
@@ -775,9 +783,9 @@ class GOEnrichmentAnalyzer:
             background_count=total_bg,
             tested_term_count=sum(s["tested_term_count"] for s in ontology_stats.values()),
             significant_count=sum(s["significant_count"] for s in ontology_stats.values()),
-            annotation_source="ensembl_biomart+ncbi_gaf_grcg6a",
+            annotation_source=GO_ANNOTATION_SOURCE,
             annotation_mode=params.annotation_mode,
-            background_mode="annotated_grcg6a_ncbi_genes",
+            background_mode="annotated_grcg6a_biomart_genes",
             parameters={
                 "correction": params.correction,
                 "fdr_cutoff": params.fdr_cutoff,

@@ -196,11 +196,11 @@ export default function GOEnrichmentPage() {
           Singular Enrichment Analysis for Gallus gallus GRCg6a genes
         </Text>
         <Text c="dimmed" size="xs" mt={2}>
-          Uses local Ensembl BioMart + NCBI GAF GO annotations for GRCg6a.
-          Background: GRCg6a genes with NCBI Gene ID and GO annotations.
+          Uses local Ensembl BioMart GO annotations mapped to GRCg6a genes.
+          Background: GRCg6a genes with BioMart GO annotations and NCBI Gene ID.
         </Text>
         <Text c="dimmed" size="xs">
-          This analysis uses local GO annotations mapped to the NCBI GRCg6a gene set.
+          This analysis uses BioMart-only GO annotations mapped to the NCBI GRCg6a gene set.
           <b>Direct</b>: only directly assigned GO terms are tested.
           <b>Propagated</b>: direct annotations are propagated to all is_a/part_of ancestor terms
           (GO DAG from go-basic.obo, January 2026 release).

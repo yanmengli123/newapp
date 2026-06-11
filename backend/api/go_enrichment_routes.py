@@ -9,7 +9,12 @@ import random
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
-from backend.go_enrichment_service import GOEnrichmentAnalyzer, EnrichmentParams, GODagNotReadyError
+from backend.go_enrichment_service import (
+    GO_ANNOTATION_SOURCE,
+    GOEnrichmentAnalyzer,
+    EnrichmentParams,
+    GODagNotReadyError,
+)
 
 router = APIRouter(prefix="/go-enrichment", tags=["GO Enrichment"])
 
@@ -199,11 +204,12 @@ async def get_example_sets(request: Request):
             FROM gene_go gg
             JOIN gene_xref gx ON gx.gene_id = gg.gene_id
             WHERE gx.ncbi_gene_id IS NOT NULL AND gg.evidence_code != 'IEA'
+              AND gg.source = %s
             GROUP BY gg.go_id
             HAVING COUNT(DISTINCT gg.gene_id) >= 30 AND COUNT(DISTINCT gg.gene_id) <= 600
             ORDER BY RANDOM()
             LIMIT 4
-        """)
+        """, (GO_ANNOTATION_SOURCE,))
         hub_go_ids = [r[0] for r in cur.fetchall()]
 
         # Step 2: for each hub, pick 20 genes (that hub GO term + ≥2 total direct GO terms)
@@ -218,11 +224,14 @@ async def get_example_sets(request: Request):
                     JOIN gene_xref gx ON gx.gene_id = gg.gene_id
                     WHERE gx.ncbi_gene_id IS NOT NULL
                       AND gg.evidence_code != 'IEA'
+                      AND gg.source = %s
                       AND gg.gene_id IN (
                           SELECT gg2.gene_id
                           FROM gene_go gg2
                           JOIN gene_xref gx2 ON gx2.gene_id = gg2.gene_id
-                          WHERE gx2.ncbi_gene_id IS NOT NULL AND gg2.evidence_code != 'IEA'
+                          WHERE gx2.ncbi_gene_id IS NOT NULL
+                            AND gg2.evidence_code != 'IEA'
+                            AND gg2.source = %s
                           GROUP BY gg2.gene_id
                           HAVING COUNT(DISTINCT gg2.go_id) >= 2
                       )
@@ -230,7 +239,7 @@ async def get_example_sets(request: Request):
                     GROUP BY gg.gene_id, gx.gene_symbol
                 ) sub
                 WHERE sub.rn <= 20
-            """, (hub_id,))
+            """, (GO_ANNOTATION_SOURCE, GO_ANNOTATION_SOURCE, hub_id))
             for row in cur.fetchall():
                 all_rows.append((hub_id, row[0]))
 
@@ -293,9 +302,9 @@ async def get_go_term(go_id: str, request: Request):
 
         cur.execute(
             "SELECT gene_id, ncbi_gene_id::text, gene_symbol FROM gene_xref "
-            "WHERE gene_id IN (SELECT gene_id FROM gene_go WHERE go_id = %s) "
+            "WHERE gene_id IN (SELECT gene_id FROM gene_go WHERE go_id = %s AND source = %s) "
             "AND ncbi_gene_id IS NOT NULL",
-            (resolved_go_id,)
+            (resolved_go_id, GO_ANNOTATION_SOURCE)
         )
         genes = [{"gene_id": r[0], "ncbi_id": r[1], "symbol": r[2]} for r in cur.fetchall()]
 
@@ -538,8 +547,8 @@ async def get_go_term_dag(
         # Direct gene counts per node
         cur.execute(
             "SELECT go_id, COUNT(DISTINCT gene_id) FROM gene_go "
-            "WHERE go_id = ANY(%s) GROUP BY go_id",
-            (go_ids_list,),
+            "WHERE go_id = ANY(%s) AND source = %s GROUP BY go_id",
+            (go_ids_list, GO_ANNOTATION_SOURCE),
         )
         direct_counts = dict(cur.fetchall())
 
@@ -549,8 +558,9 @@ async def get_go_term_dag(
             "FROM gene_go gg "
             "JOIN go_closure gc ON gc.descendant_go_id = gg.go_id "
             "WHERE gc.ancestor_go_id = ANY(%s) "
+            "AND gg.source = %s "
             "GROUP BY gc.ancestor_go_id",
-            (go_ids_list,),
+            (go_ids_list, GO_ANNOTATION_SOURCE),
         )
         propagated_counts = dict(cur.fetchall())
 
