@@ -138,6 +138,7 @@ export const jbrowseModes = {
       "GRCg6a Genes",
       "GRCg7b Genes",
       "GRCg6a -> GRCg7b Natural Synteny",
+      "Gene Collinearity Anchors",
     ],
   },
 } as const;
@@ -146,6 +147,7 @@ export const comparativeTrackIds = {
   grcg6aGenes: "genes-grcg6a",
   grcg7bGenes: "genes-grcg7b",
   synteny: "synteny-grcg6a-grcg7b",
+  geneCollinearity: "gene-collinearity-grcg6a-grcg7b",
 } as const;
 
 // ============================================

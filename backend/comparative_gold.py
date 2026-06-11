@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Literal, Optional
 import csv
 import gzip
+import html
 import os
 import shutil
 import subprocess
@@ -110,6 +111,18 @@ class GoldStandardComparativeStore:
     @property
     def anchors(self) -> Path:
         return self.gene_root / "grcg6a_grcg7b.anchors"
+
+    @property
+    def simple_anchors(self) -> Path:
+        return self.gene_root / "grcg6a_grcg7b.anchors.simple"
+
+    @property
+    def grcg6a_bed(self) -> Path:
+        return self.gene_root / "GRCg6a.bed"
+
+    @property
+    def grcg7b_bed(self) -> Path:
+        return self.gene_root / "GRCg7b.bed"
 
     @property
     def gene_provenance(self) -> Path:
@@ -487,6 +500,417 @@ class GoldStandardComparativeStore:
                 if len(rows) >= limit:
                     break
         return rows
+
+    def _read_gene_pairs(self, *, block_id: Optional[str] = None, limit: int = 20000) -> list[dict]:
+        rows = self._read_tsv_rows(self.gene_pairs, limit)
+        if block_id:
+            rows = [row for row in rows if row.get("block_id") == block_id]
+        return rows
+
+    def _read_gene_blocks(self, limit: int = 5000) -> list[dict]:
+        return self._read_tsv_rows(self.gene_blocks, limit)
+
+    def _float(self, value: object, default: float = 0.0) -> float:
+        try:
+            return float(value) if value not in {None, ""} else default
+        except (TypeError, ValueError):
+            return default
+
+    def _int(self, value: object, default: int = 0) -> int:
+        try:
+            return int(float(value)) if value not in {None, ""} else default
+        except (TypeError, ValueError):
+            return default
+
+    def _chr_sort_key(self, chr_name: str) -> tuple[int, str]:
+        normalized = chr_name[3:] if chr_name.startswith("chr") else chr_name
+        if normalized.isdigit():
+            return (int(normalized), normalized)
+        special = {"W": 40, "Z": 41, "MT": 42, "M": 42}
+        return (special.get(normalized, 99), normalized)
+
+    def _build_offsets(self, lengths: dict[str, int]) -> tuple[dict[str, int], int, list[str]]:
+        ordered = sorted(lengths, key=self._chr_sort_key)
+        offsets: dict[str, int] = {}
+        cursor = 0
+        for chr_name in ordered:
+            offsets[chr_name] = cursor
+            cursor += max(1, lengths[chr_name])
+        return offsets, max(1, cursor), ordered
+
+    def _svg_shell(self, *, title: str, subtitle: str, width: int, height: int, body: str) -> str:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
+            f'viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title)}">'
+            "<style>"
+            ".title{font:700 24px Arial,sans-serif;fill:#111827}"
+            ".subtitle{font:13px Arial,sans-serif;fill:#4b5563}"
+            ".label{font:11px Arial,sans-serif;fill:#374151}"
+            ".small{font:10px Arial,sans-serif;fill:#6b7280}"
+            ".axis{stroke:#111827;stroke-width:1}"
+            ".grid{stroke:#d1d5db;stroke-width:.7}"
+            ".plus{stroke:#0f766e;fill:#0f766e}"
+            ".minus{stroke:#b91c1c;fill:#b91c1c}"
+            ".ribbonPlus{fill:#14b8a6;fill-opacity:.24;stroke:#0f766e;stroke-opacity:.5}"
+            ".ribbonMinus{fill:#f97316;fill-opacity:.22;stroke:#c2410c;stroke-opacity:.5}"
+            ".gene{fill:#2563eb;stroke:#1d4ed8}"
+            ".gene2{fill:#9333ea;stroke:#7e22ce}"
+            ".link{stroke:#6b7280;stroke-width:1;stroke-opacity:.45}"
+            "</style>"
+            '<rect width="100%" height="100%" fill="#ffffff"/>'
+            f'<text x="32" y="36" class="title">{html.escape(title)}</text>'
+            f'<text x="32" y="58" class="subtitle">{html.escape(subtitle)}</text>'
+            f"{body}</svg>"
+        )
+
+    def _empty_figure(self, title: str, message: str) -> str:
+        body = (
+            '<rect x="32" y="88" width="896" height="420" rx="4" fill="#f9fafb" stroke="#d1d5db"/>'
+            f'<text x="480" y="300" text-anchor="middle" class="subtitle">{html.escape(message)}</text>'
+        )
+        return self._svg_shell(title=title, subtitle="GRCg6a vs GRCg7b", width=960, height=560, body=body)
+
+    def _read_primary_paf_records(self, limit: int = 5000):
+        if not self.primary_paf.exists():
+            return []
+        records = []
+        with self.primary_paf.open("r", encoding="utf-8", errors="replace") as handle:
+            for index, line in enumerate(handle):
+                if not line.strip() or line.startswith("#"):
+                    continue
+                record = parse_paf_line(line, index)
+                if record is not None:
+                    records.append(record)
+                if len(records) >= limit:
+                    break
+        return records
+
+    def _render_dna_dotplot_svg(self) -> str:
+        records = self._read_primary_paf_records()
+        if not records:
+            return self._empty_figure("DNA Whole-genome Dotplot", "Natural-breakpoint PAF is missing.")
+
+        q_lengths: dict[str, int] = {}
+        t_lengths: dict[str, int] = {}
+        for record in records:
+            q_lengths[record.chr_1] = max(q_lengths.get(record.chr_1, 0), record.query_length)
+            t_lengths[record.chr_2] = max(t_lengths.get(record.chr_2, 0), record.target_length)
+        q_offsets, q_total, q_order = self._build_offsets(q_lengths)
+        t_offsets, t_total, t_order = self._build_offsets(t_lengths)
+        left, top, plot_w, plot_h = 82, 92, 800, 390
+
+        def x(chr_name: str, pos: int) -> float:
+            return left + ((q_offsets.get(chr_name, 0) + pos) / q_total) * plot_w
+
+        def y(chr_name: str, pos: int) -> float:
+            return top + plot_h - ((t_offsets.get(chr_name, 0) + pos) / t_total) * plot_h
+
+        parts = [
+            f'<rect x="{left}" y="{top}" width="{plot_w}" height="{plot_h}" fill="#f9fafb" stroke="#111827"/>',
+        ]
+        for chr_name in q_order:
+            gx = x(chr_name, 0)
+            parts.append(f'<line x1="{gx:.2f}" y1="{top}" x2="{gx:.2f}" y2="{top + plot_h}" class="grid"/>')
+        for chr_name in t_order:
+            gy = y(chr_name, 0)
+            parts.append(f'<line x1="{left}" y1="{gy:.2f}" x2="{left + plot_w}" y2="{gy:.2f}" class="grid"/>')
+        for record in records:
+            cls = "minus" if record.strand == "-" else "plus"
+            parts.append(
+                f'<line x1="{x(record.chr_1, record.start_1):.2f}" '
+                f'y1="{y(record.chr_2, record.start_2):.2f}" '
+                f'x2="{x(record.chr_1, record.end_1):.2f}" '
+                f'y2="{y(record.chr_2, record.end_2):.2f}" '
+                f'class="{cls}" stroke-width="1.7" stroke-opacity=".75"/>'
+            )
+        parts.extend(
+            [
+                f'<text x="{left + plot_w / 2}" y="520" text-anchor="middle" class="label">GRCg6a cumulative genomic coordinate</text>',
+                f'<text x="22" y="{top + plot_h / 2}" transform="rotate(-90 22 {top + plot_h / 2})" text-anchor="middle" class="label">GRCg7b cumulative genomic coordinate</text>',
+                f'<text x="{left}" y="74" class="small">Blocks: {len(records)}; green=forward, orange=reverse; source=minimap2 asm5 natural PAF</text>',
+            ]
+        )
+        return self._svg_shell(
+            title="DNA Whole-genome Dotplot",
+            subtitle="Natural-breakpoint whole-genome alignment; DNA-level evidence.",
+            width=960,
+            height=560,
+            body="".join(parts),
+        )
+
+    def _render_gene_dotplot_svg(self) -> str:
+        pairs = self._read_gene_pairs(limit=50000)
+        if not pairs:
+            return self._empty_figure("Gene Collinearity Dotplot", "Gene anchor pairs are missing.")
+        q_lengths: dict[str, int] = {}
+        t_lengths: dict[str, int] = {}
+        for row in pairs:
+            q_chr = str(row.get("chr_1", ""))
+            t_chr = str(row.get("chr_2", ""))
+            q_lengths[q_chr] = max(q_lengths.get(q_chr, 0), self._int(row.get("end_1")))
+            t_lengths[t_chr] = max(t_lengths.get(t_chr, 0), self._int(row.get("end_2")))
+        q_offsets, q_total, q_order = self._build_offsets(q_lengths)
+        t_offsets, t_total, t_order = self._build_offsets(t_lengths)
+        left, top, plot_w, plot_h = 82, 92, 800, 390
+
+        def x(row: dict) -> float:
+            return left + ((q_offsets.get(str(row.get("chr_1", "")), 0) + self._int(row.get("start_1"))) / q_total) * plot_w
+
+        def y(row: dict) -> float:
+            return top + plot_h - ((t_offsets.get(str(row.get("chr_2", "")), 0) + self._int(row.get("start_2"))) / t_total) * plot_h
+
+        parts = [f'<rect x="{left}" y="{top}" width="{plot_w}" height="{plot_h}" fill="#f9fafb" stroke="#111827"/>']
+        for chr_name in q_order:
+            gx = left + (q_offsets[chr_name] / q_total) * plot_w
+            parts.append(f'<line x1="{gx:.2f}" y1="{top}" x2="{gx:.2f}" y2="{top + plot_h}" class="grid"/>')
+        for chr_name in t_order:
+            gy = top + plot_h - (t_offsets[chr_name] / t_total) * plot_h
+            parts.append(f'<line x1="{left}" y1="{gy:.2f}" x2="{left + plot_w}" y2="{gy:.2f}" class="grid"/>')
+        for row in pairs:
+            cls = "minus" if row.get("orientation") == "-" else "plus"
+            radius = 1.8 if self._float(row.get("pident")) >= 95 else 1.2
+            parts.append(f'<circle cx="{x(row):.2f}" cy="{y(row):.2f}" r="{radius}" class="{cls}" opacity=".72"/>')
+        method = pairs[0].get("method", "gene-anchor collinearity")
+        parts.extend(
+            [
+                f'<text x="{left + plot_w / 2}" y="520" text-anchor="middle" class="label">GRCg6a gene order coordinate</text>',
+                f'<text x="22" y="{top + plot_h / 2}" transform="rotate(-90 22 {top + plot_h / 2})" text-anchor="middle" class="label">GRCg7b gene order coordinate</text>',
+                f'<text x="{left}" y="74" class="small">Anchor pairs: {len(pairs)}; method={html.escape(str(method))}; green=same orientation, orange=inverted</text>',
+            ]
+        )
+        return self._svg_shell(
+            title="Gene Collinearity Dotplot",
+            subtitle="Gene-level conserved order from anchor pairs; distinct from DNA PAF.",
+            width=960,
+            height=560,
+            body="".join(parts),
+        )
+
+    def _render_karyotype_svg(self) -> str:
+        blocks = self._read_gene_blocks()
+        if not blocks:
+            return self._empty_figure("Karyotype Ribbon Overview", "Collinearity blocks are missing.")
+        q_lengths: dict[str, int] = {}
+        t_lengths: dict[str, int] = {}
+        for row in blocks:
+            q_chr = str(row.get("chr_1", ""))
+            t_chr = str(row.get("chr_2", ""))
+            q_lengths[q_chr] = max(q_lengths.get(q_chr, 0), self._int(row.get("end_1")))
+            t_lengths[t_chr] = max(t_lengths.get(t_chr, 0), self._int(row.get("end_2")))
+        q_offsets, q_total, q_order = self._build_offsets(q_lengths)
+        t_offsets, t_total, t_order = self._build_offsets(t_lengths)
+        left, width = 72, 820
+        top_y, bottom_y = 150, 380
+
+        def sx(offsets: dict[str, int], total: int, chr_name: str, pos: int) -> float:
+            return left + ((offsets.get(chr_name, 0) + pos) / total) * width
+
+        parts = [
+            f'<text x="{left}" y="116" class="label">GRCg6a</text>',
+            f'<text x="{left}" y="416" class="label">GRCg7b</text>',
+        ]
+        for chr_name in q_order:
+            x1 = sx(q_offsets, q_total, chr_name, 0)
+            x2 = sx(q_offsets, q_total, chr_name, q_lengths[chr_name])
+            parts.append(f'<rect x="{x1:.2f}" y="{top_y}" width="{max(1, x2 - x1):.2f}" height="14" fill="#e5e7eb" stroke="#9ca3af"/>')
+            if len(q_order) <= 35:
+                parts.append(f'<text x="{(x1 + x2) / 2:.2f}" y="{top_y - 8}" text-anchor="middle" class="small">{html.escape(chr_name)}</text>')
+        for chr_name in t_order:
+            x1 = sx(t_offsets, t_total, chr_name, 0)
+            x2 = sx(t_offsets, t_total, chr_name, t_lengths[chr_name])
+            parts.append(f'<rect x="{x1:.2f}" y="{bottom_y}" width="{max(1, x2 - x1):.2f}" height="14" fill="#e5e7eb" stroke="#9ca3af"/>')
+            if len(t_order) <= 35:
+                parts.append(f'<text x="{(x1 + x2) / 2:.2f}" y="{bottom_y + 34}" text-anchor="middle" class="small">{html.escape(chr_name)}</text>')
+        for row in blocks[:300]:
+            q_chr = str(row.get("chr_1", ""))
+            t_chr = str(row.get("chr_2", ""))
+            q1 = sx(q_offsets, q_total, q_chr, self._int(row.get("start_1")))
+            q2 = sx(q_offsets, q_total, q_chr, self._int(row.get("end_1")))
+            t1 = sx(t_offsets, t_total, t_chr, self._int(row.get("start_2")))
+            t2 = sx(t_offsets, t_total, t_chr, self._int(row.get("end_2")))
+            cls = "ribbonMinus" if row.get("orientation") == "-" else "ribbonPlus"
+            parts.append(
+                f'<path d="M {q1:.2f} {top_y + 14} C {q1:.2f} 240 {t1:.2f} 290 {t1:.2f} {bottom_y} '
+                f'L {t2:.2f} {bottom_y} C {t2:.2f} 290 {q2:.2f} 240 {q2:.2f} {top_y + 14} Z" class="{cls}"/>'
+            )
+        parts.append(
+            f'<text x="{left}" y="74" class="small">Collinear blocks: {len(blocks)}; ribbon width follows block span; method={html.escape(str(blocks[0].get("method", "")))}</text>'
+        )
+        return self._svg_shell(
+            title="Karyotype Ribbon Overview",
+            subtitle="Chromosome-scale gene collinearity blocks for publication overview.",
+            width=960,
+            height=500,
+            body="".join(parts),
+        )
+
+    def _render_micro_synteny_svg(self, block_id: Optional[str] = None) -> str:
+        blocks = self._read_gene_blocks()
+        if not block_id and blocks:
+            block_id = str(blocks[0].get("block_id", ""))
+        pairs = self._read_gene_pairs(block_id=block_id, limit=80) if block_id else []
+        if not pairs:
+            return self._empty_figure("Micro-synteny", "No anchor pairs are available for the selected block.")
+
+        q_min = min(self._int(row.get("start_1")) for row in pairs)
+        q_max = max(self._int(row.get("end_1")) for row in pairs)
+        t_min = min(self._int(row.get("start_2")) for row in pairs)
+        t_max = max(self._int(row.get("end_2")) for row in pairs)
+        left, width = 84, 790
+        q_y, t_y = 170, 330
+
+        def sx(value: int, start: int, end: int) -> float:
+            span = max(1, end - start)
+            return left + ((value - start) / span) * width
+
+        def arrow(x1: float, x2: float, y: int, strand: str, cls: str) -> str:
+            if x2 < x1:
+                x1, x2 = x2, x1
+            head = min(10, max(4, (x2 - x1) / 3))
+            if strand == "-":
+                points = f"{x1:.2f},{y} {x1 + head:.2f},{y - 8} {x2:.2f},{y - 8} {x2:.2f},{y + 8} {x1 + head:.2f},{y + 8}"
+            else:
+                points = f"{x1:.2f},{y - 8} {x2 - head:.2f},{y - 8} {x2:.2f},{y} {x2 - head:.2f},{y + 8} {x1:.2f},{y + 8}"
+            return f'<polygon points="{points}" class="{cls}" opacity=".86"/>'
+
+        parts = [
+            f'<text x="{left}" y="{q_y - 38}" class="label">GRCg6a block {html.escape(str(block_id))}</text>',
+            f'<text x="{left}" y="{t_y + 50}" class="label">GRCg7b homologous region</text>',
+            f'<line x1="{left}" y1="{q_y}" x2="{left + width}" y2="{q_y}" class="grid"/>',
+            f'<line x1="{left}" y1="{t_y}" x2="{left + width}" y2="{t_y}" class="grid"/>',
+        ]
+        for index, row in enumerate(pairs[:60]):
+            q1 = sx(self._int(row.get("start_1")), q_min, q_max)
+            q2 = sx(self._int(row.get("end_1")), q_min, q_max)
+            t1 = sx(self._int(row.get("start_2")), t_min, t_max)
+            t2 = sx(self._int(row.get("end_2")), t_min, t_max)
+            q_mid = (q1 + q2) / 2
+            t_mid = (t1 + t2) / 2
+            parts.append(f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="link"/>')
+            parts.append(arrow(q1, q2, q_y, str(row.get("strand_1", "+")), "gene"))
+            parts.append(arrow(t1, t2, t_y, str(row.get("strand_2", "+")), "gene2"))
+            if index < 16:
+                symbol = row.get("gene_symbol_1") or row.get("gene_1") or ""
+                parts.append(f'<text x="{q_mid:.2f}" y="{q_y - 16}" text-anchor="middle" class="small">{html.escape(str(symbol))}</text>')
+        block_row = next((row for row in blocks if str(row.get("block_id", "")) == str(block_id)), {})
+        method = block_row.get("method") or pairs[0].get("method", "")
+        parts.append(
+            f'<text x="{left}" y="74" class="small">Block: {html.escape(str(block_id))}; anchors shown: {min(len(pairs), 60)}; method={html.escape(str(method))}</text>'
+        )
+        return self._svg_shell(
+            title="Micro-synteny",
+            subtitle="Local gene order, direction, and homologous anchor connections.",
+            width=960,
+            height=460,
+            body="".join(parts),
+        )
+
+    def get_static_figure_catalog(self) -> dict:
+        figure_defs = [
+            {
+                "id": "dna-dotplot",
+                "title": "DNA Whole-genome Dotplot",
+                "evidence_layer": "DNA natural synteny",
+                "data_sources": [EvidenceFile.from_path("natural_paf", self.primary_paf).to_dict()],
+                "description": "Whole-genome DNA-level dotplot from minimap2 asm5 natural-breakpoint PAF.",
+            },
+            {
+                "id": "gene-collinearity-dotplot",
+                "title": "Gene Collinearity Dotplot",
+                "evidence_layer": "Gene collinearity",
+                "data_sources": [
+                    EvidenceFile.from_path("gene_pairs", self.gene_pairs).to_dict(),
+                    EvidenceFile.from_path("anchors", self.anchors).to_dict(),
+                ],
+                "description": "Gene anchor dotplot showing conserved gene order and orientation.",
+            },
+            {
+                "id": "karyotype-ribbons",
+                "title": "Karyotype Ribbon Overview",
+                "evidence_layer": "Gene collinearity blocks",
+                "data_sources": [EvidenceFile.from_path("blocks", self.gene_blocks).to_dict()],
+                "description": "Chromosome-scale ribbon overview of collinear blocks.",
+            },
+            {
+                "id": "micro-synteny",
+                "title": "Micro-synteny",
+                "evidence_layer": "Selected gene collinearity block",
+                "data_sources": [
+                    EvidenceFile.from_path("blocks", self.gene_blocks).to_dict(),
+                    EvidenceFile.from_path("gene_pairs", self.gene_pairs).to_dict(),
+                ],
+                "description": "Local gene arrows and homologous anchor links for one block.",
+            },
+        ]
+        figures = []
+        for item in figure_defs:
+            available = all(source["exists"] for source in item["data_sources"])
+            figures.append(
+                {
+                    **item,
+                    "status": "available" if available else "missing",
+                    "svg_endpoint": f"/comparative/static-figures/{item['id']}.svg",
+                    "export_formats": ["svg"],
+                    "coordinate_system": "Source files use 0-based genomic coordinates; labels are publication-style genomic intervals.",
+                    "provenance": "Static figure generated from local audited comparative evidence files.",
+                }
+            )
+        return {
+            "pair": {"assembly_1": "GRCg6a", "assembly_2": "GRCg7b", "species": "Gallus gallus"},
+            "dynamic_layers": [
+                "JBrowse2 Natural DNA Synteny",
+                "JBrowse2 Gene Collinearity Anchors",
+            ],
+            "figures": figures,
+        }
+
+    def render_static_figure_svg(self, figure_id: str, *, block_id: Optional[str] = None) -> str:
+        if figure_id == "dna-dotplot":
+            return self._render_dna_dotplot_svg()
+        if figure_id == "gene-collinearity-dotplot":
+            return self._render_gene_dotplot_svg()
+        if figure_id == "karyotype-ribbons":
+            return self._render_karyotype_svg()
+        if figure_id == "micro-synteny":
+            return self._render_micro_synteny_svg(block_id=block_id)
+        raise ValueError(f"Unknown static figure id: {figure_id}")
+
+    def _normalize_bed_content(self, path: Path, assembly: str) -> str:
+        if not path.exists():
+            return ""
+        lines: list[str] = []
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                if not line.strip() or line.startswith("#"):
+                    lines.append(line)
+                    continue
+                fields = line.rstrip("\n").split("\t")
+                if fields:
+                    fields[0] = normalize_chr(assembly, fields[0])
+                    if assembly == "GRCg7b" and not fields[0].startswith("chr"):
+                        fields[0] = f"chr{fields[0]}"
+                lines.append("\t".join(fields) + "\n")
+        return "".join(lines)
+
+    def get_gene_collinearity_file(self, name: str) -> Optional[dict]:
+        allowed = {
+            "grcg6a_grcg7b.anchors": self.anchors,
+            "grcg6a_grcg7b.anchors.simple": self.simple_anchors,
+            "GRCg6a.bed": self.grcg6a_bed,
+            "GRCg7b.bed": self.grcg7b_bed,
+        }
+        if name not in allowed:
+            return None
+        path = allowed[name]
+        if not path.exists():
+            return None
+        if name == "GRCg6a.bed":
+            content = self._normalize_bed_content(path, "GRCg6a")
+        elif name == "GRCg7b.bed":
+            content = self._normalize_bed_content(path, "GRCg7b")
+        else:
+            content = path.read_text(encoding="utf-8", errors="replace")
+        return {"path": path, "content": content, "media_type": "text/plain"}
 
     def get_gene_collinearity(self, *, chr_name: Optional[str] = None, limit: int = 100) -> dict:
         status = self.get_status()["layers"]["gene_collinearity"]["status"]

@@ -86,6 +86,7 @@ export interface SyntenyFeature {
 
 interface CreateSyntenyViewStateOptions {
   features: SyntenyFeature[];
+  geneFeatures?: SyntenyFeature[];
   location?: string | { refName: string; start?: number; end?: number };
   mateLocation?: string;
   onChange?: (patch: IJsonPatch, reversePatch: IJsonPatch) => void;
@@ -243,7 +244,20 @@ function buildSyntenyTrack(features: SyntenyFeature[]) {
   return {
     type: "SyntenyTrack",
     trackId: comparativeTrackIds.synteny,
-    name: "GRCg6a -> GRCg7b Synteny",
+    name: "GRCg6a -> GRCg7b Natural DNA Synteny",
+    assemblyNames: ["GRCg6a", "GRCg7b"],
+    adapter: {
+      type: "FromConfigAdapter",
+      features,
+    },
+  };
+}
+
+function buildGeneCollinearityTrack(features: SyntenyFeature[]) {
+  return {
+    type: "SyntenyTrack",
+    trackId: comparativeTrackIds.geneCollinearity,
+    name: "GRCg6a -> GRCg7b Gene Collinearity Anchors",
     assemblyNames: ["GRCg6a", "GRCg7b"],
     adapter: {
       type: "FromConfigAdapter",
@@ -254,6 +268,7 @@ function buildSyntenyTrack(features: SyntenyFeature[]) {
 
 export function createLinearSyntenyViewState({
   features,
+  geneFeatures = [],
   location = "chr1:1..5000000",
   mateLocation,
   onChange,
@@ -269,6 +284,7 @@ export function createLinearSyntenyViewState({
           geneTrackGRCg6a,
           geneTrackGRCg7b,
           buildSyntenyTrack(features),
+          ...(geneFeatures.length ? [buildGeneCollinearityTrack(geneFeatures)] : []),
         ],
         internetAccounts: [],
         connections: [],
@@ -293,7 +309,10 @@ export function createLinearSyntenyViewState({
                 tracks: [comparativeTrackIds.grcg7bGenes],
               },
             ],
-            tracks: [[comparativeTrackIds.synteny]],
+            tracks: [[
+              comparativeTrackIds.synteny,
+              ...(geneFeatures.length ? [comparativeTrackIds.geneCollinearity] : []),
+            ]],
           },
         },
       },

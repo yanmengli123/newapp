@@ -149,6 +149,27 @@ async def get_gold_standard_status():
     return service.get_gold_standard_status()
 
 
+@router.get("/static-figures")
+async def get_static_figure_catalog():
+    """Get publication-style static comparative figure metadata."""
+    service = get_service()
+    return service.get_static_figure_catalog()
+
+
+@router.get("/static-figures/{figure_id}.svg", response_class=PlainTextResponse)
+async def get_static_figure_svg(
+    figure_id: str,
+    block_id: Optional[str] = Query(None, description="Optional gene collinearity block for micro-synteny")
+):
+    """Render a publication-style static comparative figure as SVG."""
+    service = get_service()
+    try:
+        svg = service.get_static_figure_svg(figure_id, block_id=block_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return PlainTextResponse(svg, media_type="image/svg+xml")
+
+
 @router.get("/base-level")
 async def get_base_level_records(
     side: Literal["query", "target"] = Query("query"),
@@ -173,11 +194,32 @@ async def get_base_level_records(
 @router.get("/gene-collinearity")
 async def get_gene_collinearity(
     chr: Optional[str] = Query(None, description="Optional normalized chromosome filter"),
-    limit: int = Query(100, ge=1, le=1000)
+    limit: int = Query(100, ge=1, le=20000)
 ):
     """Get gene-level collinearity evidence if JCVI/MCScanX outputs exist."""
     service = get_service()
     return service.get_gene_collinearity(chr_name=chr, limit=limit)
+
+
+@router.get("/gene-collinearity/file", response_class=PlainTextResponse)
+async def get_gene_collinearity_file(
+    name: Literal[
+        "grcg6a_grcg7b.anchors",
+        "grcg6a_grcg7b.anchors.simple",
+        "GRCg6a.bed",
+        "GRCg7b.bed",
+    ] = Query(..., description="MCScan-compatible anchors or BED file")
+):
+    """Serve MCScan-compatible anchors/BED files for JBrowse2 dynamic gene synteny."""
+    service = get_service()
+    result = service.get_gene_collinearity_file(name)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Gene collinearity file is not available: {name}")
+    return PlainTextResponse(
+        result["content"],
+        media_type=result["media_type"],
+        headers={"X-Comparative-Source-Path": str(result["path"])},
+    )
 
 
 @router.get("/paf/status")

@@ -151,10 +151,11 @@ export default function JBrowsePage() {
     if (!syntenyFeatures.length) return undefined;
     return createLinearSyntenyViewState({
       features: syntenyFeatures,
+      geneFeatures: syntenyLayer?.geneFeatures || [],
       location: initialLoc,
       mateLocation: findMateLocation(syntenyFeatures, initialLoc),
     });
-  }, [initialLoc, syntenyFeatures]);
+  }, [initialLoc, syntenyFeatures, syntenyLayer?.geneFeatures]);
 
   const viewState = viewMode === "single" ? singleViewState : comparativeViewState;
   const currentMode = jbrowseModes[viewMode];
@@ -259,10 +260,17 @@ export default function JBrowsePage() {
                   <Badge color="green" variant="light">
                     {syntenyLayer?.status || "loading"}
                   </Badge>
+                  <Badge color="blue" variant="light">
+                    {syntenyLayer?.geneStatus || "gene loading"}
+                  </Badge>
                 </Group>
                 <Text size="sm" c="dimmed">
-                  The synteny layer uses /comparative/paf/file?mode=natural with mapQ &gt;= 30, identity &gt;= 85%, and length &gt;= 50 kb.
+                  Dynamic tracks use natural DNA PAF plus MCScan-compatible gene collinearity anchors.
                 </Text>
+                <Group gap={6}>
+                  <Badge color="green" variant="light">Natural DNA PAF</Badge>
+                  <Badge color="blue" variant="light">Gene anchors</Badge>
+                </Group>
                 {syntenyLayer?.source && (
                   <Text size="xs" c="dimmed" ff="monospace">{syntenyLayer.source}</Text>
                 )}

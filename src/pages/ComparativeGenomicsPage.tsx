@@ -26,6 +26,7 @@ import {
   IconChartDots,
   IconDna,
   IconExternalLink,
+  IconPhoto,
   IconInfoCircle,
   IconRefresh,
   IconTable,
@@ -41,6 +42,7 @@ import {
   getGeneCollinearity,
   getGoldStandardStatus,
   getOrthologTable,
+  getStaticFigureCatalog,
   mapCoordinates,
   type AlignmentBlock,
   type AlignmentMode,
@@ -52,6 +54,8 @@ import {
   type GeneCollinearityResponse,
   type GoldStandardLayer,
   type GoldStandardStatus,
+  type StaticFigureCatalog,
+  type StaticFigureItem,
 } from "../lib/comparativeApi";
 
 const CHROMOSOMES = [
@@ -106,6 +110,7 @@ export default function ComparativeGenomicsPage() {
   const [naturalStats, setNaturalStats] = useState<AlignmentStats | null>(null);
   const [methods, setMethods] = useState<ComparativeMethods | null>(null);
   const [goldStatus, setGoldStatus] = useState<GoldStandardStatus | null>(null);
+  const [staticFigures, setStaticFigures] = useState<StaticFigureCatalog | null>(null);
   const [baseLevel, setBaseLevel] = useState<BaseLevelResponse | null>(null);
   const [geneCollinearity, setGeneCollinearity] = useState<GeneCollinearityResponse | null>(null);
   const [chrMapping, setChrMapping] = useState<ChromosomeMapping[]>([]);
@@ -116,6 +121,7 @@ export default function ComparativeGenomicsPage() {
   const [baseChr, setBaseChr] = useState("1");
   const [baseStart, setBaseStart] = useState("1");
   const [baseEnd, setBaseEnd] = useState("5000000");
+  const [microBlockId, setMicroBlockId] = useState<string | null>(null);
   const [baseLoading, setBaseLoading] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -132,6 +138,7 @@ export default function ComparativeGenomicsPage() {
         naturalRows,
         methodRows,
         goldRows,
+        staticFigureRows,
         geneCollinearityRows,
         mappingRows,
       ] = await Promise.all([
@@ -139,6 +146,7 @@ export default function ComparativeGenomicsPage() {
         getAlignmentBlocks({ mode: "natural", chr_1: chrParam, order: "coordinate", ...NATURAL_FILTERS }),
         getComparativeMethods(),
         getGoldStandardStatus(),
+        getStaticFigureCatalog(),
         getGeneCollinearity({ chr: chrParam, limit: 100 }).catch(() => null),
         getChromosomeMapping("GRCg6a", "GRCg7b").catch(() => []),
       ]);
@@ -146,7 +154,9 @@ export default function ComparativeGenomicsPage() {
       setNaturalBlocks(naturalRows);
       setMethods(methodRows);
       setGoldStatus(goldRows);
+      setStaticFigures(staticFigureRows);
       setGeneCollinearity(geneCollinearityRows);
+      setMicroBlockId((current) => current || geneCollinearityRows?.blocks?.[0]?.block_id || null);
       setChrMapping(mappingRows);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -298,6 +308,7 @@ export default function ComparativeGenomicsPage() {
             <Tabs.Tab value="gold" leftSection={<IconInfoCircle size={16} />}>Gold Standard</Tabs.Tab>
             <Tabs.Tab value="natural" leftSection={<IconDna size={16} />}>Natural Synteny</Tabs.Tab>
             <Tabs.Tab value="dotplot" leftSection={<IconChartDots size={16} />}>Dotplot</Tabs.Tab>
+            <Tabs.Tab value="figures" leftSection={<IconPhoto size={16} />}>Static Figures</Tabs.Tab>
             <Tabs.Tab value="baselevel" leftSection={<IconTable size={16} />}>Base-Level</Tabs.Tab>
             <Tabs.Tab value="collinearity" leftSection={<IconTable size={16} />}>Gene Collinearity</Tabs.Tab>
             <Tabs.Tab value="genes" leftSection={<IconTable size={16} />}>Gene Layer</Tabs.Tab>
@@ -333,6 +344,15 @@ export default function ComparativeGenomicsPage() {
               </Group>
               <DotplotPanel data={naturalBlocks} loading={loading} mode="natural" stats={naturalStats} />
             </Stack>
+          </Tabs.Panel>
+          <Tabs.Panel value="figures" pt="md">
+            <StaticFiguresPanel
+              catalog={staticFigures}
+              loading={loading}
+              blocks={geneCollinearity?.blocks || []}
+              microBlockId={microBlockId}
+              onMicroBlockChange={setMicroBlockId}
+            />
           </Tabs.Panel>
           <Tabs.Panel value="baselevel" pt="md">
             <BaseLevelPanel
@@ -691,6 +711,127 @@ function GeneCollinearityPanel({ result, layer }: {
         <Alert color="gray">{result?.message || "Gene collinearity outputs are not generated yet."}</Alert>
       )}
     </Stack>
+  );
+}
+
+function StaticFiguresPanel({
+  catalog,
+  loading,
+  blocks,
+  microBlockId,
+  onMicroBlockChange,
+}: {
+  catalog: StaticFigureCatalog | null;
+  loading: boolean;
+  blocks: Record<string, string>[];
+  microBlockId: string | null;
+  onMicroBlockChange: (value: string | null) => void;
+}) {
+  if (!catalog) {
+    return (
+      <Paper withBorder p="xl" pos="relative">
+        <LoadingOverlay visible={loading} />
+        <Alert color="gray">Static figure catalog is not loaded.</Alert>
+      </Paper>
+    );
+  }
+
+  const blockOptions = blocks
+    .map((block) => block.block_id)
+    .filter(Boolean)
+    .map((blockId) => ({ value: blockId, label: blockId }));
+
+  return (
+    <Stack gap="md">
+      <Card withBorder radius="sm">
+        <Group justify="space-between" align="flex-start" gap="md">
+          <div>
+            <Text fw={700}>Dynamic + Static Evidence Package</Text>
+            <Text size="xs" c="dimmed">
+              {catalog.pair.assembly_1} vs {catalog.pair.assembly_2} publication figures are generated from audited local evidence files.
+            </Text>
+          </div>
+          <Group gap="xs">
+            {catalog.dynamic_layers.map((layer) => (
+              <Badge key={layer} variant="light" color="blue">{layer}</Badge>
+            ))}
+          </Group>
+        </Group>
+      </Card>
+
+      {blockOptions.length > 0 && (
+        <Card withBorder radius="sm">
+          <Select
+            label="Micro-synteny block"
+            value={microBlockId}
+            onChange={onMicroBlockChange}
+            data={blockOptions.slice(0, 500)}
+            searchable
+            w={{ base: "100%", sm: 280 }}
+          />
+        </Card>
+      )}
+
+      <SimpleGrid cols={{ base: 1, lg: 2 }}>
+        {catalog.figures.map((figure) => (
+          <StaticFigureCard key={figure.id} figure={figure} microBlockId={microBlockId} />
+        ))}
+      </SimpleGrid>
+    </Stack>
+  );
+}
+
+function figureSvgUrl(figure: StaticFigureItem, microBlockId: string | null) {
+  if (figure.id !== "micro-synteny" || !microBlockId) return figure.svg_endpoint;
+  return `${figure.svg_endpoint}?block_id=${encodeURIComponent(microBlockId)}`;
+}
+
+function StaticFigureCard({ figure, microBlockId }: {
+  figure: StaticFigureItem;
+  microBlockId: string | null;
+}) {
+  const url = figureSvgUrl(figure, microBlockId);
+  const availableSources = figure.data_sources.filter((source) => source.exists).length;
+
+  return (
+    <Card withBorder radius="sm">
+      <Stack gap="sm">
+        <Group justify="space-between" align="flex-start">
+          <div>
+            <Text fw={700}>{figure.title}</Text>
+            <Text size="xs" c="dimmed">{figure.evidence_layer}</Text>
+          </div>
+          <Badge color={layerColor(figure.status)} variant="light">{figure.status}</Badge>
+        </Group>
+        <Paper withBorder radius="sm" p={0} style={{ overflow: "hidden", background: "#fff" }}>
+          {figure.status === "available" ? (
+            <img
+              key={url}
+              src={url}
+              alt={figure.title}
+              style={{ display: "block", width: "100%", height: 360, objectFit: "contain" }}
+            />
+          ) : (
+            <Group justify="center" h={360}>
+              <Text c="dimmed" size="sm">Required source files are missing.</Text>
+            </Group>
+          )}
+        </Paper>
+        <Text size="xs" c="dimmed">{figure.description}</Text>
+        <SimpleGrid cols={2} spacing="xs">
+          <SmallStat label="Sources" value={`${availableSources}/${figure.data_sources.length}`} />
+          <SmallStat label="Format" value={figure.export_formats.join(", ").toUpperCase()} />
+        </SimpleGrid>
+        <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+            {figure.coordinate_system}
+          </Text>
+          <Button component="a" href={url} target="_blank" rel="noreferrer" size="xs" variant="light">
+            Open SVG
+          </Button>
+        </Group>
+      </Stack>
+    </Card>
   );
 }
 

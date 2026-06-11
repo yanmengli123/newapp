@@ -203,6 +203,29 @@ export interface GoldStandardStatus {
   tool_status: Record<string, { available: boolean; path?: string | null }>;
 }
 
+export interface StaticFigureItem {
+  id: "dna-dotplot" | "gene-collinearity-dotplot" | "karyotype-ribbons" | "micro-synteny" | string;
+  title: string;
+  evidence_layer: string;
+  data_sources: EvidenceFile[];
+  description: string;
+  status: string;
+  svg_endpoint: string;
+  export_formats: string[];
+  coordinate_system: string;
+  provenance: string;
+}
+
+export interface StaticFigureCatalog {
+  pair: {
+    assembly_1: string;
+    assembly_2: string;
+    species: string;
+  };
+  dynamic_layers: string[];
+  figures: StaticFigureItem[];
+}
+
 export interface BaseLevelRecord extends AlignmentBlock {
   has_cs: boolean;
   has_cigar: boolean;
@@ -403,6 +426,10 @@ export async function getComparativeMethods(): Promise<ComparativeMethods> {
 
 export async function getGoldStandardStatus(): Promise<GoldStandardStatus> {
   return apiFetch<GoldStandardStatus>("/comparative/gold-standard");
+}
+
+export async function getStaticFigureCatalog(): Promise<StaticFigureCatalog> {
+  return apiFetch<StaticFigureCatalog>("/comparative/static-figures");
 }
 
 export async function getBaseLevelRecords(params: {

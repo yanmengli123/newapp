@@ -1,10 +1,13 @@
 import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
 
 const PAF_URL = "/comparative/paf/file?mode=natural&min_quality=30&min_identity=85&min_alignment_length=50000";
+const GENE_COLLINEARITY_URL = "/comparative/gene-collinearity?limit=20000";
 
 export interface LoadedPafSynteny {
   features: SyntenyFeature[];
+  geneFeatures: SyntenyFeature[];
   status: string;
+  geneStatus: string;
   source: string;
   warning: string;
   isFallback: boolean;
@@ -92,16 +95,22 @@ const GRCG7B_REFSEQ_TO_CHR: Record<string, string> = {
 };
 
 export async function loadPafSyntenyFeatures(): Promise<LoadedPafSynteny> {
-  const response = await fetch(PAF_URL);
+  const [response, geneResponse] = await Promise.all([
+    fetch(PAF_URL),
+    fetch(GENE_COLLINEARITY_URL).catch(() => undefined),
+  ]);
   if (!response.ok) {
     throw new Error(`Failed to load natural-breakpoint PAF synteny file: ${response.status}`);
   }
   const status = response.headers.get("X-Synteny-Layer-Status") || "primary";
   const source = response.headers.get("X-Synteny-Source-Path") || PAF_URL;
   const warning = response.headers.get("X-Synteny-Warning") || "";
+  const geneData = geneResponse?.ok ? await geneResponse.json().catch(() => null) : null;
   return {
     features: parsePaf(await response.text()),
+    geneFeatures: parseGeneCollinearity(geneData),
     status,
+    geneStatus: geneData?.status || "missing",
     source,
     warning,
     isFallback: false,
@@ -128,6 +137,58 @@ export function findMateLocation(features: SyntenyFeature[], loc: string) {
   const mateStart = Math.max(1, hit.mate.start + 1);
   const mateEnd = Math.max(mateStart + 1, hit.mate.end);
   return `${hit.mate.refName}:${mateStart}..${mateEnd}`;
+}
+
+function parseGeneCollinearity(data: unknown): SyntenyFeature[] {
+  if (!data || typeof data !== "object" || !Array.isArray((data as { pairs?: unknown }).pairs)) {
+    return [];
+  }
+  const pairs = (data as { pairs: Array<Record<string, string>> }).pairs;
+  return pairs
+    .map((row, index) => parseGenePair(row, index))
+    .filter((feature): feature is SyntenyFeature => Boolean(feature));
+}
+
+function parseGenePair(row: Record<string, string>, index: number): SyntenyFeature | undefined {
+  const queryStart = Math.max(0, Number(row.start_1) - 1);
+  const queryEnd = Number(row.end_1);
+  const targetStart = Math.max(0, Number(row.start_2) - 1);
+  const targetEnd = Number(row.end_2);
+  if ([queryStart, queryEnd, targetStart, targetEnd].some(Number.isNaN)) return undefined;
+
+  const queryRefName = normalizeDisplayChr(row.chr_1);
+  const targetRefName = normalizeDisplayChr(row.chr_2);
+  const strand = row.orientation === "-" ? -1 : 1;
+  const score = Number(row.bitscore || row.pident || 1);
+  const pairId = row.pair_id || `gene-anchor-${index}`;
+  const name = `${row.gene_symbol_1 || row.gene_1 || "gene"} <-> ${row.gene_symbol_2 || row.gene_2 || "gene"}`;
+
+  return {
+    uniqueId: `grcg6a-grcg7b-gene-${pairId}`,
+    refName: queryRefName,
+    start: queryStart,
+    end: queryEnd,
+    type: "match",
+    name,
+    strand,
+    assemblyName: "GRCg6a",
+    CIGAR: `${Math.max(1, queryEnd - queryStart)}M`,
+    score: Number.isFinite(score) ? score : 1,
+    mate: {
+      uniqueId: `grcg6a-grcg7b-gene-${pairId}-mate`,
+      refName: targetRefName,
+      start: targetStart,
+      end: targetEnd,
+      type: "match",
+      strand,
+      assemblyName: "GRCg7b",
+    },
+  };
+}
+
+function normalizeDisplayChr(chr: string) {
+  if (!chr) return chr;
+  return chr.startsWith("chr") ? chr : `chr${chr}`;
 }
 
 function parsePafLine(line: string, index: number): SyntenyFeature | undefined {

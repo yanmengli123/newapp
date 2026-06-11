@@ -165,6 +165,18 @@ class ComparativeService:
         """Return file-backed status for all gold-standard evidence layers."""
         return self.gold_store.get_status()
 
+    def get_static_figure_catalog(self) -> dict:
+        """Return the publication-style static figure catalog."""
+        return self.gold_store.get_static_figure_catalog()
+
+    def get_static_figure_svg(self, figure_id: str, block_id: Optional[str] = None) -> str:
+        """Render a static comparative figure as SVG."""
+        return self.gold_store.render_static_figure_svg(figure_id, block_id=block_id)
+
+    def get_gene_collinearity_file(self, name: str) -> Optional[dict]:
+        """Return MCScan-compatible anchors/BED content for JBrowse2."""
+        return self.gold_store.get_gene_collinearity_file(name)
+
     def get_base_level_records(
         self,
         side: CoordinateSide = "query",
