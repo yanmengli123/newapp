@@ -169,9 +169,14 @@ class ComparativeService:
         """Return the publication-style static figure catalog."""
         return self.gold_store.get_static_figure_catalog()
 
-    def get_static_figure_svg(self, figure_id: str, block_id: Optional[str] = None) -> str:
+    def get_static_figure_svg(
+        self,
+        figure_id: str,
+        block_id: Optional[str] = None,
+        settings: Optional[dict[str, Any]] = None,
+    ) -> str:
         """Render a static comparative figure as SVG."""
-        return self.gold_store.render_static_figure_svg(figure_id, block_id=block_id)
+        return self.gold_store.render_static_figure_svg(figure_id, block_id=block_id, settings=settings)
 
     def get_gene_collinearity_file(self, name: str) -> Optional[dict]:
         """Return MCScan-compatible anchors/BED content for JBrowse2."""

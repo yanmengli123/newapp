@@ -15,12 +15,15 @@ promote a QC/fallback dataset to primary evidence.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 import csv
 import gzip
 import html
+import json
 import os
+import re
 import shutil
 import subprocess
 
@@ -29,6 +32,143 @@ from backend.comparative_paf import GRCG6A_REFSEQ_TO_CHR, normalize_chr, parse_p
 
 EvidenceStatus = Literal["available", "missing", "not_indexed"]
 CoordinateSide = Literal["query", "target"]
+
+
+HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+SAFE_BLOCK_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]+$")
+
+
+@dataclass(frozen=True)
+class FigureSettings:
+    width: int
+    height: int
+    dpi: int = 150
+    forward_color: str = "#0f766e"
+    reverse_color: str = "#b91c1c"
+    low_confidence_color: str = "#d1d5db"
+    background_color: str = "#ffffff"
+    grid_color: str = "#d1d5db"
+    text_color: str = "#111827"
+    show_labels: bool = True
+    label_density: Literal["all", "primary_only", "none"] = "primary_only"
+    show_legend: bool = True
+    show_title: bool = True
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    stroke_width: float = 1.7
+    point_size: float = 1.8
+    opacity: float = 0.75
+    selected_block_id: Optional[str] = None
+    selected_block_id_provided: bool = False
+    show_gene_arrows: bool = True
+    show_anchor_lines: bool = True
+
+    @classmethod
+    def from_payload(
+        cls,
+        payload: Optional[dict[str, Any] | "FigureSettings"],
+        *,
+        default_width: int,
+        default_height: int,
+    ) -> "FigureSettings":
+        if isinstance(payload, FigureSettings):
+            return payload
+        data = payload or {}
+        colors = data.get("colorScheme") if isinstance(data.get("colorScheme"), dict) else {}
+
+        def clamp_int(name: str, default: int, minimum: int, maximum: int) -> int:
+            if name not in data:
+                return default
+            try:
+                value = int(float(data.get(name)))
+            except (TypeError, ValueError):
+                return default
+            return max(minimum, min(maximum, value))
+
+        def clamp_float(name: str, default: float, minimum: float, maximum: float) -> float:
+            if name not in data:
+                return default
+            try:
+                value = float(data.get(name))
+            except (TypeError, ValueError):
+                return default
+            return max(minimum, min(maximum, value))
+
+        def bool_value(name: str, default: bool) -> bool:
+            value = data.get(name)
+            return default if value is None else bool(value)
+
+        def color_value(name: str, default: str) -> str:
+            value = colors.get(name)
+            return str(value) if isinstance(value, str) and HEX_COLOR_RE.match(value) else default
+
+        def text_value(name: str) -> Optional[str]:
+            value = data.get(name)
+            if not isinstance(value, str):
+                return None
+            value = value.strip()
+            return value[:160] if value else None
+
+        label_density = data.get("labelDensity", "primary_only")
+        if label_density not in {"all", "primary_only", "none"}:
+            label_density = "primary_only"
+
+        block_id_provided = "selectedBlockId" in data or "selected_block_id" in data
+        block_id = data.get("selectedBlockId") or data.get("selected_block_id")
+        if not isinstance(block_id, str) or not SAFE_BLOCK_ID_RE.match(block_id):
+            block_id = None
+
+        return cls(
+            width=clamp_int("width", default_width, 800, 4000),
+            height=clamp_int("height", default_height, 600, 3000),
+            dpi=clamp_int("dpi", 150, 72, 600),
+            forward_color=color_value("forward", "#0f766e"),
+            reverse_color=color_value("reverse", "#b91c1c"),
+            low_confidence_color=color_value("lowConfidence", "#d1d5db"),
+            background_color=color_value("background", "#ffffff"),
+            grid_color=color_value("grid", "#d1d5db"),
+            text_color=color_value("text", "#111827"),
+            show_labels=bool_value("showLabels", True),
+            label_density=label_density,  # type: ignore[arg-type]
+            show_legend=bool_value("showLegend", True),
+            show_title=bool_value("showTitle", True),
+            title=text_value("title"),
+            subtitle=text_value("subtitle"),
+            stroke_width=clamp_float("strokeWidth", 1.7, 0.5, 8.0),
+            point_size=clamp_float("pointSize", 1.8, 0.5, 12.0),
+            opacity=clamp_float("opacity", 0.75, 0.1, 1.0),
+            selected_block_id=block_id,
+            selected_block_id_provided=block_id_provided,
+            show_gene_arrows=bool_value("showGeneArrows", True),
+            show_anchor_lines=bool_value("showAnchorLines", True),
+        )
+
+    def to_public_dict(self) -> dict[str, Any]:
+        return {
+            "width": self.width,
+            "height": self.height,
+            "dpi": self.dpi,
+            "colorScheme": {
+                "forward": self.forward_color,
+                "reverse": self.reverse_color,
+                "lowConfidence": self.low_confidence_color,
+                "background": self.background_color,
+                "grid": self.grid_color,
+                "text": self.text_color,
+            },
+            "showLabels": self.show_labels,
+            "labelDensity": self.label_density,
+            "showLegend": self.show_legend,
+            "showTitle": self.show_title,
+            "title": self.title,
+            "subtitle": self.subtitle,
+            "strokeWidth": self.stroke_width,
+            "pointSize": self.point_size,
+            "opacity": self.opacity,
+            "selectedBlockId": self.selected_block_id,
+            "showGeneArrows": self.show_gene_arrows,
+            "showAnchorLines": self.show_anchor_lines,
+        }
 
 
 @dataclass(frozen=True)
@@ -538,37 +678,96 @@ class GoldStandardComparativeStore:
             cursor += max(1, lengths[chr_name])
         return offsets, max(1, cursor), ordered
 
-    def _svg_shell(self, *, title: str, subtitle: str, width: int, height: int, body: str) -> str:
+    def _figure_provenance(self, figure_id: str, settings: FigureSettings) -> str:
+        payload = {
+            "assembly_1": "GRCg6a",
+            "assembly_2": "GRCg7b",
+            "species": "Gallus gallus",
+            "figure_id": figure_id,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "source_files": {
+                "dna_natural_paf": str(self.primary_paf),
+                "gene_pairs": str(self.gene_pairs),
+                "gene_blocks": str(self.gene_blocks),
+                "anchors": str(self.anchors),
+            },
+            "filters": {
+                "mapQ": ">=30",
+                "identity": ">=85%",
+                "min_alignment_length": ">=50000",
+            },
+            "settings": settings.to_public_dict(),
+        }
+        return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+
+    def _svg_shell(
+        self,
+        *,
+        figure_id: str,
+        title: str,
+        subtitle: str,
+        settings: FigureSettings,
+        body: str,
+    ) -> str:
+        width = settings.width
+        height = settings.height
+        title_text = settings.title or title
+        subtitle_text = settings.subtitle if settings.subtitle is not None else subtitle
+        metadata = html.escape(self._figure_provenance(figure_id, settings), quote=False)
+        title_markup = ""
+        if settings.show_title:
+            title_markup = (
+                f'<text x="32" y="36" class="title">{html.escape(title_text)}</text>'
+                f'<text x="32" y="58" class="subtitle">{html.escape(subtitle_text)}</text>'
+            )
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
-            f'viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title)}">'
+            f'viewBox="0 0 {width} {height}" role="img" aria-label="{html.escape(title_text)}">'
+            f"<metadata>{metadata}</metadata>"
             "<style>"
-            ".title{font:700 24px Arial,sans-serif;fill:#111827}"
-            ".subtitle{font:13px Arial,sans-serif;fill:#4b5563}"
-            ".label{font:11px Arial,sans-serif;fill:#374151}"
-            ".small{font:10px Arial,sans-serif;fill:#6b7280}"
+            f".title{{font:700 24px Arial,sans-serif;fill:{settings.text_color}}}"
+            f".subtitle{{font:13px Arial,sans-serif;fill:{settings.text_color};opacity:.78}}"
+            f".label{{font:11px Arial,sans-serif;fill:{settings.text_color};opacity:.82}}"
+            f".small{{font:10px Arial,sans-serif;fill:{settings.text_color};opacity:.68}}"
             ".axis{stroke:#111827;stroke-width:1}"
-            ".grid{stroke:#d1d5db;stroke-width:.7}"
-            ".plus{stroke:#0f766e;fill:#0f766e}"
-            ".minus{stroke:#b91c1c;fill:#b91c1c}"
-            ".ribbonPlus{fill:#14b8a6;fill-opacity:.24;stroke:#0f766e;stroke-opacity:.5}"
-            ".ribbonMinus{fill:#f97316;fill-opacity:.22;stroke:#c2410c;stroke-opacity:.5}"
-            ".gene{fill:#2563eb;stroke:#1d4ed8}"
-            ".gene2{fill:#9333ea;stroke:#7e22ce}"
-            ".link{stroke:#6b7280;stroke-width:1;stroke-opacity:.45}"
+            f".grid{{stroke:{settings.grid_color};stroke-width:.7}}"
+            f".plus{{stroke:{settings.forward_color};fill:{settings.forward_color}}}"
+            f".minus{{stroke:{settings.reverse_color};fill:{settings.reverse_color}}}"
+            f".ribbonPlus{{fill:{settings.forward_color};fill-opacity:{settings.opacity * 0.32:.3f};stroke:{settings.forward_color};stroke-opacity:{settings.opacity * 0.75:.3f}}}"
+            f".ribbonMinus{{fill:{settings.reverse_color};fill-opacity:{settings.opacity * 0.30:.3f};stroke:{settings.reverse_color};stroke-opacity:{settings.opacity * 0.75:.3f}}}"
+            f".gene{{fill:{settings.forward_color};stroke:{settings.forward_color}}}"
+            f".gene2{{fill:{settings.reverse_color};stroke:{settings.reverse_color}}}"
+            f".link{{stroke:{settings.low_confidence_color};stroke-width:{max(0.5, settings.stroke_width * 0.65):.2f};stroke-opacity:{settings.opacity * 0.62:.3f}}}"
             "</style>"
-            '<rect width="100%" height="100%" fill="#ffffff"/>'
-            f'<text x="32" y="36" class="title">{html.escape(title)}</text>'
-            f'<text x="32" y="58" class="subtitle">{html.escape(subtitle)}</text>'
+            f'<rect width="100%" height="100%" fill="{settings.background_color}"/>'
+            f"{title_markup}"
             f"{body}</svg>"
         )
 
-    def _empty_figure(self, title: str, message: str) -> str:
+    def _empty_figure(
+        self,
+        title: str,
+        message: str,
+        *,
+        settings: Optional[FigureSettings] = None,
+        figure_id: str = "empty",
+    ) -> str:
+        settings = settings or FigureSettings.from_payload(None, default_width=960, default_height=560)
+        rect_w = max(120, settings.width - 64)
+        rect_h = max(120, settings.height - 140)
+        center_x = settings.width / 2
+        center_y = 88 + rect_h / 2
         body = (
-            '<rect x="32" y="88" width="896" height="420" rx="4" fill="#f9fafb" stroke="#d1d5db"/>'
-            f'<text x="480" y="300" text-anchor="middle" class="subtitle">{html.escape(message)}</text>'
+            f'<rect x="32" y="88" width="{rect_w}" height="{rect_h}" rx="4" fill="#f9fafb" stroke="{settings.grid_color}"/>'
+            f'<text x="{center_x:.2f}" y="{center_y:.2f}" text-anchor="middle" class="subtitle">{html.escape(message)}</text>'
         )
-        return self._svg_shell(title=title, subtitle="GRCg6a vs GRCg7b", width=960, height=560, body=body)
+        return self._svg_shell(
+            figure_id=figure_id,
+            title=title,
+            subtitle="GRCg6a vs GRCg7b",
+            settings=settings,
+            body=body,
+        )
 
     def _read_primary_paf_records(self, limit: int = 5000):
         if not self.primary_paf.exists():
@@ -585,10 +784,24 @@ class GoldStandardComparativeStore:
                     break
         return records
 
-    def _render_dna_dotplot_svg(self) -> str:
+    def _should_label_chr(self, chr_name: str, settings: FigureSettings) -> bool:
+        if not settings.show_labels or settings.label_density == "none":
+            return False
+        if settings.label_density == "all":
+            return True
+        normalized = chr_name[3:] if chr_name.startswith("chr") else chr_name
+        return normalized in {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "W", "Z", "MT"}
+
+    def _render_dna_dotplot_svg(self, settings: Optional[dict[str, Any] | FigureSettings] = None) -> str:
+        settings = FigureSettings.from_payload(settings, default_width=960, default_height=560)
         records = self._read_primary_paf_records()
         if not records:
-            return self._empty_figure("DNA Whole-genome Dotplot", "Natural-breakpoint PAF is missing.")
+            return self._empty_figure(
+                "DNA Whole-genome Dotplot",
+                "Natural-breakpoint PAF is missing.",
+                settings=settings,
+                figure_id="dna-dotplot",
+            )
 
         q_lengths: dict[str, int] = {}
         t_lengths: dict[str, int] = {}
@@ -597,7 +810,11 @@ class GoldStandardComparativeStore:
             t_lengths[record.chr_2] = max(t_lengths.get(record.chr_2, 0), record.target_length)
         q_offsets, q_total, q_order = self._build_offsets(q_lengths)
         t_offsets, t_total, t_order = self._build_offsets(t_lengths)
-        left, top, plot_w, plot_h = 82, 92, 800, 390
+        left = max(82, int(settings.width * 0.085))
+        top = 92 if settings.show_title else 46
+        plot_w = max(220, settings.width - left - 78)
+        plot_h = max(180, settings.height - top - 78)
+        caption_y = 74 if settings.show_title else 30
 
         def x(chr_name: str, pos: int) -> float:
             return left + ((q_offsets.get(chr_name, 0) + pos) / q_total) * plot_w
@@ -611,9 +828,13 @@ class GoldStandardComparativeStore:
         for chr_name in q_order:
             gx = x(chr_name, 0)
             parts.append(f'<line x1="{gx:.2f}" y1="{top}" x2="{gx:.2f}" y2="{top + plot_h}" class="grid"/>')
+            if self._should_label_chr(chr_name, settings):
+                parts.append(f'<text x="{gx + 3:.2f}" y="{top + plot_h + 14}" class="small">{html.escape(chr_name)}</text>')
         for chr_name in t_order:
             gy = y(chr_name, 0)
             parts.append(f'<line x1="{left}" y1="{gy:.2f}" x2="{left + plot_w}" y2="{gy:.2f}" class="grid"/>')
+            if self._should_label_chr(chr_name, settings):
+                parts.append(f'<text x="{left - 8}" y="{gy + 3:.2f}" text-anchor="end" class="small">{html.escape(chr_name)}</text>')
         for record in records:
             cls = "minus" if record.strand == "-" else "plus"
             parts.append(
@@ -621,27 +842,45 @@ class GoldStandardComparativeStore:
                 f'y1="{y(record.chr_2, record.start_2):.2f}" '
                 f'x2="{x(record.chr_1, record.end_1):.2f}" '
                 f'y2="{y(record.chr_2, record.end_2):.2f}" '
-                f'class="{cls}" stroke-width="1.7" stroke-opacity=".75"/>'
+                f'class="{cls}" stroke-width="{settings.stroke_width}" stroke-opacity="{settings.opacity}"/>'
             )
-        parts.extend(
-            [
-                f'<text x="{left + plot_w / 2}" y="520" text-anchor="middle" class="label">GRCg6a cumulative genomic coordinate</text>',
-                f'<text x="22" y="{top + plot_h / 2}" transform="rotate(-90 22 {top + plot_h / 2})" text-anchor="middle" class="label">GRCg7b cumulative genomic coordinate</text>',
-                f'<text x="{left}" y="74" class="small">Blocks: {len(records)}; green=forward, orange=reverse; source=minimap2 asm5 natural PAF</text>',
-            ]
+        if settings.show_labels:
+            parts.extend(
+                [
+                    f'<text x="{left + plot_w / 2}" y="{settings.height - 24}" text-anchor="middle" class="label">GRCg6a cumulative genomic coordinate</text>',
+                    f'<text x="22" y="{top + plot_h / 2}" transform="rotate(-90 22 {top + plot_h / 2})" text-anchor="middle" class="label">GRCg7b cumulative genomic coordinate</text>',
+                ]
+            )
+        if settings.show_legend:
+            parts.extend(
+                [
+                    f'<line x1="{settings.width - 190}" y1="{caption_y}" x2="{settings.width - 154}" y2="{caption_y}" class="plus" stroke-width="{settings.stroke_width}"/>',
+                    f'<text x="{settings.width - 148}" y="{caption_y + 4}" class="small">forward</text>',
+                    f'<line x1="{settings.width - 96}" y1="{caption_y}" x2="{settings.width - 60}" y2="{caption_y}" class="minus" stroke-width="{settings.stroke_width}"/>',
+                    f'<text x="{settings.width - 54}" y="{caption_y + 4}" class="small">reverse</text>',
+                ]
+            )
+        parts.append(
+            f'<text x="{left}" y="{caption_y}" class="small">Blocks: {len(records)}; source=minimap2 asm5 natural PAF</text>'
         )
         return self._svg_shell(
+            figure_id="dna-dotplot",
             title="DNA Whole-genome Dotplot",
             subtitle="Natural-breakpoint whole-genome alignment; DNA-level evidence.",
-            width=960,
-            height=560,
+            settings=settings,
             body="".join(parts),
         )
 
-    def _render_gene_dotplot_svg(self) -> str:
+    def _render_gene_dotplot_svg(self, settings: Optional[dict[str, Any] | FigureSettings] = None) -> str:
+        settings = FigureSettings.from_payload(settings, default_width=960, default_height=560)
         pairs = self._read_gene_pairs(limit=50000)
         if not pairs:
-            return self._empty_figure("Gene Collinearity Dotplot", "Gene anchor pairs are missing.")
+            return self._empty_figure(
+                "Gene Collinearity Dotplot",
+                "Gene anchor pairs are missing.",
+                settings=settings,
+                figure_id="gene-collinearity-dotplot",
+            )
         q_lengths: dict[str, int] = {}
         t_lengths: dict[str, int] = {}
         for row in pairs:
@@ -651,7 +890,11 @@ class GoldStandardComparativeStore:
             t_lengths[t_chr] = max(t_lengths.get(t_chr, 0), self._int(row.get("end_2")))
         q_offsets, q_total, q_order = self._build_offsets(q_lengths)
         t_offsets, t_total, t_order = self._build_offsets(t_lengths)
-        left, top, plot_w, plot_h = 82, 92, 800, 390
+        left = max(82, int(settings.width * 0.085))
+        top = 92 if settings.show_title else 46
+        plot_w = max(220, settings.width - left - 78)
+        plot_h = max(180, settings.height - top - 78)
+        caption_y = 74 if settings.show_title else 30
 
         def x(row: dict) -> float:
             return left + ((q_offsets.get(str(row.get("chr_1", "")), 0) + self._int(row.get("start_1"))) / q_total) * plot_w
@@ -663,33 +906,55 @@ class GoldStandardComparativeStore:
         for chr_name in q_order:
             gx = left + (q_offsets[chr_name] / q_total) * plot_w
             parts.append(f'<line x1="{gx:.2f}" y1="{top}" x2="{gx:.2f}" y2="{top + plot_h}" class="grid"/>')
+            if self._should_label_chr(chr_name, settings):
+                parts.append(f'<text x="{gx + 3:.2f}" y="{top + plot_h + 14}" class="small">{html.escape(chr_name)}</text>')
         for chr_name in t_order:
             gy = top + plot_h - (t_offsets[chr_name] / t_total) * plot_h
             parts.append(f'<line x1="{left}" y1="{gy:.2f}" x2="{left + plot_w}" y2="{gy:.2f}" class="grid"/>')
+            if self._should_label_chr(chr_name, settings):
+                parts.append(f'<text x="{left - 8}" y="{gy + 3:.2f}" text-anchor="end" class="small">{html.escape(chr_name)}</text>')
         for row in pairs:
             cls = "minus" if row.get("orientation") == "-" else "plus"
-            radius = 1.8 if self._float(row.get("pident")) >= 95 else 1.2
-            parts.append(f'<circle cx="{x(row):.2f}" cy="{y(row):.2f}" r="{radius}" class="{cls}" opacity=".72"/>')
+            radius = settings.point_size if self._float(row.get("pident")) >= 95 else max(0.5, settings.point_size * 0.7)
+            parts.append(f'<circle cx="{x(row):.2f}" cy="{y(row):.2f}" r="{radius:.2f}" class="{cls}" opacity="{settings.opacity}"/>')
         method = pairs[0].get("method", "gene-anchor collinearity")
-        parts.extend(
-            [
-                f'<text x="{left + plot_w / 2}" y="520" text-anchor="middle" class="label">GRCg6a gene order coordinate</text>',
-                f'<text x="22" y="{top + plot_h / 2}" transform="rotate(-90 22 {top + plot_h / 2})" text-anchor="middle" class="label">GRCg7b gene order coordinate</text>',
-                f'<text x="{left}" y="74" class="small">Anchor pairs: {len(pairs)}; method={html.escape(str(method))}; green=same orientation, orange=inverted</text>',
-            ]
+        if settings.show_labels:
+            parts.extend(
+                [
+                    f'<text x="{left + plot_w / 2}" y="{settings.height - 24}" text-anchor="middle" class="label">GRCg6a gene order coordinate</text>',
+                    f'<text x="22" y="{top + plot_h / 2}" transform="rotate(-90 22 {top + plot_h / 2})" text-anchor="middle" class="label">GRCg7b gene order coordinate</text>',
+                ]
+            )
+        if settings.show_legend:
+            parts.extend(
+                [
+                    f'<circle cx="{settings.width - 180}" cy="{caption_y - 2}" r="{settings.point_size:.2f}" class="plus" opacity="{settings.opacity}"/>',
+                    f'<text x="{settings.width - 168}" y="{caption_y + 2}" class="small">same orientation</text>',
+                    f'<circle cx="{settings.width - 66}" cy="{caption_y - 2}" r="{settings.point_size:.2f}" class="minus" opacity="{settings.opacity}"/>',
+                    f'<text x="{settings.width - 54}" y="{caption_y + 2}" class="small">inverted</text>',
+                ]
+            )
+        parts.append(
+            f'<text x="{left}" y="{caption_y}" class="small">Anchor pairs: {len(pairs)}; method={html.escape(str(method))}</text>'
         )
         return self._svg_shell(
+            figure_id="gene-collinearity-dotplot",
             title="Gene Collinearity Dotplot",
             subtitle="Gene-level conserved order from anchor pairs; distinct from DNA PAF.",
-            width=960,
-            height=560,
+            settings=settings,
             body="".join(parts),
         )
 
-    def _render_karyotype_svg(self) -> str:
+    def _render_karyotype_svg(self, settings: Optional[dict[str, Any] | FigureSettings] = None) -> str:
+        settings = FigureSettings.from_payload(settings, default_width=960, default_height=500)
         blocks = self._read_gene_blocks()
         if not blocks:
-            return self._empty_figure("Karyotype Ribbon Overview", "Collinearity blocks are missing.")
+            return self._empty_figure(
+                "Karyotype Ribbon Overview",
+                "Collinearity blocks are missing.",
+                settings=settings,
+                figure_id="karyotype-ribbons",
+            )
         q_lengths: dict[str, int] = {}
         t_lengths: dict[str, int] = {}
         for row in blocks:
@@ -699,27 +964,35 @@ class GoldStandardComparativeStore:
             t_lengths[t_chr] = max(t_lengths.get(t_chr, 0), self._int(row.get("end_2")))
         q_offsets, q_total, q_order = self._build_offsets(q_lengths)
         t_offsets, t_total, t_order = self._build_offsets(t_lengths)
-        left, width = 72, 820
-        top_y, bottom_y = 150, 380
+        left = max(72, int(settings.width * 0.075))
+        width = max(240, settings.width - left - 68)
+        top_y = 150 if settings.show_title else 100
+        bottom_y = max(top_y + 160, settings.height - 120)
+        caption_y = 74 if settings.show_title else 34
 
         def sx(offsets: dict[str, int], total: int, chr_name: str, pos: int) -> float:
             return left + ((offsets.get(chr_name, 0) + pos) / total) * width
 
         parts = [
-            f'<text x="{left}" y="116" class="label">GRCg6a</text>',
-            f'<text x="{left}" y="416" class="label">GRCg7b</text>',
         ]
+        if settings.show_labels:
+            parts.extend(
+                [
+                    f'<text x="{left}" y="{top_y - 34}" class="label">GRCg6a</text>',
+                    f'<text x="{left}" y="{bottom_y + 50}" class="label">GRCg7b</text>',
+                ]
+            )
         for chr_name in q_order:
             x1 = sx(q_offsets, q_total, chr_name, 0)
             x2 = sx(q_offsets, q_total, chr_name, q_lengths[chr_name])
             parts.append(f'<rect x="{x1:.2f}" y="{top_y}" width="{max(1, x2 - x1):.2f}" height="14" fill="#e5e7eb" stroke="#9ca3af"/>')
-            if len(q_order) <= 35:
+            if self._should_label_chr(chr_name, settings):
                 parts.append(f'<text x="{(x1 + x2) / 2:.2f}" y="{top_y - 8}" text-anchor="middle" class="small">{html.escape(chr_name)}</text>')
         for chr_name in t_order:
             x1 = sx(t_offsets, t_total, chr_name, 0)
             x2 = sx(t_offsets, t_total, chr_name, t_lengths[chr_name])
             parts.append(f'<rect x="{x1:.2f}" y="{bottom_y}" width="{max(1, x2 - x1):.2f}" height="14" fill="#e5e7eb" stroke="#9ca3af"/>')
-            if len(t_order) <= 35:
+            if self._should_label_chr(chr_name, settings):
                 parts.append(f'<text x="{(x1 + x2) / 2:.2f}" y="{bottom_y + 34}" text-anchor="middle" class="small">{html.escape(chr_name)}</text>')
         for row in blocks[:300]:
             q_chr = str(row.get("chr_1", ""))
@@ -734,30 +1007,56 @@ class GoldStandardComparativeStore:
                 f'L {t2:.2f} {bottom_y} C {t2:.2f} 290 {q2:.2f} 240 {q2:.2f} {top_y + 14} Z" class="{cls}"/>'
             )
         parts.append(
-            f'<text x="{left}" y="74" class="small">Collinear blocks: {len(blocks)}; ribbon width follows block span; method={html.escape(str(blocks[0].get("method", "")))}</text>'
+            f'<text x="{left}" y="{caption_y}" class="small">Collinear blocks: {len(blocks)}; ribbon width follows block span; method={html.escape(str(blocks[0].get("method", "")))}</text>'
         )
+        if settings.show_legend:
+            parts.extend(
+                [
+                    f'<rect x="{settings.width - 190}" y="{caption_y - 10}" width="34" height="10" class="ribbonPlus"/>',
+                    f'<text x="{settings.width - 150}" y="{caption_y}" class="small">forward</text>',
+                    f'<rect x="{settings.width - 96}" y="{caption_y - 10}" width="34" height="10" class="ribbonMinus"/>',
+                    f'<text x="{settings.width - 56}" y="{caption_y}" class="small">reverse</text>',
+                ]
+            )
         return self._svg_shell(
+            figure_id="karyotype-ribbons",
             title="Karyotype Ribbon Overview",
             subtitle="Chromosome-scale gene collinearity blocks for publication overview.",
-            width=960,
-            height=500,
+            settings=settings,
             body="".join(parts),
         )
 
-    def _render_micro_synteny_svg(self, block_id: Optional[str] = None) -> str:
+    def _render_micro_synteny_svg(
+        self,
+        block_id: Optional[str] = None,
+        settings: Optional[dict[str, Any] | FigureSettings] = None,
+    ) -> str:
+        settings = FigureSettings.from_payload(settings, default_width=960, default_height=460)
+        if settings.selected_block_id or settings.selected_block_id_provided:
+            block_id = settings.selected_block_id
+        if block_id and not SAFE_BLOCK_ID_RE.match(block_id):
+            block_id = None
         blocks = self._read_gene_blocks()
-        if not block_id and blocks:
+        if not block_id and blocks and not settings.selected_block_id_provided:
             block_id = str(blocks[0].get("block_id", ""))
         pairs = self._read_gene_pairs(block_id=block_id, limit=80) if block_id else []
         if not pairs:
-            return self._empty_figure("Micro-synteny", "No anchor pairs are available for the selected block.")
+            return self._empty_figure(
+                "Micro-synteny",
+                "No anchor pairs are available for the selected block.",
+                settings=settings,
+                figure_id="micro-synteny",
+            )
 
         q_min = min(self._int(row.get("start_1")) for row in pairs)
         q_max = max(self._int(row.get("end_1")) for row in pairs)
         t_min = min(self._int(row.get("start_2")) for row in pairs)
         t_max = max(self._int(row.get("end_2")) for row in pairs)
-        left, width = 84, 790
-        q_y, t_y = 170, 330
+        left = max(84, int(settings.width * 0.087))
+        width = max(240, settings.width - left - 86)
+        q_y = 170 if settings.show_title else 110
+        t_y = max(q_y + 120, settings.height - 130)
+        caption_y = 74 if settings.show_title else 34
 
         def sx(value: int, start: int, end: int) -> float:
             span = max(1, end - start)
@@ -771,14 +1070,19 @@ class GoldStandardComparativeStore:
                 points = f"{x1:.2f},{y} {x1 + head:.2f},{y - 8} {x2:.2f},{y - 8} {x2:.2f},{y + 8} {x1 + head:.2f},{y + 8}"
             else:
                 points = f"{x1:.2f},{y - 8} {x2 - head:.2f},{y - 8} {x2:.2f},{y} {x2 - head:.2f},{y + 8} {x1:.2f},{y + 8}"
-            return f'<polygon points="{points}" class="{cls}" opacity=".86"/>'
+            return f'<polygon points="{points}" class="{cls}" opacity="{settings.opacity}"/>'
 
         parts = [
-            f'<text x="{left}" y="{q_y - 38}" class="label">GRCg6a block {html.escape(str(block_id))}</text>',
-            f'<text x="{left}" y="{t_y + 50}" class="label">GRCg7b homologous region</text>',
             f'<line x1="{left}" y1="{q_y}" x2="{left + width}" y2="{q_y}" class="grid"/>',
             f'<line x1="{left}" y1="{t_y}" x2="{left + width}" y2="{t_y}" class="grid"/>',
         ]
+        if settings.show_labels:
+            parts.extend(
+                [
+                    f'<text x="{left}" y="{q_y - 38}" class="label">GRCg6a block {html.escape(str(block_id))}</text>',
+                    f'<text x="{left}" y="{t_y + 50}" class="label">GRCg7b homologous region</text>',
+                ]
+            )
         for index, row in enumerate(pairs[:60]):
             q1 = sx(self._int(row.get("start_1")), q_min, q_max)
             q2 = sx(self._int(row.get("end_1")), q_min, q_max)
@@ -786,22 +1090,33 @@ class GoldStandardComparativeStore:
             t2 = sx(self._int(row.get("end_2")), t_min, t_max)
             q_mid = (q1 + q2) / 2
             t_mid = (t1 + t2) / 2
-            parts.append(f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="link"/>')
-            parts.append(arrow(q1, q2, q_y, str(row.get("strand_1", "+")), "gene"))
-            parts.append(arrow(t1, t2, t_y, str(row.get("strand_2", "+")), "gene2"))
-            if index < 16:
+            if settings.show_anchor_lines:
+                parts.append(f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="link"/>')
+            if settings.show_gene_arrows:
+                parts.append(arrow(q1, q2, q_y, str(row.get("strand_1", "+")), "gene"))
+                parts.append(arrow(t1, t2, t_y, str(row.get("strand_2", "+")), "gene2"))
+            if index < 16 and settings.show_labels:
                 symbol = row.get("gene_symbol_1") or row.get("gene_1") or ""
                 parts.append(f'<text x="{q_mid:.2f}" y="{q_y - 16}" text-anchor="middle" class="small">{html.escape(str(symbol))}</text>')
         block_row = next((row for row in blocks if str(row.get("block_id", "")) == str(block_id)), {})
         method = block_row.get("method") or pairs[0].get("method", "")
         parts.append(
-            f'<text x="{left}" y="74" class="small">Block: {html.escape(str(block_id))}; anchors shown: {min(len(pairs), 60)}; method={html.escape(str(method))}</text>'
+            f'<text x="{left}" y="{caption_y}" class="small">Block: {html.escape(str(block_id))}; anchors shown: {min(len(pairs), 60)}; method={html.escape(str(method))}</text>'
         )
+        if settings.show_legend:
+            parts.extend(
+                [
+                    f'<rect x="{settings.width - 186}" y="{caption_y - 10}" width="30" height="10" class="gene"/>',
+                    f'<text x="{settings.width - 150}" y="{caption_y}" class="small">GRCg6a gene</text>',
+                    f'<rect x="{settings.width - 82}" y="{caption_y - 10}" width="30" height="10" class="gene2"/>',
+                    f'<text x="{settings.width - 46}" y="{caption_y}" class="small">GRCg7b</text>',
+                ]
+            )
         return self._svg_shell(
+            figure_id="micro-synteny",
             title="Micro-synteny",
             subtitle="Local gene order, direction, and homologous anchor connections.",
-            width=960,
-            height=460,
+            settings=settings,
             body="".join(parts),
         )
 
@@ -864,15 +1179,21 @@ class GoldStandardComparativeStore:
             "figures": figures,
         }
 
-    def render_static_figure_svg(self, figure_id: str, *, block_id: Optional[str] = None) -> str:
+    def render_static_figure_svg(
+        self,
+        figure_id: str,
+        *,
+        block_id: Optional[str] = None,
+        settings: Optional[dict[str, Any] | FigureSettings] = None,
+    ) -> str:
         if figure_id == "dna-dotplot":
-            return self._render_dna_dotplot_svg()
+            return self._render_dna_dotplot_svg(settings=settings)
         if figure_id == "gene-collinearity-dotplot":
-            return self._render_gene_dotplot_svg()
+            return self._render_gene_dotplot_svg(settings=settings)
         if figure_id == "karyotype-ribbons":
-            return self._render_karyotype_svg()
+            return self._render_karyotype_svg(settings=settings)
         if figure_id == "micro-synteny":
-            return self._render_micro_synteny_svg(block_id=block_id)
+            return self._render_micro_synteny_svg(block_id=block_id, settings=settings)
         raise ValueError(f"Unknown static figure id: {figure_id}")
 
     def _normalize_bed_content(self, path: Path, assembly: str) -> str:

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
@@ -25,10 +25,12 @@ import {
   IconChartBar,
   IconChartDots,
   IconDna,
+  IconDownload,
   IconExternalLink,
   IconPhoto,
   IconInfoCircle,
   IconRefresh,
+  IconSettings,
   IconTable,
   IconTransform,
 } from "@tabler/icons-react";
@@ -43,7 +45,9 @@ import {
   getGoldStandardStatus,
   getOrthologTable,
   getStaticFigureCatalog,
+  createDefaultFigureSettings,
   mapCoordinates,
+  renderStaticFigureSvg,
   type AlignmentBlock,
   type AlignmentMode,
   type AlignmentStats,
@@ -54,9 +58,11 @@ import {
   type GeneCollinearityResponse,
   type GoldStandardLayer,
   type GoldStandardStatus,
+  type FigureSettings,
   type StaticFigureCatalog,
   type StaticFigureItem,
 } from "../lib/comparativeApi";
+import FigureSettingsDrawer from "../components/comparative/FigureSettingsDrawer";
 
 const CHROMOSOMES = [
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
@@ -774,7 +780,7 @@ function StaticFiguresPanel({
 
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         {catalog.figures.map((figure) => (
-          <StaticFigureCard key={figure.id} figure={figure} microBlockId={microBlockId} />
+          <StaticFigureCard key={figure.id} figure={figure} microBlockId={microBlockId} blocks={blocks} />
         ))}
       </SimpleGrid>
     </Stack>
@@ -786,52 +792,183 @@ function figureSvgUrl(figure: StaticFigureItem, microBlockId: string | null) {
   return `${figure.svg_endpoint}?block_id=${encodeURIComponent(microBlockId)}`;
 }
 
-function StaticFigureCard({ figure, microBlockId }: {
+function figureFileName(figure: StaticFigureItem) {
+  return `${figure.id || figure.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.svg`;
+}
+
+function downloadSvgText(svg: string, filename: string) {
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function StaticFigureCard({ figure, microBlockId, blocks }: {
   figure: StaticFigureItem;
   microBlockId: string | null;
+  blocks: Record<string, string>[];
 }) {
-  const url = figureSvgUrl(figure, microBlockId);
+  const defaultUrl = figureSvgUrl(figure, microBlockId);
+  const defaultSettings = useMemo(
+    () => createDefaultFigureSettings(figure.id, microBlockId),
+    [figure.id, microBlockId],
+  );
+  const [settings, setSettings] = useState<FigureSettings>(defaultSettings);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [customSvgUrl, setCustomSvgUrl] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState("");
+  const customSvgRef = useRef<string | null>(null);
+  const url = customSvgUrl || defaultUrl;
   const availableSources = figure.data_sources.filter((source) => source.exists).length;
 
+  useEffect(() => {
+    setSettings((current) => ({
+      ...current,
+      selectedBlockId: figure.id === "micro-synteny" ? microBlockId || null : current.selectedBlockId,
+    }));
+  }, [figure.id, microBlockId]);
+
+  useEffect(() => () => {
+    if (customSvgRef.current) URL.revokeObjectURL(customSvgRef.current);
+  }, []);
+
+  const setCustomPreview = (svg: string) => {
+    if (customSvgRef.current) URL.revokeObjectURL(customSvgRef.current);
+    const nextUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+    customSvgRef.current = nextUrl;
+    setCustomSvgUrl(nextUrl);
+  };
+
+  const resetFigure = () => {
+    if (customSvgRef.current) URL.revokeObjectURL(customSvgRef.current);
+    customSvgRef.current = null;
+    setCustomSvgUrl(null);
+    setSettings(defaultSettings);
+    setRenderError("");
+  };
+
+  const renderWithSettings = async (nextSettings: FigureSettings) => {
+    setRendering(true);
+    setRenderError("");
+    try {
+      const svg = await renderStaticFigureSvg(figure.id, nextSettings);
+      setCustomPreview(svg);
+      setSettings(nextSettings);
+    } catch (err) {
+      setRenderError(getErrorMessage(err));
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  const downloadWithSettings = async (nextSettings: FigureSettings) => {
+    setRendering(true);
+    setRenderError("");
+    try {
+      const svg = await renderStaticFigureSvg(figure.id, nextSettings);
+      downloadSvgText(svg, figureFileName(figure));
+    } catch (err) {
+      setRenderError(getErrorMessage(err));
+    } finally {
+      setRendering(false);
+    }
+  };
+
+  const copyProvenance = (nextSettings: FigureSettings) => {
+    const payload = {
+      figure_id: figure.id,
+      title: figure.title,
+      assembly_1: "GRCg6a",
+      assembly_2: "GRCg7b",
+      sources: figure.data_sources.map((source) => source.path),
+      settings: nextSettings,
+    };
+    navigator.clipboard?.writeText(JSON.stringify(payload, null, 2)).catch(() => undefined);
+  };
+
   return (
-    <Card withBorder radius="sm">
-      <Stack gap="sm">
-        <Group justify="space-between" align="flex-start">
-          <div>
-            <Text fw={700}>{figure.title}</Text>
-            <Text size="xs" c="dimmed">{figure.evidence_layer}</Text>
-          </div>
-          <Badge color={layerColor(figure.status)} variant="light">{figure.status}</Badge>
-        </Group>
-        <Paper withBorder radius="sm" p={0} style={{ overflow: "hidden", background: "#fff" }}>
-          {figure.status === "available" ? (
-            <img
-              key={url}
-              src={url}
-              alt={figure.title}
-              style={{ display: "block", width: "100%", height: 360, objectFit: "contain" }}
-            />
-          ) : (
-            <Group justify="center" h={360}>
-              <Text c="dimmed" size="sm">Required source files are missing.</Text>
+    <>
+      <Card withBorder radius="sm">
+        <Stack gap="sm">
+          <Group justify="space-between" align="flex-start">
+            <div>
+              <Text fw={700}>{figure.title}</Text>
+              <Text size="xs" c="dimmed">{figure.evidence_layer}</Text>
+            </div>
+            <Group gap="xs">
+              {customSvgUrl && <Badge color="blue" variant="light">custom</Badge>}
+              <Badge color={layerColor(figure.status)} variant="light">{figure.status}</Badge>
             </Group>
-          )}
-        </Paper>
-        <Text size="xs" c="dimmed">{figure.description}</Text>
-        <SimpleGrid cols={2} spacing="xs">
-          <SmallStat label="Sources" value={`${availableSources}/${figure.data_sources.length}`} />
-          <SmallStat label="Format" value={figure.export_formats.join(", ").toUpperCase()} />
-        </SimpleGrid>
-        <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
-          <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-            {figure.coordinate_system}
-          </Text>
-          <Button component="a" href={url} target="_blank" rel="noreferrer" size="xs" variant="light">
-            Open SVG
-          </Button>
-        </Group>
-      </Stack>
-    </Card>
+          </Group>
+          <Paper withBorder radius="sm" p={0} style={{ overflow: "hidden", background: "#fff" }}>
+            {figure.status === "available" ? (
+              <img
+                key={url}
+                src={url}
+                alt={figure.title}
+                style={{ display: "block", width: "100%", height: 360, objectFit: "contain" }}
+              />
+            ) : (
+              <Group justify="center" h={360}>
+                <Text c="dimmed" size="sm">Required source files are missing.</Text>
+              </Group>
+            )}
+          </Paper>
+          <Text size="xs" c="dimmed">{figure.description}</Text>
+          <SimpleGrid cols={2} spacing="xs">
+            <SmallStat label="Sources" value={`${availableSources}/${figure.data_sources.length}`} />
+            <SmallStat label="Format" value={figure.export_formats.join(", ").toUpperCase()} />
+          </SimpleGrid>
+          <Group justify="space-between" align="center" gap="xs" wrap="nowrap">
+            <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+              {figure.coordinate_system}
+            </Text>
+            <Group gap="xs" wrap="nowrap">
+              <Button
+                size="xs"
+                variant="subtle"
+                leftSection={<IconSettings size={14} />}
+                onClick={() => setSettingsOpen(true)}
+                disabled={figure.status !== "available"}
+              >
+                Settings
+              </Button>
+              <Button
+                size="xs"
+                variant="subtle"
+                leftSection={<IconDownload size={14} />}
+                onClick={() => downloadWithSettings(settings)}
+                loading={rendering}
+                disabled={figure.status !== "available"}
+              >
+                SVG
+              </Button>
+              <Button component="a" href={url} target="_blank" rel="noreferrer" size="xs" variant="light">
+                Open SVG
+              </Button>
+            </Group>
+          </Group>
+        </Stack>
+      </Card>
+      <FigureSettingsDrawer
+        opened={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        figure={figure}
+        settings={settings}
+        blocks={figure.id === "micro-synteny" ? blocks : []}
+        rendering={rendering}
+        error={renderError}
+        onApply={renderWithSettings}
+        onReset={resetFigure}
+        onDownload={downloadWithSettings}
+        onCopyProvenance={copyProvenance}
+      />
+    </>
   );
 }
 

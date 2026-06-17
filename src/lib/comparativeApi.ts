@@ -2,7 +2,7 @@
  * Comparative Genomics API Client
  */
 
-import { apiFetch } from "./apiClient";
+import { API_BASE, ApiError, apiFetch } from "./apiClient";
 
 export interface Assembly {
   assembly_name: string;
@@ -226,6 +226,149 @@ export interface StaticFigureCatalog {
   figures: StaticFigureItem[];
 }
 
+export type StaticFigureId =
+  | "dna-dotplot"
+  | "gene-collinearity-dotplot"
+  | "karyotype-ribbons"
+  | "micro-synteny"
+  | string;
+
+export interface FigureColorScheme {
+  forward: string;
+  reverse: string;
+  lowConfidence: string;
+  background: string;
+  grid: string;
+  text: string;
+}
+
+export interface FigureSettings {
+  width: number;
+  height: number;
+  dpi: number;
+  colorScheme: FigureColorScheme;
+  showLabels: boolean;
+  labelDensity: "all" | "primary_only" | "none";
+  showLegend: boolean;
+  showTitle: boolean;
+  title?: string;
+  subtitle?: string;
+  strokeWidth: number;
+  pointSize: number;
+  opacity: number;
+  selectedBlockId?: string | null;
+  showGeneArrows: boolean;
+  showAnchorLines: boolean;
+}
+
+export interface FigurePreset {
+  name: "publication" | "presentation" | "compact";
+  label: string;
+  settings: Partial<FigureSettings>;
+}
+
+const PUBLICATION_COLORS: FigureColorScheme = {
+  forward: "#2166ac",
+  reverse: "#b2182b",
+  lowConfidence: "#d1d5db",
+  background: "#ffffff",
+  grid: "#e5e7eb",
+  text: "#111827",
+};
+
+export const FIGURE_PRESETS: FigurePreset[] = [
+  {
+    name: "publication",
+    label: "Publication",
+    settings: {
+      width: 2000,
+      height: 1400,
+      dpi: 300,
+      colorScheme: PUBLICATION_COLORS,
+      showLabels: true,
+      labelDensity: "primary_only",
+      showLegend: true,
+      showTitle: true,
+      strokeWidth: 1.5,
+      pointSize: 2.2,
+      opacity: 0.82,
+      showGeneArrows: true,
+      showAnchorLines: true,
+    },
+  },
+  {
+    name: "presentation",
+    label: "Slides",
+    settings: {
+      width: 2400,
+      height: 1600,
+      dpi: 150,
+      colorScheme: {
+        forward: "#1976d2",
+        reverse: "#d32f2f",
+        lowConfidence: "#9e9e9e",
+        background: "#ffffff",
+        grid: "#dfe3e8",
+        text: "#212121",
+      },
+      showLabels: true,
+      labelDensity: "all",
+      showLegend: true,
+      showTitle: true,
+      strokeWidth: 2,
+      pointSize: 2.8,
+      opacity: 0.9,
+      showGeneArrows: true,
+      showAnchorLines: true,
+    },
+  },
+  {
+    name: "compact",
+    label: "Compact",
+    settings: {
+      width: 1200,
+      height: 800,
+      dpi: 150,
+      colorScheme: PUBLICATION_COLORS,
+      showLabels: false,
+      labelDensity: "none",
+      showLegend: false,
+      showTitle: false,
+      strokeWidth: 1,
+      pointSize: 1.8,
+      opacity: 0.72,
+      showGeneArrows: true,
+      showAnchorLines: true,
+    },
+  },
+];
+
+export function createDefaultFigureSettings(
+  figureId: StaticFigureId,
+  selectedBlockId?: string | null,
+): FigureSettings {
+  const isKaryotype = figureId === "karyotype-ribbons";
+  const isMicro = figureId === "micro-synteny";
+  return {
+    width: 960,
+    height: isMicro ? 460 : isKaryotype ? 500 : 560,
+    dpi: 150,
+    colorScheme: PUBLICATION_COLORS,
+    showLabels: true,
+    labelDensity: "primary_only",
+    showLegend: true,
+    showTitle: true,
+    title: undefined,
+    subtitle: undefined,
+    strokeWidth: 1.7,
+    pointSize: 1.8,
+    opacity: 0.75,
+    selectedBlockId: isMicro ? selectedBlockId || null : undefined,
+    showGeneArrows: true,
+    showAnchorLines: true,
+  };
+}
+
 export interface BaseLevelRecord extends AlignmentBlock {
   has_cs: boolean;
   has_cigar: boolean;
@@ -430,6 +573,22 @@ export async function getGoldStandardStatus(): Promise<GoldStandardStatus> {
 
 export async function getStaticFigureCatalog(): Promise<StaticFigureCatalog> {
   return apiFetch<StaticFigureCatalog>("/comparative/static-figures");
+}
+
+export async function renderStaticFigureSvg(
+  figureId: StaticFigureId,
+  settings: FigureSettings,
+): Promise<string> {
+  const response = await fetch(`${API_BASE}/comparative/static-figures/${encodeURIComponent(figureId)}/svg`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ detail: `HTTP ${response.status}` }));
+    throw new ApiError(err.detail || "Static figure rendering failed", response.status);
+  }
+  return response.text();
 }
 
 export async function getBaseLevelRecords(params: {

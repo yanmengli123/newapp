@@ -3,7 +3,7 @@ Comparative Genomics API Routes
 Provides endpoints for synteny, coordinate mapping, and cross-assembly analysis
 """
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Body, Query, HTTPException
 from fastapi.responses import PlainTextResponse
 from typing import Optional, Literal
 
@@ -165,6 +165,20 @@ async def get_static_figure_svg(
     service = get_service()
     try:
         svg = service.get_static_figure_svg(figure_id, block_id=block_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return PlainTextResponse(svg, media_type="image/svg+xml")
+
+
+@router.post("/static-figures/{figure_id}/svg", response_class=PlainTextResponse)
+async def render_custom_static_figure_svg(
+    figure_id: str,
+    settings: Optional[dict] = Body(default=None),
+):
+    """Render a publication-style static comparative figure with custom visual settings."""
+    service = get_service()
+    try:
+        svg = service.get_static_figure_svg(figure_id, settings=settings or {})
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return PlainTextResponse(svg, media_type="image/svg+xml")

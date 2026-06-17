@@ -191,6 +191,64 @@ def test_static_figure_svg_rendering_is_scientifically_labeled(tmp_path: Path):
     assert "BLASTP_RBH_CHAINING" in svg
 
 
+def test_static_figure_svg_accepts_reproducible_style_settings(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    settings = {
+        "width": 1200,
+        "height": 700,
+        "colorScheme": {
+            "forward": "#123456",
+            "reverse": "#abcdef",
+            "lowConfidence": "#999999",
+            "background": "#ffffff",
+            "grid": "#dddddd",
+            "text": "#111111",
+        },
+        "showTitle": False,
+        "showLegend": True,
+        "strokeWidth": 3.0,
+        "opacity": 0.42,
+        "title": "Custom DNA",
+        "subtitle": "Custom subtitle",
+    }
+
+    svg = store.render_static_figure_svg("dna-dotplot", settings=settings)
+
+    assert 'width="1200"' in svg
+    assert 'height="700"' in svg
+    assert "#123456" in svg
+    assert "#abcdef" in svg
+    assert "stroke-width=\"3.0\"" in svg
+    assert "stroke-opacity=\"0.42\"" in svg
+    assert '<text x="32" y="36" class="title">Custom DNA</text>' not in svg
+    assert "<metadata" in svg
+    assert '"figure_id": "dna-dotplot"' in svg
+    assert '"showTitle": false' in svg
+
+
+def test_static_figure_svg_settings_are_clamped_and_block_ids_are_safe(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    svg = store.render_static_figure_svg(
+        "micro-synteny",
+        settings={
+            "width": 20,
+            "height": 20,
+            "selectedBlockId": "../GENEBLOCK_00001",
+            "showAnchorLines": False,
+            "showGeneArrows": True,
+        },
+    )
+
+    assert 'width="800"' in svg
+    assert 'height="600"' in svg
+    assert "No anchor pairs are available" in svg
+    assert "GENEBLOCK_00001" not in svg
+
+
 def test_gene_collinearity_file_endpoint_paths_are_safe_and_normalized(tmp_path: Path):
     _write_static_figure_fixture(tmp_path)
     store = GoldStandardComparativeStore(tmp_path)
@@ -217,6 +275,10 @@ if __name__ == "__main__":
         test_static_figure_catalog_exposes_four_publication_figures(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_static_figure_svg_rendering_is_scientifically_labeled(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_static_figure_svg_accepts_reproducible_style_settings(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_static_figure_svg_settings_are_clamped_and_block_ids_are_safe(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_gene_collinearity_file_endpoint_paths_are_safe_and_normalized(Path(tmp))
     print("All comparative PAF tests passed.")
