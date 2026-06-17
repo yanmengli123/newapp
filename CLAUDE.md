@@ -93,7 +93,10 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
             ├── V003__add_mv_dataset_metric.sql
             ├── V004__go_dag_closure.sql
             ├── V005__add_gene_go_provenance.sql
-            └── V006__fix_fold_change_to_stage_level.sql
+            ├── V006__fix_fold_change_to_stage_level.sql
+            ├── V007__expression_staging_layer.sql
+            ├── V009__comparative_genomics.sql
+            └── V010__go_biomart_only.sql
 
 D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 ├── grcg6a_nc.db                 # SQLite (gffutils, read-only at startup)
@@ -185,6 +188,8 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `V005__add_gene_go_provenance.sql` — GO annotation provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
   - `V006__fix_fold_change_to_stage_level.sql` — Fix fold_change to use stage-level means (log2 scale, NULL for uncomputable)
 - `V007__expression_staging_layer.sql` — Staging layer: `import_batch`, `stg_update_expression_matrix`, `gene_source_mapping` tables + `source_gene_count`/`curated_gene_count` on `dataset`
+- `V009__comparative_genomics.sql` — Comparative genomics: `genome_assembly`, `chromosome_mapping`, `synteny_block`, `paf_alignment`, `gene_coordinate_mapping`
+- `V010__go_biomart_only.sql` — Remove NCBI GAF annotations from `gene_go`, BioMart-only enrichment
 
 ## Backend Endpoints
 
@@ -676,7 +681,9 @@ D:/soft/python310/python.exe backend/scripts/build_grcg7b_main_jbrowse_assets.py
 
 ### GO Annotation Import Scripts
 
-**Coverage note**: 60.7% GO coverage is normal for chicken (GRCg6a) — it's not a model organism like human/mouse. The two annotation sources (Ensembl BioMart + NCBI GAF) complement each other well. For publication-level enrichment analysis, consider using `evidence_filter="non_iea"` to exclude electronic annotations (IEA is 92.9% of all annotations).
+**Coverage note**: 60.7% GO coverage is normal for chicken (GRCg6a) — it's not a model organism like human/mouse. For publication-level enrichment analysis, consider using `evidence_filter="non_iea"` to exclude electronic annotations (IEA is 92.9% of all annotations).
+
+**Current source**: Ensembl BioMart only (V010 migration removed NCBI GAF to avoid mixing assembly-derived annotation sources). The GRCg7b RefSeq GAF was used as a supplemental experiment but is no longer in the enrichment pipeline.
 
 **GAF Import** (`backend/scripts/import_go_from_gaf.py`):
 ```bash
@@ -701,14 +708,16 @@ python backend/scripts/import_go_from_gene2go.py --gene2go gene2go.gz --batch-si
 python backend/scripts/qc_go_annotation_sources.py
 ```
 
-**Current State** (as of 2026-05-20):
-- Source: `ensembl_biomart` (144,234 annotations, 12,890 genes) + `ncbi_gaf_gcf_016699485.2` (27,239 annotations, 9,987 genes)
-- Genes with GO: 14,835 (60.7% of 24,421 total gene_xref)
+**Current State** (as of 2026-06-10, V010 BioMart-only):
+- Source: `ensembl_biomart` only (144,234 annotations, 12,890 genes)
+- NCBI GAF removed by V010 migration (was 27,239 annotations)
+- Genes with GO: 12,890 (52.8% of 24,421 total gene_xref)
 - Background genes: P=12,739 / C=12,893 / F=12,702
 - Evidence codes: IEA 92.9%, IBA 5.1%, experimental <1%
 - GO DAG: 14,651 terms, 497,764 closure rows, 65,124 edges, 3,646 alt IDs
 - Migration V005: Added provenance columns (qualifier/reference/pubmed_ids/assigned_by/aspect/source_gene_id)
 - Migration V006: Fixed fold_change to use stage-level means (log2 scale, NULL for uncomputable)
+- Migration V010: Removed NCBI GAF annotations, BioMart-only enrichment
 - **Expression data**: 3,349,440 fact rows, 23,373 genes, 36 samples, 4 metrics
 
 ## Git
