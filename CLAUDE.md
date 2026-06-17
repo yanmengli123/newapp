@@ -433,8 +433,8 @@ All routers registered in `main.py`:
 | genome_analysis_routes.py | `/genome-api` | 21 |
 | chat_router.py | `/api` | 1 |
 | overview_routes.py | `/overview` | 17 |
-| comparative_routes.py | `/comparative` | 11 |
-| **Total** | | **80** |
+| comparative_routes.py | `/comparative` | 18 |
+| **Total** | | **87** |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
@@ -649,10 +649,37 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 | `GET /comparative/paf/file` | PAF file for JBrowse2 |
 | `GET /comparative/stats` | Comparison statistics |
 | `GET /comparative/orthologs` | Gene ortholog table |
+| `GET /comparative/gold-standard` | Gold standard evidence layers status |
+| `GET /comparative/gene-collinearity` | Gene-level collinearity (BLASTP RBH) |
+| `GET /comparative/base-level` | Base-level PAF details (tabix) |
+| `GET /comparative/static-figures` | List 4 static figures (DNA dotplot, gene dotplot, karyotype ribbons, micro-synteny) |
+| `GET /comparative/static-figures/{id}.svg` | Individual SVG figure |
 
 **Frontend pages**:
-- `/comparative` — Comparative genomics dashboard (Overview, Synteny, Dotplot, Orthologs, Coordinate Mapper)
+- `/comparative` — Comparative genomics dashboard (Overview, Synteny, Dotplot, Orthologs, Coordinate Mapper, Static Figures)
 - `/jbrowse` — JBrowse2 with LinearSyntenyView (GRCg6a top + GRCg7b bottom + synteny ribbons)
+
+**Gold Standard Evidence Layers**:
+| Layer | Data | Status |
+|-------|------|--------|
+| DNA natural synteny | minimap2 -x asm5 PAF (59 blocks) | available |
+| Base-level alignment | --cs=long PAF + tabix (291 MB) | available |
+| Gene collinearity | BLASTP RBH + chaining (14,590 pairs, 220 blocks) | available |
+
+**Static Figures** (`/comparative/static-figures`):
+| Figure | Description |
+|--------|-------------|
+| DNA Whole-genome Dotplot | Natural PAF dotplot (SVG) |
+| Gene Collinearity Dotplot | Gene anchors dotplot (SVG) |
+| Karyotype Ribbon Overview | Chromosome-level ribbon overview (SVG) |
+| Micro-synteny | Selected block gene arrow diagram (SVG) |
+
+**FigureSettingsDrawer** (`src/components/comparative/FigureSettingsDrawer.tsx`):
+- Size presets: 1200x800, 1600x1000, 2000x1200, 2400x1600
+- Color scheme: forward/reverse/low-confidence/background
+- Label density: all/primary_only/none
+- Export: SVG/PNG/PDF
+- Presets: Publication, Presentation, Compact
 
 **JBrowse2 LinearSyntenyView** (`src/jbrowseSyntenyViewState.ts`):
 - Creates dual-panel view: GRCg6a (top) + GRCg7b (bottom)
