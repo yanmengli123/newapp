@@ -96,7 +96,7 @@ def _write_static_figure_fixture(root: Path) -> None:
     natural_dir.joinpath("grcg6a_vs_grcg7b.natural.asm5.paf").write_text(
         "\n".join(
             [
-                "NC_006088.5\t197608386\t1000\t9000\t+\tNC_052532.1\t196449156\t2000\t10000\t7600\t8000\t60",
+                "NC_006088.5\t197608386\t1000\t101000\t+\tNC_052532.1\t196449156\t2000\t102000\t95000\t100000\t60",
                 "NC_006089.5\t149682049\t2000\t12000\t-\tNC_052533.1\t149539284\t3000\t13000\t9100\t10000\t60",
             ]
         )
@@ -228,6 +228,16 @@ def test_static_figure_svg_accepts_reproducible_style_settings(tmp_path: Path):
     assert '"showTitle": false' in svg
 
 
+def test_dna_static_figure_uses_gold_standard_display_filters(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    svg = store.render_static_figure_svg("dna-dotplot")
+
+    assert "Blocks: 1;" in svg
+    assert "10000" not in svg
+
+
 def test_static_figure_svg_settings_are_clamped_and_block_ids_are_safe(tmp_path: Path):
     _write_static_figure_fixture(tmp_path)
     store = GoldStandardComparativeStore(tmp_path)
@@ -277,6 +287,8 @@ if __name__ == "__main__":
         test_static_figure_svg_rendering_is_scientifically_labeled(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_static_figure_svg_accepts_reproducible_style_settings(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_dna_static_figure_uses_gold_standard_display_filters(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_static_figure_svg_settings_are_clamped_and_block_ids_are_safe(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:

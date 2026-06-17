@@ -27,7 +27,7 @@ import re
 import shutil
 import subprocess
 
-from backend.comparative_paf import GRCG6A_REFSEQ_TO_CHR, normalize_chr, parse_paf_line
+from backend.comparative_paf import GRCG6A_REFSEQ_TO_CHR, normalize_chr, parse_paf_line, read_paf_records
 
 
 EvidenceStatus = Literal["available", "missing", "not_indexed"]
@@ -772,17 +772,14 @@ class GoldStandardComparativeStore:
     def _read_primary_paf_records(self, limit: int = 5000):
         if not self.primary_paf.exists():
             return []
-        records = []
-        with self.primary_paf.open("r", encoding="utf-8", errors="replace") as handle:
-            for index, line in enumerate(handle):
-                if not line.strip() or line.startswith("#"):
-                    continue
-                record = parse_paf_line(line, index)
-                if record is not None:
-                    records.append(record)
-                if len(records) >= limit:
-                    break
-        return records
+        return read_paf_records(
+            self.primary_paf,
+            min_mapq=30,
+            min_identity=85.0,
+            min_alignment_length=50_000,
+            limit=limit,
+            order="coordinate",
+        )
 
     def _should_label_chr(self, chr_name: str, settings: FigureSettings) -> bool:
         if not settings.show_labels or settings.label_density == "none":
