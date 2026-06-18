@@ -184,6 +184,16 @@ async def render_custom_static_figure_svg(
     return PlainTextResponse(svg, media_type="image/svg+xml")
 
 
+@router.get("/micro-synteny/{block_id}")
+async def get_micro_synteny_block_details(block_id: str):
+    """Get selected micro-synteny block summary and gene-pair details."""
+    service = get_service()
+    result = service.get_micro_synteny_block_details(block_id)
+    if result.get("status") != "available":
+        raise HTTPException(status_code=404, detail=result.get("message", "Micro-synteny block is not available."))
+    return result
+
+
 @router.get("/base-level")
 async def get_base_level_records(
     side: Literal["query", "target"] = Query("query"),

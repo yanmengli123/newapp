@@ -1072,14 +1072,14 @@ class GoldStandardComparativeStore:
         elif settings.label_density == "all":
             label_mode = "normal" if px_per_anchor >= 45 else "compact"
         elif anchor_count >= 50 or px_per_anchor < 18:
-            label_mode = "overview"
+            label_mode = "overview-landmark"
         elif anchor_count >= 20 or px_per_anchor < 45:
             label_mode = "compact"
         else:
             label_mode = "normal"
         max_lanes = 4 if label_mode == "normal" else 3
         q_y = max(170 if settings.show_title else 118, int(settings.height * 0.34))
-        label_top_padding = max_lanes * 18 + 22 if label_mode in {"normal", "compact"} else 22
+        label_top_padding = max_lanes * 18 + 22 if label_mode in {"normal", "compact", "overview-landmark"} else 22
         caption_y = 74 if settings.show_title else 34
         q_y = max(q_y, caption_y + label_top_padding + 34)
         t_y = max(q_y + 150, settings.height - 150)
@@ -1089,7 +1089,7 @@ class GoldStandardComparativeStore:
             span = max(1, end - start)
             return left + ((value - start) / span) * width
 
-        def arrow(x1: float, x2: float, y: int, strand: str, cls: str) -> str:
+        def arrow(x1: float, x2: float, y: int, strand: str, cls: str, title: str = "") -> str:
             if x2 < x1:
                 x1, x2 = x2, x1
             head = min(10, max(4, (x2 - x1) / 3))
@@ -1097,7 +1097,33 @@ class GoldStandardComparativeStore:
                 points = f"{x1:.2f},{y} {x1 + head:.2f},{y - 8} {x2:.2f},{y - 8} {x2:.2f},{y + 8} {x1 + head:.2f},{y + 8}"
             else:
                 points = f"{x1:.2f},{y - 8} {x2 - head:.2f},{y - 8} {x2:.2f},{y} {x2 - head:.2f},{y + 8} {x1:.2f},{y + 8}"
-            return f'<polygon points="{points}" class="{cls}" opacity="{settings.opacity}"/>'
+            title_markup = f"<title>{html.escape(title)}</title>" if title else ""
+            return f'<polygon points="{points}" class="{cls}" opacity="{settings.opacity}">{title_markup}</polygon>'
+
+        def gene_title(row: dict, assembly: str) -> str:
+            if assembly == "GRCg6a":
+                gene = row.get("gene_1") or ""
+                symbol = row.get("gene_symbol_1") or ""
+                chr_name = row.get("chr_1") or ""
+                start = self._int(row.get("start_1"))
+                end = self._int(row.get("end_1"))
+                strand = row.get("strand_1") or "+"
+            else:
+                gene = row.get("gene_2") or ""
+                symbol = row.get("gene_symbol_2") or ""
+                chr_name = row.get("chr_2") or ""
+                start = self._int(row.get("start_2"))
+                end = self._int(row.get("end_2"))
+                strand = row.get("strand_2") or "+"
+            symbol_text = f"; symbol={symbol}" if symbol else ""
+            return f"{assembly} {chr_name}:{start}-{end} ({strand}); gene={gene}{symbol_text}"
+
+        def anchor_title(row: dict) -> str:
+            return (
+                f"{row.get('pair_id', '')}: {row.get('gene_1', '')} -> {row.get('gene_2', '')}; "
+                f"pident={row.get('pident', '')}; qcovs={row.get('qcovs', '')}; "
+                f"bitscore={row.get('bitscore', '')}; method={row.get('method', '')}"
+            )
 
         def label_tier(row: dict, index: int) -> int:
             symbol = str(row.get("gene_symbol_1") or "").strip()
@@ -1116,7 +1142,7 @@ class GoldStandardComparativeStore:
             return value[:24]
 
         def layout_gene_labels() -> list[dict[str, Any]]:
-            if label_mode in {"none", "overview"}:
+            if label_mode == "none":
                 return []
             candidates: list[dict[str, Any]] = []
             for index, row in enumerate(pairs):
@@ -1124,7 +1150,7 @@ class GoldStandardComparativeStore:
                 if not text:
                     continue
                 tier = label_tier(row, index)
-                if label_mode == "compact" and tier > 2:
+                if label_mode in {"compact", "overview-landmark"} and tier > 2:
                     continue
                 q1 = sx(self._int(row.get("start_1")), q_min, q_max)
                 q2 = sx(self._int(row.get("end_1")), q_min, q_max)
@@ -1137,9 +1163,12 @@ class GoldStandardComparativeStore:
                     }
                 )
             candidates.sort(key=lambda item: (item["tier"], item["index"]))
+            max_labels = 15 if label_mode == "overview-landmark" else 20000
             lanes = [left - 9999.0 for _ in range(max_lanes)]
             labels: list[dict[str, Any]] = []
             for item in candidates:
+                if len(labels) >= max_labels:
+                    break
                 estimated_width = max(24.0, len(item["text"]) * 6.2)
                 x = max(left + estimated_width / 2, min(left + width - estimated_width / 2, item["x"]))
                 placed_lane: Optional[int] = None
@@ -1181,10 +1210,13 @@ class GoldStandardComparativeStore:
             q_mid = (q1 + q2) / 2
             t_mid = (t1 + t2) / 2
             if settings.show_anchor_lines:
-                parts.append(f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="anchor-link link"/>')
+                parts.append(
+                    f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="anchor-link link">'
+                    f"<title>{html.escape(anchor_title(row))}</title></line>"
+                )
             if settings.show_gene_arrows:
-                parts.append(arrow(q1, q2, q_y, str(row.get("strand_1", "+")), "gene"))
-                parts.append(arrow(t1, t2, t_y, str(row.get("strand_2", "+")), "gene2"))
+                parts.append(arrow(q1, q2, q_y, str(row.get("strand_1", "+")), "gene", gene_title(row, "GRCg6a")))
+                parts.append(arrow(t1, t2, t_y, str(row.get("strand_2", "+")), "gene2", gene_title(row, "GRCg7b")))
         labels = layout_gene_labels()
         for item in labels:
             tier_class = "gene-label-tier1" if item["tier"] == 1 else "gene-label-tier2"
@@ -1326,6 +1358,63 @@ class GoldStandardComparativeStore:
         else:
             content = path.read_text(encoding="utf-8", errors="replace")
         return {"path": path, "content": content, "media_type": "text/plain"}
+
+    def get_micro_synteny_block_details(self, block_id: str, pair_limit: int = 20000) -> dict:
+        if not SAFE_BLOCK_ID_RE.match(block_id):
+            return {
+                "status": "missing",
+                "block_id": block_id,
+                "block": {},
+                "summary": {},
+                "pairs": [],
+                "pair_count": 0,
+                "message": "Invalid micro-synteny block id.",
+            }
+        blocks = self._read_gene_blocks()
+        block = next((row for row in blocks if str(row.get("block_id", "")) == block_id), None)
+        pairs = self._read_gene_pairs(block_id=block_id, limit=pair_limit)
+        if not block or not pairs:
+            return {
+                "status": "missing",
+                "block_id": block_id,
+                "block": block or {},
+                "summary": {},
+                "pairs": [],
+                "pair_count": 0,
+                "message": "No anchor pairs are available for the selected block.",
+            }
+
+        q_start = min(self._int(row.get("start_1")) for row in pairs)
+        q_end = max(self._int(row.get("end_1")) for row in pairs)
+        t_start = min(self._int(row.get("start_2")) for row in pairs)
+        t_end = max(self._int(row.get("end_2")) for row in pairs)
+        pidents = [self._float(row.get("pident")) for row in pairs if row.get("pident") not in {None, ""}]
+        qcovs = [self._float(row.get("qcovs")) for row in pairs if row.get("qcovs") not in {None, ""}]
+        query_chr = str(block.get("chr_1") or pairs[0].get("chr_1") or "")
+        target_chr = str(block.get("chr_2") or pairs[0].get("chr_2") or "")
+        summary = {
+            "block_id": block_id,
+            "anchor_count": len(pairs),
+            "query_chr": query_chr,
+            "target_chr": target_chr,
+            "query_interval": f"{query_chr}:{q_start}-{q_end}",
+            "target_interval": f"{target_chr}:{t_start}-{t_end}",
+            "query_span_bp": max(0, q_end - q_start),
+            "target_span_bp": max(0, t_end - t_start),
+            "orientation": block.get("orientation") or pairs[0].get("orientation") or "",
+            "mean_identity": round(sum(pidents) / len(pidents), 3) if pidents else None,
+            "mean_qcovs": round(sum(qcovs) / len(qcovs), 3) if qcovs else None,
+            "method": block.get("method") or pairs[0].get("method") or "",
+        }
+        return {
+            "status": "available",
+            "block_id": block_id,
+            "block": block,
+            "summary": summary,
+            "pairs": pairs,
+            "pair_count": len(pairs),
+            "message": "Micro-synteny block details are available.",
+        }
 
     def get_gene_collinearity(
         self,

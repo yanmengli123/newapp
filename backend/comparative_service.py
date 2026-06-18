@@ -182,6 +182,10 @@ class ComparativeService:
         """Return MCScan-compatible anchors/BED content for JBrowse2."""
         return self.gold_store.get_gene_collinearity_file(name)
 
+    def get_micro_synteny_block_details(self, block_id: str) -> dict:
+        """Return selected micro-synteny block summary and gene-pair details."""
+        return self.gold_store.get_micro_synteny_block_details(block_id)
+
     def get_base_level_records(
         self,
         side: CoordinateSide = "query",

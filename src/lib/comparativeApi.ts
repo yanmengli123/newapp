@@ -226,6 +226,29 @@ export interface StaticFigureCatalog {
   figures: StaticFigureItem[];
 }
 
+export interface MicroSyntenyBlockDetails {
+  status: string;
+  block_id: string;
+  block: Record<string, string>;
+  summary: {
+    block_id: string;
+    anchor_count: number;
+    query_chr: string;
+    target_chr: string;
+    query_interval: string;
+    target_interval: string;
+    query_span_bp: number;
+    target_span_bp: number;
+    orientation: string;
+    mean_identity: number | null;
+    mean_qcovs: number | null;
+    method: string;
+  };
+  pairs: Record<string, string>[];
+  pair_count: number;
+  message: string;
+}
+
 export type StaticFigureId =
   | "dna-dotplot"
   | "gene-collinearity-dotplot"
@@ -589,6 +612,10 @@ export async function renderStaticFigureSvg(
     throw new ApiError(err.detail || "Static figure rendering failed", response.status);
   }
   return response.text();
+}
+
+export async function getMicroSyntenyBlockDetails(blockId: string): Promise<MicroSyntenyBlockDetails> {
+  return apiFetch<MicroSyntenyBlockDetails>(`/comparative/micro-synteny/${encodeURIComponent(blockId)}`);
 }
 
 export async function getBaseLevelRecords(params: {

@@ -270,12 +270,28 @@ def test_micro_synteny_dense_block_renders_all_anchors_without_static_label_clut
     store = GoldStandardComparativeStore(tmp_path)
 
     svg = store.render_static_figure_svg("micro-synteny", block_id="GENEBLOCK_DENSE")
+    labels = re.findall(r'<text x="([0-9.]+)" y="([0-9.]+)" text-anchor="middle" class="gene-label[^"]*">([^<]+)</text>', svg)
 
     assert "anchors rendered: 72/72" in svg
-    assert "label mode: overview" in svg
-    assert "labels shown: 0/72" in svg
+    assert "label mode: overview-landmark" in svg
+    assert 0 < len(labels) <= 15
     assert svg.count('class="anchor-link link"') == 72
-    assert 'class="gene-label' not in svg
+    assert "GENEPAIR_DENSE_00000" in svg
+    assert "GRCg6a_DENSE_00000" in svg
+    assert "GRCg7b_DENSE_00000" in svg
+    assert "pident=98.0" in svg
+    assert "qcovs=91" in svg
+    assert "GRCg6a 1:10000-10080 (-)" in svg
+    assert "GRCg7b 1:11000-11080 (-)" in svg
+
+    by_lane: dict[str, list[tuple[float, str]]] = {}
+    for x_value, y_value, label in labels:
+        by_lane.setdefault(y_value, []).append((float(x_value), label))
+    for lane_labels in by_lane.values():
+        ordered = sorted(lane_labels)
+        for (left_x, left_label), (right_x, _right_label) in zip(ordered, ordered[1:]):
+            min_gap = len(left_label) * 6 + 6
+            assert right_x - left_x >= min_gap
 
 
 def test_micro_synteny_compact_labels_are_assigned_to_non_overlapping_lanes(tmp_path: Path):
@@ -300,6 +316,24 @@ def test_micro_synteny_compact_labels_are_assigned_to_non_overlapping_lanes(tmp_
         for (left_x, left_label), (right_x, _right_label) in zip(ordered, ordered[1:]):
             min_gap = len(left_label) * 6 + 6
             assert right_x - left_x >= min_gap
+
+
+def test_micro_synteny_block_details_return_summary_and_pairs(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    _append_dense_micro_synteny_block(tmp_path, count=72)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    details = store.get_micro_synteny_block_details("GENEBLOCK_DENSE")
+
+    assert details["status"] == "available"
+    assert details["block"]["block_id"] == "GENEBLOCK_DENSE"
+    assert details["summary"]["anchor_count"] == 72
+    assert details["summary"]["query_interval"] == "1:10000-17180"
+    assert details["summary"]["target_interval"] == "1:11000-18180"
+    assert details["summary"]["method"] == "BLASTP_RBH_CHAINING"
+    assert details["pair_count"] == 72
+    assert details["pairs"][0]["gene_1"] == "GRCg6a_DENSE_00000"
+    assert details["pairs"][0]["gene_2"] == "GRCg7b_DENSE_00000"
 
 
 def test_gene_collinearity_can_return_all_blocks_without_large_pair_payload(tmp_path: Path):

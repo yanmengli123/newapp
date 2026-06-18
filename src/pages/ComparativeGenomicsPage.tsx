@@ -44,6 +44,7 @@ import {
   getComparativeMethods,
   getGeneCollinearity,
   getGoldStandardStatus,
+  getMicroSyntenyBlockDetails,
   getOrthologTable,
   getStaticFigureCatalog,
   createDefaultFigureSettings,
@@ -60,6 +61,7 @@ import {
   type GoldStandardLayer,
   type GoldStandardStatus,
   type FigureSettings,
+  type MicroSyntenyBlockDetails,
   type StaticFigureCatalog,
   type StaticFigureItem,
 } from "../lib/comparativeApi";
@@ -734,6 +736,37 @@ function StaticFiguresPanel({
   microBlockId: string | null;
   onMicroBlockChange: (value: string | null) => void;
 }) {
+  const [microDetails, setMicroDetails] = useState<MicroSyntenyBlockDetails | null>(null);
+  const [microDetailsLoading, setMicroDetailsLoading] = useState(false);
+  const [microDetailsError, setMicroDetailsError] = useState("");
+
+  useEffect(() => {
+    if (!microBlockId) return;
+    let cancelled = false;
+    void Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+        setMicroDetailsLoading(true);
+        setMicroDetailsError("");
+        return getMicroSyntenyBlockDetails(microBlockId);
+      })
+      .then((details) => {
+        if (!cancelled && details) setMicroDetails(details);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setMicroDetails(null);
+          setMicroDetailsError(getErrorMessage(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setMicroDetailsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [microBlockId]);
+
   if (!catalog) {
     return (
       <Paper withBorder p="xl" pos="relative">
@@ -850,6 +883,11 @@ function StaticFiguresPanel({
             blocks={blocks}
             onMicroBlockChange={onMicroBlockChange}
           />
+          <MicroSyntenyDetailsPanel
+            details={microDetails?.block_id === microBlockId ? microDetails : null}
+            loading={microDetailsLoading}
+            error={microBlockId ? microDetailsError : ""}
+          />
         </Stack>
       )}
 
@@ -878,6 +916,98 @@ function figureSvgUrl(figure: StaticFigureItem, microBlockId: string | null) {
 
 function figureFileName(figure: StaticFigureItem) {
   return `${figure.id || figure.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.svg`;
+}
+
+function MicroSyntenyDetailsPanel({
+  details,
+  loading,
+  error,
+}: {
+  details: MicroSyntenyBlockDetails | null;
+  loading: boolean;
+  error: string;
+}) {
+  if (error) {
+    return <Alert color="red">{error}</Alert>;
+  }
+  if (!details) {
+    return (
+      <Card withBorder radius="sm" pos="relative">
+        <LoadingOverlay visible={loading} />
+        <Text size="sm" c="dimmed">Select a gene collinearity block to view micro-synteny details.</Text>
+      </Card>
+    );
+  }
+
+  const summary = details.summary;
+  const rows = details.pairs.slice(0, 20);
+
+  return (
+    <Card withBorder radius="sm" pos="relative">
+      <LoadingOverlay visible={loading} />
+      <Stack gap="md">
+        <Group justify="space-between" align="flex-start">
+          <div>
+            <Text fw={800}>Selected Block Details</Text>
+            <Text size="xs" c="dimmed">
+              Complete gene-pair evidence for the selected Micro-synteny block; table preview shows {rows.length}/{details.pair_count} anchors.
+            </Text>
+          </div>
+          <Badge color="teal" variant="light">{details.status}</Badge>
+        </Group>
+
+        <SimpleGrid cols={{ base: 2, md: 4 }} spacing="xs">
+          <SmallStat label="Block" value={summary.block_id || details.block_id} />
+          <SmallStat label="Anchors" value={String(summary.anchor_count ?? details.pair_count)} />
+          <SmallStat label="Orientation" value={summary.orientation || "-"} />
+          <SmallStat label="Method" value={summary.method || "-"} />
+          <SmallStat label="GRCg6a interval" value={summary.query_interval || "-"} />
+          <SmallStat label="GRCg7b interval" value={summary.target_interval || "-"} />
+          <SmallStat label="GRCg6a span" value={bp(summary.query_span_bp || 0)} />
+          <SmallStat label="GRCg7b span" value={bp(summary.target_span_bp || 0)} />
+          <SmallStat label="Mean identity" value={summary.mean_identity === null ? "-" : `${dash(summary.mean_identity, 2)}%`} />
+          <SmallStat label="Mean qcovs" value={summary.mean_qcovs === null ? "-" : `${dash(summary.mean_qcovs, 2)}%`} />
+        </SimpleGrid>
+
+        <ScrollArea>
+          <Table striped highlightOnHover withTableBorder>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>GRCg6a gene</Table.Th>
+                <Table.Th>Symbol</Table.Th>
+                <Table.Th>GRCg6a position</Table.Th>
+                <Table.Th>Strand</Table.Th>
+                <Table.Th>GRCg7b gene</Table.Th>
+                <Table.Th>Symbol</Table.Th>
+                <Table.Th>GRCg7b position</Table.Th>
+                <Table.Th>Strand</Table.Th>
+                <Table.Th>Identity</Table.Th>
+                <Table.Th>Qcovs</Table.Th>
+                <Table.Th>Bitscore</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {rows.map((row) => (
+                <Table.Tr key={row.pair_id || `${row.gene_1}-${row.gene_2}`}>
+                  <Table.Td>{row.gene_1}</Table.Td>
+                  <Table.Td>{row.gene_symbol_1 || "-"}</Table.Td>
+                  <Table.Td>{row.chr_1}:{row.start_1}-{row.end_1}</Table.Td>
+                  <Table.Td>{row.strand_1 || "-"}</Table.Td>
+                  <Table.Td>{row.gene_2}</Table.Td>
+                  <Table.Td>{row.gene_symbol_2 || "-"}</Table.Td>
+                  <Table.Td>{row.chr_2}:{row.start_2}-{row.end_2}</Table.Td>
+                  <Table.Td>{row.strand_2 || "-"}</Table.Td>
+                  <Table.Td>{row.pident ? `${row.pident}%` : "-"}</Table.Td>
+                  <Table.Td>{row.qcovs ? `${row.qcovs}%` : "-"}</Table.Td>
+                  <Table.Td>{row.bitscore || "-"}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      </Stack>
+    </Card>
+  );
 }
 
 function downloadSvgText(svg: string, filename: string) {
