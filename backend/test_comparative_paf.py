@@ -191,6 +191,23 @@ def test_static_figure_svg_rendering_is_scientifically_labeled(tmp_path: Path):
     assert "BLASTP_RBH_CHAINING" in svg
 
 
+def test_static_figures_mark_selected_micro_synteny_block(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    store = GoldStandardComparativeStore(tmp_path)
+    settings = {"selectedBlockId": "GENEBLOCK_00001"}
+
+    for figure_id in [
+        "dna-dotplot",
+        "gene-collinearity-dotplot",
+        "karyotype-ribbons",
+        "micro-synteny",
+    ]:
+        svg = store.render_static_figure_svg(figure_id, settings=settings)
+
+        assert 'data-selected-block="GENEBLOCK_00001"' in svg
+        assert "Selected block: GENEBLOCK_00001" in svg
+
+
 def test_static_figure_svg_accepts_reproducible_style_settings(tmp_path: Path):
     _write_static_figure_fixture(tmp_path)
     store = GoldStandardComparativeStore(tmp_path)
