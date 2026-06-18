@@ -748,6 +748,10 @@ class GoldStandardComparativeStore:
             f".gene{{fill:{settings.forward_color};stroke:{settings.forward_color}}}"
             f".gene2{{fill:{settings.reverse_color};stroke:{settings.reverse_color}}}"
             f".link{{stroke:{settings.low_confidence_color};stroke-width:{max(0.5, settings.stroke_width * 0.65):.2f};stroke-opacity:{settings.opacity * 0.62:.3f}}}"
+            f".anchor-link{{stroke-linecap:round}}"
+            f".gene-label{{font:10px Arial,sans-serif;fill:{settings.text_color};stroke:#fff;stroke-width:3px;paint-order:stroke;stroke-linejoin:round;opacity:.88}}"
+            f".gene-label-tier1{{font-weight:700}}"
+            f".gene-label-tier2{{font-weight:600;opacity:.78}}"
             "</style>"
             f'<rect width="100%" height="100%" fill="{settings.background_color}"/>'
             f"{title_markup}"
@@ -1038,7 +1042,7 @@ class GoldStandardComparativeStore:
         block_id: Optional[str] = None,
         settings: Optional[dict[str, Any] | FigureSettings] = None,
     ) -> str:
-        settings = FigureSettings.from_payload(settings, default_width=960, default_height=460)
+        settings = FigureSettings.from_payload(settings, default_width=1200, default_height=720)
         if settings.selected_block_id or settings.selected_block_id_provided:
             block_id = settings.selected_block_id
         if block_id and not SAFE_BLOCK_ID_RE.match(block_id):
@@ -1046,7 +1050,7 @@ class GoldStandardComparativeStore:
         blocks = self._read_gene_blocks()
         if not block_id and blocks and not settings.selected_block_id_provided:
             block_id = str(blocks[0].get("block_id", ""))
-        pairs = self._read_gene_pairs(block_id=block_id, limit=80) if block_id else []
+        pairs = self._read_gene_pairs(block_id=block_id, limit=20000) if block_id else []
         if not pairs:
             return self._empty_figure(
                 "Micro-synteny",
@@ -1059,10 +1063,26 @@ class GoldStandardComparativeStore:
         q_max = max(self._int(row.get("end_1")) for row in pairs)
         t_min = min(self._int(row.get("start_2")) for row in pairs)
         t_max = max(self._int(row.get("end_2")) for row in pairs)
-        left = max(84, int(settings.width * 0.087))
-        width = max(240, settings.width - left - 86)
-        q_y = 170 if settings.show_title else 110
-        t_y = max(q_y + 120, settings.height - 130)
+        left = max(96, int(settings.width * 0.09))
+        width = max(240, settings.width - left - max(96, int(settings.width * 0.08)))
+        anchor_count = len(pairs)
+        px_per_anchor = width / max(1, anchor_count)
+        if not settings.show_labels or settings.label_density == "none":
+            label_mode = "none"
+        elif settings.label_density == "all":
+            label_mode = "normal" if px_per_anchor >= 45 else "compact"
+        elif anchor_count >= 50 or px_per_anchor < 18:
+            label_mode = "overview"
+        elif anchor_count >= 20 or px_per_anchor < 45:
+            label_mode = "compact"
+        else:
+            label_mode = "normal"
+        max_lanes = 4 if label_mode == "normal" else 3
+        q_y = max(170 if settings.show_title else 118, int(settings.height * 0.34))
+        label_top_padding = max_lanes * 18 + 22 if label_mode in {"normal", "compact"} else 22
+        caption_y = 74 if settings.show_title else 34
+        q_y = max(q_y, caption_y + label_top_padding + 34)
+        t_y = max(q_y + 150, settings.height - 150)
         caption_y = 74 if settings.show_title else 34
 
         def sx(value: int, start: int, end: int) -> float:
@@ -1079,6 +1099,69 @@ class GoldStandardComparativeStore:
                 points = f"{x1:.2f},{y - 8} {x2 - head:.2f},{y - 8} {x2:.2f},{y} {x2 - head:.2f},{y + 8} {x1:.2f},{y + 8}"
             return f'<polygon points="{points}" class="{cls}" opacity="{settings.opacity}"/>'
 
+        def label_tier(row: dict, index: int) -> int:
+            symbol = str(row.get("gene_symbol_1") or "").strip()
+            gene_id = str(row.get("gene_1") or "").strip()
+            if index in {0, len(pairs) - 1}:
+                return 2
+            previous = pairs[index - 1] if index > 0 else None
+            if previous and previous.get("strand_1") != row.get("strand_1"):
+                return 2
+            if symbol and not symbol.upper().startswith("LOC") and symbol != gene_id:
+                return 1
+            return 3
+
+        def label_text(row: dict) -> str:
+            value = str(row.get("gene_symbol_1") or row.get("gene_1") or "").strip()
+            return value[:24]
+
+        def layout_gene_labels() -> list[dict[str, Any]]:
+            if label_mode in {"none", "overview"}:
+                return []
+            candidates: list[dict[str, Any]] = []
+            for index, row in enumerate(pairs):
+                text = label_text(row)
+                if not text:
+                    continue
+                tier = label_tier(row, index)
+                if label_mode == "compact" and tier > 2:
+                    continue
+                q1 = sx(self._int(row.get("start_1")), q_min, q_max)
+                q2 = sx(self._int(row.get("end_1")), q_min, q_max)
+                candidates.append(
+                    {
+                        "x": (q1 + q2) / 2,
+                        "text": text,
+                        "tier": tier,
+                        "index": index,
+                    }
+                )
+            candidates.sort(key=lambda item: (item["tier"], item["index"]))
+            lanes = [left - 9999.0 for _ in range(max_lanes)]
+            labels: list[dict[str, Any]] = []
+            for item in candidates:
+                estimated_width = max(24.0, len(item["text"]) * 6.2)
+                x = max(left + estimated_width / 2, min(left + width - estimated_width / 2, item["x"]))
+                placed_lane: Optional[int] = None
+                for lane_index, occupied_until in enumerate(lanes):
+                    label_left = x - estimated_width / 2
+                    if label_left >= occupied_until + 8:
+                        placed_lane = lane_index
+                        lanes[lane_index] = x + estimated_width / 2
+                        break
+                if placed_lane is None:
+                    continue
+                labels.append(
+                    {
+                        **item,
+                        "x": x,
+                        "y": q_y - 22 - placed_lane * 18,
+                        "lane": placed_lane,
+                    }
+                )
+            labels.sort(key=lambda item: item["index"])
+            return labels
+
         parts = [
             f'<line x1="{left}" y1="{q_y}" x2="{left + width}" y2="{q_y}" class="grid"/>',
             f'<line x1="{left}" y1="{t_y}" x2="{left + width}" y2="{t_y}" class="grid"/>',
@@ -1090,7 +1173,7 @@ class GoldStandardComparativeStore:
                     f'<text x="{left}" y="{t_y + 50}" class="label">GRCg7b homologous region</text>',
                 ]
             )
-        for index, row in enumerate(pairs[:60]):
+        for row in pairs:
             q1 = sx(self._int(row.get("start_1")), q_min, q_max)
             q2 = sx(self._int(row.get("end_1")), q_min, q_max)
             t1 = sx(self._int(row.get("start_2")), t_min, t_max)
@@ -1098,17 +1181,21 @@ class GoldStandardComparativeStore:
             q_mid = (q1 + q2) / 2
             t_mid = (t1 + t2) / 2
             if settings.show_anchor_lines:
-                parts.append(f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="link"/>')
+                parts.append(f'<line x1="{q_mid:.2f}" y1="{q_y + 10}" x2="{t_mid:.2f}" y2="{t_y - 10}" class="anchor-link link"/>')
             if settings.show_gene_arrows:
                 parts.append(arrow(q1, q2, q_y, str(row.get("strand_1", "+")), "gene"))
                 parts.append(arrow(t1, t2, t_y, str(row.get("strand_2", "+")), "gene2"))
-            if index < 16 and settings.show_labels:
-                symbol = row.get("gene_symbol_1") or row.get("gene_1") or ""
-                parts.append(f'<text x="{q_mid:.2f}" y="{q_y - 16}" text-anchor="middle" class="small">{html.escape(str(symbol))}</text>')
+        labels = layout_gene_labels()
+        for item in labels:
+            tier_class = "gene-label-tier1" if item["tier"] == 1 else "gene-label-tier2"
+            parts.append(
+                f'<text x="{item["x"]:.2f}" y="{item["y"]:.2f}" text-anchor="middle" class="gene-label {tier_class}">'
+                f'{html.escape(str(item["text"]))}</text>'
+            )
         block_row = next((row for row in blocks if str(row.get("block_id", "")) == str(block_id)), {})
         method = block_row.get("method") or pairs[0].get("method", "")
         parts.append(
-            f'<text x="{left}" y="{caption_y}" class="small">Block: {html.escape(str(block_id))}; anchors shown: {min(len(pairs), 60)}; method={html.escape(str(method))}</text>'
+            f'<text x="{left}" y="{caption_y}" class="small">Block: {html.escape(str(block_id))}; anchors rendered: {len(pairs)}/{anchor_count}; labels shown: {len(labels)}/{anchor_count}; label mode: {label_mode}; method={html.escape(str(method))}</text>'
         )
         if settings.show_legend:
             parts.extend(

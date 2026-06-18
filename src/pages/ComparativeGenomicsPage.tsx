@@ -6,6 +6,7 @@ import {
   Card,
   Container,
   Divider,
+  Grid,
   Group,
   LoadingOverlay,
   Paper,
@@ -746,49 +747,126 @@ function StaticFiguresPanel({
     .map((block) => block.block_id)
     .filter(Boolean)
     .map((blockId) => ({ value: blockId, label: blockId }));
+  const figureById = new Map(catalog.figures.map((figure) => [figure.id, figure]));
+  const dnaFigure = figureById.get("dna-dotplot");
+  const karyotypeFigure = figureById.get("karyotype-ribbons");
+  const geneFigure = figureById.get("gene-collinearity-dotplot");
+  const microFigure = figureById.get("micro-synteny");
+  const fallbackFigures = catalog.figures.filter(
+    (figure) => !["dna-dotplot", "karyotype-ribbons", "gene-collinearity-dotplot", "micro-synteny"].includes(figure.id),
+  );
 
   return (
-    <Stack gap="md">
-      <Card withBorder radius="sm">
+    <Stack gap="lg">
+      <Card
+        withBorder
+        radius="sm"
+        style={{ position: "sticky", top: 8, zIndex: 3, background: "rgba(255,255,255,0.96)", backdropFilter: "blur(6px)" }}
+      >
         <Group justify="space-between" align="flex-start" gap="md">
-          <div>
-            <Text fw={700}>Dynamic + Static Evidence Package</Text>
+          <Stack gap={4}>
+            <Text fw={800}>Publication-Ready Static Evidence Suite</Text>
             <Text size="xs" c="dimmed">
-              {catalog.pair.assembly_1} vs {catalog.pair.assembly_2} publication figures are generated from audited local evidence files.
+              {catalog.pair.assembly_1} vs {catalog.pair.assembly_2}; figures are generated from audited local comparative evidence files.
             </Text>
-          </div>
-          <Group gap="xs">
-            {catalog.dynamic_layers.map((layer) => (
-              <Badge key={layer} variant="light" color="blue">{layer}</Badge>
-            ))}
+            <Group gap={6}>
+              {catalog.dynamic_layers.map((layer) => (
+                <Badge key={layer} variant="light" color="blue">{layer}</Badge>
+              ))}
+            </Group>
+          </Stack>
+          <Group gap="sm" align="flex-end">
+            <Badge color="teal" variant="filled">{catalog.pair.assembly_1} vs {catalog.pair.assembly_2}</Badge>
+            <Badge color="gray" variant="light">Auto density labels</Badge>
           </Group>
         </Group>
+        {blockOptions.length > 0 && (
+          <>
+            <Divider my="sm" />
+            <Select
+              label="Micro-synteny block"
+              value={microBlockId}
+              onChange={onMicroBlockChange}
+              data={blockOptions}
+              searchable
+              w={{ base: "100%", sm: 360 }}
+            />
+          </>
+        )}
       </Card>
 
-      {blockOptions.length > 0 && (
-        <Card withBorder radius="sm">
-          <Select
-            label="Micro-synteny block"
-            value={microBlockId}
-            onChange={onMicroBlockChange}
-            data={blockOptions.slice(0, 500)}
-            searchable
-            w={{ base: "100%", sm: 280 }}
-          />
-        </Card>
-      )}
+      <Stack gap="xs">
+        <Text size="xs" tt="uppercase" fw={800} c="dimmed">Tier 1 - Macro DNA and chromosome-scale evidence</Text>
+        <Grid gutter="md">
+          {dnaFigure && (
+            <Grid.Col span={{ base: 12, xl: 7 }}>
+              <StaticFigureCard
+                figure={dnaFigure}
+                figureCode="A"
+                previewHeight={520}
+                microBlockId={microBlockId}
+                blocks={blocks}
+                onMicroBlockChange={onMicroBlockChange}
+              />
+            </Grid.Col>
+          )}
+          {karyotypeFigure && (
+            <Grid.Col span={{ base: 12, xl: 5 }}>
+              <StaticFigureCard
+                figure={karyotypeFigure}
+                figureCode="B"
+                previewHeight={520}
+                microBlockId={microBlockId}
+                blocks={blocks}
+                onMicroBlockChange={onMicroBlockChange}
+              />
+            </Grid.Col>
+          )}
+        </Grid>
+      </Stack>
 
-      <SimpleGrid cols={{ base: 1, lg: 2 }}>
-        {catalog.figures.map((figure) => (
+      {geneFigure && (
+        <Stack gap="xs">
+          <Text size="xs" tt="uppercase" fw={800} c="dimmed">Tier 2 - Gene-level collinearity evidence</Text>
           <StaticFigureCard
-            key={figure.id}
-            figure={figure}
+            figure={geneFigure}
+            figureCode="C"
+            previewHeight={500}
             microBlockId={microBlockId}
             blocks={blocks}
             onMicroBlockChange={onMicroBlockChange}
           />
-        ))}
-      </SimpleGrid>
+        </Stack>
+      )}
+
+      {microFigure && (
+        <Stack gap="xs">
+          <Text size="xs" tt="uppercase" fw={800} c="dimmed">Tier 3 - Local micro-synteny detail</Text>
+          <StaticFigureCard
+            figure={microFigure}
+            figureCode="D"
+            previewHeight={720}
+            microBlockId={microBlockId}
+            blocks={blocks}
+            onMicroBlockChange={onMicroBlockChange}
+          />
+        </Stack>
+      )}
+
+      {fallbackFigures.length > 0 && (
+        <SimpleGrid cols={{ base: 1, lg: 2 }}>
+          {fallbackFigures.map((figure) => (
+            <StaticFigureCard
+              key={figure.id}
+              figure={figure}
+              previewHeight={420}
+              microBlockId={microBlockId}
+              blocks={blocks}
+              onMicroBlockChange={onMicroBlockChange}
+            />
+          ))}
+        </SimpleGrid>
+      )}
     </Stack>
   );
 }
@@ -813,8 +891,10 @@ function downloadSvgText(svg: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function StaticFigureCard({ figure, microBlockId, blocks, onMicroBlockChange }: {
+function StaticFigureCard({ figure, figureCode, previewHeight, microBlockId, blocks, onMicroBlockChange }: {
   figure: StaticFigureItem;
+  figureCode?: string;
+  previewHeight: number;
   microBlockId: string | null;
   blocks: Record<string, string>[];
   onMicroBlockChange: (value: string | null) => void;
@@ -918,11 +998,15 @@ function StaticFigureCard({ figure, microBlockId, blocks, onMicroBlockChange }: 
       <Card withBorder radius="sm">
         <Stack gap="sm">
           <Group justify="space-between" align="flex-start">
-            <div>
-              <Text fw={700}>{figure.title}</Text>
-              <Text size="xs" c="dimmed">{figure.evidence_layer}</Text>
-            </div>
+            <Group gap="sm" align="flex-start">
+              {figureCode && <Badge color="dark" variant="filled" size="lg">{figureCode}</Badge>}
+              <div>
+                <Text fw={700}>{figure.title}</Text>
+                <Text size="xs" c="dimmed">{figure.evidence_layer}</Text>
+              </div>
+            </Group>
             <Group gap="xs">
+              {figure.id === "micro-synteny" && <Badge color="yellow" variant="light">density-aware labels</Badge>}
               {customSvgUrl && <Badge color="blue" variant="light">custom</Badge>}
               <Badge color={layerColor(figure.status)} variant="light">{figure.status}</Badge>
             </Group>
@@ -933,10 +1017,10 @@ function StaticFigureCard({ figure, microBlockId, blocks, onMicroBlockChange }: 
                 key={url}
                 src={url}
                 alt={figure.title}
-                style={{ display: "block", width: "100%", height: 360, objectFit: "contain" }}
+                style={{ display: "block", width: "100%", height: previewHeight, objectFit: "contain" }}
               />
             ) : (
-              <Group justify="center" h={360}>
+              <Group justify="center" h={previewHeight}>
                 <Text c="dimmed" size="sm">Required source files are missing.</Text>
               </Group>
             )}

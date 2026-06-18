@@ -282,7 +282,7 @@ export const FIGURE_PRESETS: FigurePreset[] = [
     label: "Publication",
     settings: {
       width: 2000,
-      height: 1400,
+      height: 1200,
       dpi: 300,
       colorScheme: PUBLICATION_COLORS,
       showLabels: true,
@@ -301,7 +301,7 @@ export const FIGURE_PRESETS: FigurePreset[] = [
     label: "Slides",
     settings: {
       width: 2400,
-      height: 1600,
+      height: 1400,
       dpi: 150,
       colorScheme: {
         forward: "#1976d2",
@@ -350,8 +350,8 @@ export function createDefaultFigureSettings(
   const isKaryotype = figureId === "karyotype-ribbons";
   const isMicro = figureId === "micro-synteny";
   return {
-    width: 960,
-    height: isMicro ? 460 : isKaryotype ? 500 : 560,
+    width: isMicro ? 1200 : 960,
+    height: isMicro ? 720 : isKaryotype ? 500 : 560,
     dpi: 150,
     colorScheme: PUBLICATION_COLORS,
     showLabels: true,

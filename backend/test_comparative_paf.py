@@ -1,6 +1,7 @@
 """Tests for comparative PAF parsing and synteny dataset summaries."""
 
 from pathlib import Path
+import re
 
 from backend.comparative_paf import (
     parse_paf_line,
@@ -163,6 +164,53 @@ def _write_static_figure_fixture(root: Path) -> None:
     )
 
 
+def _append_dense_micro_synteny_block(root: Path, count: int = 72) -> None:
+    gene_root = root / "comparative" / "pairwise" / "GRCg6a__GRCg7b" / "gene_collinearity"
+    block_id = "GENEBLOCK_DENSE"
+    with gene_root.joinpath("blocks.tsv").open("a", encoding="utf-8") as handle:
+        handle.write(
+            f"{block_id}\t1\t10000\t{10000 + count * 100}\t1\t11000\t{11000 + count * 100}\t+\t{count}\t98.5\t90.5\tBLASTP_RBH_CHAINING\n"
+        )
+    with gene_root.joinpath("gene_pairs.tsv").open("a", encoding="utf-8") as handle:
+        for index in range(count):
+            q_start = 10000 + index * 100
+            q_end = q_start + 80
+            t_start = 11000 + index * 100
+            t_end = t_start + 80
+            symbol = f"LOC{index:05d}"
+            strand = "-" if index % 11 == 0 else "+"
+            handle.write(
+                "\t".join(
+                    [
+                        f"GENEPAIR_DENSE_{index:05d}",
+                        block_id,
+                        f"GRCg6a_DENSE_{index:05d}",
+                        f"GRCg7b_DENSE_{index:05d}",
+                        symbol,
+                        symbol,
+                        f"PX{index}",
+                        f"PY{index}",
+                        "1",
+                        str(q_start),
+                        str(q_end),
+                        strand,
+                        "1",
+                        str(t_start),
+                        str(t_end),
+                        strand,
+                        "+",
+                        "98.0",
+                        "100",
+                        "1e-9",
+                        "120",
+                        "91",
+                        "BLASTP_RBH",
+                    ]
+                )
+                + "\n"
+            )
+
+
 def test_static_figure_catalog_exposes_four_publication_figures(tmp_path: Path):
     _write_static_figure_fixture(tmp_path)
     store = GoldStandardComparativeStore(tmp_path)
@@ -214,6 +262,44 @@ def test_micro_synteny_svg_changes_with_selected_block(tmp_path: Path):
     assert ">A<" in block_1_svg
     assert ">C<" in block_2_svg
     assert block_1_svg != block_2_svg
+
+
+def test_micro_synteny_dense_block_renders_all_anchors_without_static_label_clutter(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    _append_dense_micro_synteny_block(tmp_path, count=72)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    svg = store.render_static_figure_svg("micro-synteny", block_id="GENEBLOCK_DENSE")
+
+    assert "anchors rendered: 72/72" in svg
+    assert "label mode: overview" in svg
+    assert "labels shown: 0/72" in svg
+    assert svg.count('class="anchor-link link"') == 72
+    assert 'class="gene-label' not in svg
+
+
+def test_micro_synteny_compact_labels_are_assigned_to_non_overlapping_lanes(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    _append_dense_micro_synteny_block(tmp_path, count=24)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    svg = store.render_static_figure_svg(
+        "micro-synteny",
+        block_id="GENEBLOCK_DENSE",
+        settings={"width": 1200, "height": 720},
+    )
+    labels = re.findall(r'<text x="([0-9.]+)" y="([0-9.]+)" text-anchor="middle" class="gene-label[^"]*">([^<]+)</text>', svg)
+
+    assert "label mode: compact" in svg
+    assert 0 < len(labels) < 24
+    by_lane: dict[str, list[tuple[float, str]]] = {}
+    for x_value, y_value, label in labels:
+        by_lane.setdefault(y_value, []).append((float(x_value), label))
+    for lane_labels in by_lane.values():
+        ordered = sorted(lane_labels)
+        for (left_x, left_label), (right_x, _right_label) in zip(ordered, ordered[1:]):
+            min_gap = len(left_label) * 6 + 6
+            assert right_x - left_x >= min_gap
 
 
 def test_gene_collinearity_can_return_all_blocks_without_large_pair_payload(tmp_path: Path):
