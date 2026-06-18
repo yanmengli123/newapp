@@ -208,11 +208,12 @@ async def get_base_level_records(
 @router.get("/gene-collinearity")
 async def get_gene_collinearity(
     chr: Optional[str] = Query(None, description="Optional normalized chromosome filter"),
-    limit: int = Query(100, ge=1, le=20000)
+    limit: int = Query(100, ge=1, le=20000),
+    block_limit: Optional[int] = Query(None, ge=1, le=20000)
 ):
     """Get gene-level collinearity evidence if JCVI/MCScanX outputs exist."""
     service = get_service()
-    return service.get_gene_collinearity(chr_name=chr, limit=limit)
+    return service.get_gene_collinearity(chr_name=chr, limit=limit, block_limit=block_limit)
 
 
 @router.get("/gene-collinearity/file", response_class=PlainTextResponse)

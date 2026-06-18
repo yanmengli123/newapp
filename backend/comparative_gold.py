@@ -642,9 +642,19 @@ class GoldStandardComparativeStore:
         return rows
 
     def _read_gene_pairs(self, *, block_id: Optional[str] = None, limit: int = 20000) -> list[dict]:
-        rows = self._read_tsv_rows(self.gene_pairs, limit)
-        if block_id:
-            rows = [row for row in rows if row.get("block_id") == block_id]
+        if not block_id:
+            return self._read_tsv_rows(self.gene_pairs, limit)
+        if not self.gene_pairs.exists():
+            return []
+        rows: list[dict] = []
+        with self.gene_pairs.open("r", encoding="utf-8", errors="replace", newline="") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            for row in reader:
+                if row.get("block_id") != block_id:
+                    continue
+                rows.append(dict(row))
+                if len(rows) >= limit:
+                    break
         return rows
 
     def _read_gene_blocks(self, limit: int = 5000) -> list[dict]:
@@ -1230,10 +1240,16 @@ class GoldStandardComparativeStore:
             content = path.read_text(encoding="utf-8", errors="replace")
         return {"path": path, "content": content, "media_type": "text/plain"}
 
-    def get_gene_collinearity(self, *, chr_name: Optional[str] = None, limit: int = 100) -> dict:
+    def get_gene_collinearity(
+        self,
+        *,
+        chr_name: Optional[str] = None,
+        limit: int = 100,
+        block_limit: Optional[int] = None,
+    ) -> dict:
         status = self.get_status()["layers"]["gene_collinearity"]["status"]
         pairs = self._read_tsv_rows(self.gene_pairs, limit)
-        blocks = self._read_tsv_rows(self.gene_blocks, limit)
+        blocks = self._read_tsv_rows(self.gene_blocks, block_limit or limit)
         if chr_name:
             pairs = [row for row in pairs if row.get("chr_1") == chr_name or row.get("chr_2") == chr_name]
             blocks = [row for row in blocks if row.get("chr_1") == chr_name or row.get("chr_2") == chr_name]

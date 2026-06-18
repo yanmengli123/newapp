@@ -153,7 +153,7 @@ export default function ComparativeGenomicsPage() {
         getComparativeMethods(),
         getGoldStandardStatus(),
         getStaticFigureCatalog(),
-        getGeneCollinearity({ chr: chrParam, limit: 100 }).catch(() => null),
+        getGeneCollinearity({ chr: chrParam, limit: 100, block_limit: 5000 }).catch(() => null),
         getChromosomeMapping("GRCg6a", "GRCg7b").catch(() => []),
       ]);
       setNaturalStats(naturalStatsRow);
@@ -780,7 +780,13 @@ function StaticFiguresPanel({
 
       <SimpleGrid cols={{ base: 1, lg: 2 }}>
         {catalog.figures.map((figure) => (
-          <StaticFigureCard key={figure.id} figure={figure} microBlockId={microBlockId} blocks={blocks} />
+          <StaticFigureCard
+            key={figure.id}
+            figure={figure}
+            microBlockId={microBlockId}
+            blocks={blocks}
+            onMicroBlockChange={onMicroBlockChange}
+          />
         ))}
       </SimpleGrid>
     </Stack>
@@ -807,10 +813,11 @@ function downloadSvgText(svg: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function StaticFigureCard({ figure, microBlockId, blocks }: {
+function StaticFigureCard({ figure, microBlockId, blocks, onMicroBlockChange }: {
   figure: StaticFigureItem;
   microBlockId: string | null;
   blocks: Record<string, string>[];
+  onMicroBlockChange: (value: string | null) => void;
 }) {
   const defaultUrl = figureSvgUrl(figure, microBlockId);
   const defaultSettings = useMemo(
@@ -823,30 +830,41 @@ function StaticFigureCard({ figure, microBlockId, blocks }: {
   const [rendering, setRendering] = useState(false);
   const [renderError, setRenderError] = useState("");
   const customSvgRef = useRef<string | null>(null);
+  const customSvgBlockRef = useRef<string | null>(null);
   const url = customSvgUrl || defaultUrl;
   const availableSources = figure.data_sources.filter((source) => source.exists).length;
 
   useEffect(() => {
+    const selectedBlockId = figure.id === "micro-synteny" ? microBlockId || null : undefined;
     setSettings((current) => ({
       ...current,
-      selectedBlockId: figure.id === "micro-synteny" ? microBlockId || null : current.selectedBlockId,
+      selectedBlockId: selectedBlockId === undefined ? current.selectedBlockId : selectedBlockId,
     }));
+    if (figure.id === "micro-synteny" && customSvgRef.current && customSvgBlockRef.current !== (microBlockId || null)) {
+      URL.revokeObjectURL(customSvgRef.current);
+      customSvgRef.current = null;
+      customSvgBlockRef.current = null;
+      setCustomSvgUrl(null);
+      setRenderError("");
+    }
   }, [figure.id, microBlockId]);
 
   useEffect(() => () => {
     if (customSvgRef.current) URL.revokeObjectURL(customSvgRef.current);
   }, []);
 
-  const setCustomPreview = (svg: string) => {
+  const setCustomPreview = (svg: string, selectedBlockId: string | null = null) => {
     if (customSvgRef.current) URL.revokeObjectURL(customSvgRef.current);
     const nextUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
     customSvgRef.current = nextUrl;
+    customSvgBlockRef.current = selectedBlockId;
     setCustomSvgUrl(nextUrl);
   };
 
   const resetFigure = () => {
     if (customSvgRef.current) URL.revokeObjectURL(customSvgRef.current);
     customSvgRef.current = null;
+    customSvgBlockRef.current = null;
     setCustomSvgUrl(null);
     setSettings(defaultSettings);
     setRenderError("");
@@ -857,8 +875,12 @@ function StaticFigureCard({ figure, microBlockId, blocks }: {
     setRenderError("");
     try {
       const svg = await renderStaticFigureSvg(figure.id, nextSettings);
-      setCustomPreview(svg);
+      const selectedBlockId = figure.id === "micro-synteny" ? nextSettings.selectedBlockId || null : null;
+      setCustomPreview(svg, selectedBlockId);
       setSettings(nextSettings);
+      if (figure.id === "micro-synteny" && selectedBlockId !== (microBlockId || null)) {
+        onMicroBlockChange(selectedBlockId);
+      }
     } catch (err) {
       setRenderError(getErrorMessage(err));
     } finally {

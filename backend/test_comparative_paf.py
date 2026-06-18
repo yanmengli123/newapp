@@ -142,6 +142,7 @@ def _write_static_figure_fixture(root: Path) -> None:
             [
                 "block_id\tchr_1\tstart_1\tend_1\tchr_2\tstart_2\tend_2\torientation\tanchor_count\tmean_identity\tmean_qcovs\tmethod",
                 "GENEBLOCK_00001\t1\t1000\t4000\t1\t1500\t4500\t+\t2\t98.5\t90.5\tBLASTP_RBH_CHAINING",
+                "GENEBLOCK_00002\t1\t5000\t8000\t1\t5500\t8500\t-\t2\t97.5\t89.5\tBLASTP_RBH_CHAINING",
             ]
         )
         + "\n",
@@ -153,6 +154,8 @@ def _write_static_figure_fixture(root: Path) -> None:
                 "pair_id\tblock_id\tgene_1\tgene_2\tgene_symbol_1\tgene_symbol_2\tprotein_id_1\tprotein_id_2\tchr_1\tstart_1\tend_1\tstrand_1\tchr_2\tstart_2\tend_2\tstrand_2\torientation\tpident\talignment_length\tevalue\tbitscore\tqcovs\tmethod",
                 "GENEPAIR_000001\tGENEBLOCK_00001\tGRCg6a_G000001\tGRCg7b_G000001\tA\tA\tP1\tP2\t1\t1000\t2000\t+\t1\t1500\t2500\t+\t+\t99.0\t100\t1e-10\t100\t90\tBLASTP_RBH",
                 "GENEPAIR_000002\tGENEBLOCK_00001\tGRCg6a_G000002\tGRCg7b_G000002\tB\tB\tP3\tP4\t1\t3000\t4000\t-\t1\t3500\t4500\t-\t+\t98.0\t100\t1e-9\t120\t91\tBLASTP_RBH",
+                "GENEPAIR_000003\tGENEBLOCK_00002\tGRCg6a_G000003\tGRCg7b_G000003\tC\tC\tP5\tP6\t1\t5000\t6000\t+\t1\t5500\t6500\t-\t-\t97.0\t100\t1e-8\t110\t89\tBLASTP_RBH",
+                "GENEPAIR_000004\tGENEBLOCK_00002\tGRCg6a_G000004\tGRCg7b_G000004\tD\tD\tP7\tP8\t1\t7000\t8000\t-\t1\t7500\t8500\t+\t-\t98.0\t100\t1e-7\t115\t90\tBLASTP_RBH",
             ]
         )
         + "\n",
@@ -191,21 +194,61 @@ def test_static_figure_svg_rendering_is_scientifically_labeled(tmp_path: Path):
     assert "BLASTP_RBH_CHAINING" in svg
 
 
-def test_static_figures_mark_selected_micro_synteny_block(tmp_path: Path):
+def test_micro_synteny_svg_changes_with_selected_block(tmp_path: Path):
     _write_static_figure_fixture(tmp_path)
     store = GoldStandardComparativeStore(tmp_path)
-    settings = {"selectedBlockId": "GENEBLOCK_00001"}
 
-    for figure_id in [
-        "dna-dotplot",
-        "gene-collinearity-dotplot",
-        "karyotype-ribbons",
+    delayed_block_pairs = store._read_gene_pairs(block_id="GENEBLOCK_00002", limit=1)
+    block_1_svg = store.render_static_figure_svg(
         "micro-synteny",
-    ]:
-        svg = store.render_static_figure_svg(figure_id, settings=settings)
+        settings={"selectedBlockId": "GENEBLOCK_00001"},
+    )
+    block_2_svg = store.render_static_figure_svg(
+        "micro-synteny",
+        settings={"selectedBlockId": "GENEBLOCK_00002"},
+    )
 
-        assert 'data-selected-block="GENEBLOCK_00001"' in svg
-        assert "Selected block: GENEBLOCK_00001" in svg
+    assert [row["gene_symbol_1"] for row in delayed_block_pairs] == ["C"]
+    assert "Block: GENEBLOCK_00001" in block_1_svg
+    assert "Block: GENEBLOCK_00002" in block_2_svg
+    assert ">A<" in block_1_svg
+    assert ">C<" in block_2_svg
+    assert block_1_svg != block_2_svg
+
+
+def test_gene_collinearity_can_return_all_blocks_without_large_pair_payload(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    store = GoldStandardComparativeStore(tmp_path)
+
+    result = store.get_gene_collinearity(limit=1, block_limit=10)
+
+    assert result["pair_count"] == 1
+    assert result["block_count"] == 2
+    assert [row["block_id"] for row in result["blocks"]] == ["GENEBLOCK_00001", "GENEBLOCK_00002"]
+
+
+def test_comparative_service_forwards_gene_block_limit():
+    from backend.comparative_service import ComparativeService
+
+    class FakeGoldStore:
+        def __init__(self):
+            self.kwargs = None
+
+        def get_gene_collinearity(self, **kwargs):
+            self.kwargs = kwargs
+            return {"ok": True}
+
+    service = ComparativeService.__new__(ComparativeService)
+    service.gold_store = FakeGoldStore()
+
+    result = service.get_gene_collinearity(chr_name="1", limit=100, block_limit=5000)
+
+    assert result == {"ok": True}
+    assert service.gold_store.kwargs == {
+        "chr_name": "1",
+        "limit": 100,
+        "block_limit": 5000,
+    }
 
 
 def test_static_figure_svg_accepts_reproducible_style_settings(tmp_path: Path):

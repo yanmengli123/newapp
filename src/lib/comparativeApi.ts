@@ -610,10 +610,12 @@ export async function getBaseLevelRecords(params: {
 export async function getGeneCollinearity(params: {
   chr?: string;
   limit?: number;
+  block_limit?: number;
 } = {}): Promise<GeneCollinearityResponse> {
   const searchParams = new URLSearchParams();
   if (params.chr) searchParams.set("chr", params.chr);
   if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
+  if (params.block_limit !== undefined) searchParams.set("block_limit", String(params.block_limit));
   return apiFetch<GeneCollinearityResponse>(`/comparative/gene-collinearity?${searchParams.toString()}`);
 }
 

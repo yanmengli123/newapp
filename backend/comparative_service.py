@@ -203,9 +203,14 @@ class ComparativeService:
         self,
         chr_name: Optional[str] = None,
         limit: int = 100,
+        block_limit: Optional[int] = None,
     ) -> dict:
         """Return JCVI/MCScanX-style gene collinearity rows when available."""
-        return self.gold_store.get_gene_collinearity(chr_name=chr_name, limit=limit)
+        return self.gold_store.get_gene_collinearity(
+            chr_name=chr_name,
+            limit=limit,
+            block_limit=block_limit,
+        )
 
     def get_paf_file_layer_status(self, mode: AlignmentMode = "natural") -> dict:
         """Report whether /paf/file can serve primary natural-breakpoint data."""

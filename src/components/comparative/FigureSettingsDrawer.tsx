@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -54,9 +54,30 @@ function numeric(value: string | number, fallback: number) {
   return Number.isFinite(next) ? next : fallback;
 }
 
-export default function FigureSettingsDrawer({
-  opened,
-  onClose,
+export default function FigureSettingsDrawer(props: FigureSettingsDrawerProps) {
+  const { opened, onClose, figure, settings } = props;
+  const settingsKey = JSON.stringify(settings);
+
+  return (
+    <Drawer
+      opened={opened}
+      onClose={onClose}
+      position="right"
+      size="lg"
+      padding="md"
+      title={
+        <Group gap="xs">
+          <IconSettings size={18} />
+          <Title order={5}>{figure.title}</Title>
+        </Group>
+      }
+    >
+      {opened && <FigureSettingsDrawerContent key={settingsKey} {...props} />}
+    </Drawer>
+  );
+}
+
+function FigureSettingsDrawerContent({
   figure,
   settings,
   blocks,
@@ -69,10 +90,6 @@ export default function FigureSettingsDrawer({
 }: FigureSettingsDrawerProps) {
   const [draft, setDraft] = useState<FigureSettings>(settings);
   const [activePreset, setActivePreset] = useState<string>("publication");
-
-  useEffect(() => {
-    if (opened) setDraft(settings);
-  }, [opened, settings]);
 
   const blockOptions = useMemo(
     () => blocks
@@ -100,19 +117,6 @@ export default function FigureSettingsDrawer({
   };
 
   return (
-    <Drawer
-      opened={opened}
-      onClose={onClose}
-      position="right"
-      size="lg"
-      padding="md"
-      title={
-        <Group gap="xs">
-          <IconSettings size={18} />
-          <Title order={5}>{figure.title}</Title>
-        </Group>
-      }
-    >
       <Stack gap="md">
         {error && <Alert color="red">{error}</Alert>}
 
@@ -299,6 +303,5 @@ export default function FigureSettingsDrawer({
           </Group>
         </Group>
       </Stack>
-    </Drawer>
   );
 }
