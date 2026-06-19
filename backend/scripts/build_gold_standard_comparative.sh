@@ -25,11 +25,28 @@ TARGET_TSV="${DNA_ROOT}/primary.asm5.cs.target.tsv"
 TARGET_TSV_GZ="${TARGET_TSV}.gz"
 PROVENANCE="${DNA_ROOT}/provenance.json"
 STATS="${DNA_ROOT}/input_fasta.seqkit_stats.tsv"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "ERROR: required tool not found in PATH: $1" >&2
     exit 127
+  fi
+}
+
+json_escape() {
+  python3 -c 'import json,sys; print(json.dumps(sys.argv[1])[1:-1])' "$1"
+}
+
+tool_version() {
+  "$1" --version 2>&1 | head -n 1 || true
+}
+
+file_sha256() {
+  if [[ -s "$1" ]]; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    echo ""
   fi
 }
 
@@ -84,6 +101,17 @@ if [[ -s "${TARGET_TSV_GZ}" && ! -s "${TARGET_TSV_GZ}.tbi" ]]; then
   tabix -f -0 -s 1 -b 2 -e 3 "${TARGET_TSV_GZ}"
 fi
 
+MINIMAP2_VERSION="$(tool_version minimap2)"
+SEQKIT_VERSION="$(tool_version seqkit)"
+BGZIP_VERSION="$(tool_version bgzip)"
+TABIX_VERSION="$(tool_version tabix)"
+GIT_COMMIT="$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+QUERY_SHA256="$(file_sha256 "${QUERY_FASTA}")"
+TARGET_SHA256="$(file_sha256 "${TARGET_FASTA}")"
+PRIMARY_SHA256="$(file_sha256 "${PRIMARY_PAF}")"
+CS_SHA256="$(file_sha256 "${CS_PAF_GZ}")"
+TARGET_PROJECTION_SHA256="$(file_sha256 "${TARGET_TSV_GZ}")"
+
 cat > "${PROVENANCE}" <<JSON
 {
   "dataset": "GRCg6a_vs_GRCg7b_gold_standard_dna_alignment",
@@ -96,12 +124,27 @@ cat > "${PROVENANCE}" <<JSON
   "target_projection_gz": "${TARGET_TSV_GZ}",
   "tool": "minimap2",
   "preset": "asm5",
+  "tool_versions": {
+    "minimap2": "$(json_escape "${MINIMAP2_VERSION}")",
+    "seqkit": "$(json_escape "${SEQKIT_VERSION}")",
+    "bgzip": "$(json_escape "${BGZIP_VERSION}")",
+    "tabix": "$(json_escape "${TABIX_VERSION}")"
+  },
+  "primary_command_line": "minimap2 -x asm5 --secondary=no -t ${THREADS} ${TARGET_FASTA} ${QUERY_FASTA}",
+  "base_level_command_line": "minimap2 -x asm5 --cs=long --secondary=no -t ${THREADS} ${TARGET_FASTA} ${QUERY_FASTA}",
+  "git_commit": "${GIT_COMMIT}",
+  "query_fasta_sha256": "${QUERY_SHA256}",
+  "target_fasta_sha256": "${TARGET_SHA256}",
+  "primary_paf_sha256": "${PRIMARY_SHA256}",
+  "base_level_cs_paf_gz_sha256": "${CS_SHA256}",
+  "target_projection_gz_sha256": "${TARGET_PROJECTION_SHA256}",
   "secondary_alignments": "disabled",
   "base_level": "cs:long",
   "coordinate_system": "PAF 0-based half-open; tabix indexes use -0",
   "temporary_directory": "${TMP_ROOT}",
   "storage_policy": "All large outputs and sort temporary files are under DATA_ROOT/OUT_ROOT, not the app source tree.",
-  "intended_use": "Primary PAF for ribbons; cs PAF for clicked-block details only"
+  "intended_use": "Primary PAF for ribbons; cs PAF for clicked-block details only",
+  "generated_at": "$(date -Iseconds)"
 }
 JSON
 

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 import csv
 import gzip
+import hashlib
 import html
 import json
 import os
@@ -340,6 +341,47 @@ class GoldStandardComparativeStore:
             paths[tool] = path
         return paths
 
+    def _native_tabix_available(self) -> bool:
+        try:
+            import pysam  # noqa: F401
+        except Exception:
+            return False
+        return True
+
+    def _tool_version(self, command: list[str], timeout: int = 10) -> Optional[str]:
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=timeout,
+            )
+        except Exception:
+            return None
+        text = (result.stdout or result.stderr).strip()
+        if not text:
+            return None
+        return text.splitlines()[0].strip()
+
+    def _file_sha256(self, path: Path, max_bytes: Optional[int] = None) -> Optional[str]:
+        if not path.exists() or not path.is_file():
+            return None
+        digest = hashlib.sha256()
+        remaining = max_bytes
+        with path.open("rb") as handle:
+            while True:
+                size = 1024 * 1024 if remaining is None else min(1024 * 1024, remaining)
+                if size <= 0:
+                    break
+                chunk = handle.read(size)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                if remaining is not None:
+                    remaining -= len(chunk)
+        return digest.hexdigest()
+
     def _assembly_files(self) -> dict:
         assemblies = {
             "GRCg6a": {
@@ -398,6 +440,7 @@ class GoldStandardComparativeStore:
                 "base_level_alignment": {
                     "status": base_status,
                     "role": "local_block_details",
+                    "preferred_extraction": "native-tabix" if self._native_tabix_available() else "wsl-tabix-fallback",
                     "files": [
                         EvidenceFile.from_path("cs_paf_gzip", self.base_level_paf).to_dict(),
                         EvidenceFile.from_path("cs_paf_plain", self.base_level_plain_paf).to_dict(),
@@ -466,7 +509,7 @@ class GoldStandardComparativeStore:
             return chr_name
         return f"chr{normalized}"
 
-    def _extract_tabix_lines(
+    def _extract_tabix_lines_native(
         self,
         *,
         path: Path,
@@ -475,10 +518,40 @@ class GoldStandardComparativeStore:
         start: int,
         end: int,
         limit: int,
-    ) -> tuple[list[str], Optional[str]]:
+    ) -> tuple[list[str], Optional[str], str]:
+        try:
+            import pysam
+        except Exception as exc:
+            return [], f"pysam is not available for native tabix extraction: {exc}", "native-tabix-unavailable"
+
+        seqid = self._tabix_seqid(side, chr_name)
+        lines: list[str] = []
+        try:
+            with pysam.TabixFile(str(path)) as tabix_file:
+                for line in tabix_file.fetch(seqid, start, end):
+                    if line.strip():
+                        lines.append(line.rstrip("\n"))
+                    if len(lines) >= limit:
+                        break
+        except ValueError as exc:
+            return [], f"native tabix could not find {seqid}: {exc}", "native-tabix"
+        except Exception as exc:
+            return [], f"native tabix failed: {exc}", "native-tabix"
+        return lines, None, "native-tabix"
+
+    def _extract_tabix_lines_wsl(
+        self,
+        *,
+        path: Path,
+        side: CoordinateSide,
+        chr_name: str,
+        start: int,
+        end: int,
+        limit: int,
+    ) -> tuple[list[str], Optional[str], str]:
         wsl = self._wsl_executable()
         if wsl is None:
-            return [], "wsl.exe is not available for indexed tabix extraction."
+            return [], "wsl.exe is not available for indexed tabix extraction.", "wsl-tabix-unavailable"
         seqid = self._tabix_seqid(side, chr_name)
         region = f"{seqid}:{start + 1}-{end}"
         command = [
@@ -501,7 +574,7 @@ class GoldStandardComparativeStore:
                 errors="replace",
             )
         except Exception as exc:
-            return [], f"Could not start tabix: {exc}"
+            return [], f"Could not start tabix: {exc}", "wsl-tabix"
 
         assert process.stdout is not None
         reached_limit = False
@@ -510,15 +583,47 @@ class GoldStandardComparativeStore:
                 lines.append(line.rstrip("\n"))
             if len(lines) >= limit:
                 reached_limit = True
-                process.kill()
-                break
+            process.kill()
+            break
         stderr = process.stderr.read() if process.stderr is not None else ""
         return_code = process.wait()
         if reached_limit and lines:
-            return lines, None
+            return lines, None, "wsl-tabix"
         if return_code not in {0, -9}:
-            return [], stderr.strip() or f"tabix exited with status {return_code}"
-        return lines, None
+            return [], stderr.strip() or f"tabix exited with status {return_code}", "wsl-tabix"
+        return lines, None, "wsl-tabix"
+
+    def _extract_tabix_lines(
+        self,
+        *,
+        path: Path,
+        side: CoordinateSide,
+        chr_name: str,
+        start: int,
+        end: int,
+        limit: int,
+    ) -> tuple[list[str], Optional[str], str]:
+        lines, error, backend = self._extract_tabix_lines_native(
+            path=path,
+            side=side,
+            chr_name=chr_name,
+            start=start,
+            end=end,
+            limit=limit,
+        )
+        if error is None:
+            return lines, None, backend
+        wsl_lines, wsl_error, wsl_backend = self._extract_tabix_lines_wsl(
+            path=path,
+            side=side,
+            chr_name=chr_name,
+            start=start,
+            end=end,
+            limit=limit,
+        )
+        if wsl_error is None:
+            return wsl_lines, None, wsl_backend
+        return [], f"{error}; {wsl_error}", wsl_backend
 
     def _record_from_paf_fields(self, fields: list[str], index: int) -> Optional[dict]:
         paf = parse_paf_line("\t".join(fields), index)
@@ -565,7 +670,7 @@ class GoldStandardComparativeStore:
 
         if status == "available":
             tabix_path = self.base_level_paf if side == "query" else self.base_level_target_projection
-            lines, error = self._extract_tabix_lines(
+            lines, error, extraction = self._extract_tabix_lines(
                 path=tabix_path,
                 side=side,
                 chr_name=chr_name,
@@ -586,8 +691,8 @@ class GoldStandardComparativeStore:
                     "query": query,
                     "records": records,
                     "count": len(records),
-                    "extraction": "tabix",
-                    "message": "Base-level records extracted by indexed tabix region query.",
+                    "extraction": extraction,
+                    "message": f"Base-level records extracted by indexed {extraction} region query.",
                 }
 
         records: list[dict] = []
@@ -627,6 +732,150 @@ class GoldStandardComparativeStore:
                 if status == "not_indexed"
                 else "Base-level records extracted for the requested region."
             ),
+        }
+
+    def _read_primary_provenance(self) -> dict[str, Any]:
+        if not self.primary_provenance.exists():
+            return {}
+        try:
+            return json.loads(self.primary_provenance.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {"error": "Primary natural PAF provenance JSON could not be parsed."}
+
+    def get_citation_text(self) -> dict:
+        provenance = self._read_primary_provenance()
+        if not self.primary_paf.exists():
+            return {
+                "status": "missing",
+                "methods_text": "Primary natural-breakpoint PAF is missing; this comparison is not ready for citation.",
+                "provenance": provenance,
+            }
+        filters = provenance.get("default_display_filters") if isinstance(provenance.get("default_display_filters"), dict) else {}
+        tool_versions = provenance.get("tool_versions") if isinstance(provenance.get("tool_versions"), dict) else {}
+        minimap2_version = tool_versions.get("minimap2") or provenance.get("tool_version") or "version not recorded"
+        preset = provenance.get("preset") or "asm5"
+        mapq = filters.get("mapping_quality_min", 30)
+        identity = filters.get("identity_min_percent", 85)
+        min_len = filters.get("alignment_length_min_bp", 50_000)
+        secondary = provenance.get("secondary_alignments") or "disabled"
+        generated = provenance.get("generated_at") or datetime.now(timezone.utc).isoformat()
+        paf_sha = provenance.get("output_paf_sha256") or self._file_sha256(self.primary_paf, max_bytes=64 * 1024 * 1024)
+        methods_text = (
+            "Whole-genome synteny between GRCg6a and GRCg7b was generated from a primary "
+            f"natural-breakpoint PAF using minimap2 {minimap2_version} with the {preset} preset; "
+            f"secondary alignments {secondary}. Displayed blocks were filtered with mapQ >= {mapq}, "
+            f"identity >= {identity}%, and alignment length >= {min_len} bp. "
+            "Coordinates are stored as PAF 0-based half-open intervals and displayed as genomic intervals. "
+            f"The citation text was rendered at {generated}."
+        )
+        if paf_sha:
+            methods_text += f" Primary PAF SHA256: {paf_sha}."
+        return {
+            "status": "available",
+            "methods_text": methods_text,
+            "provenance": provenance,
+            "filters": {
+                "mapq_min": mapq,
+                "identity_min_percent": identity,
+                "alignment_length_min_bp": min_len,
+                "secondary_alignments": secondary,
+            },
+        }
+
+    def get_sv_candidates(
+        self,
+        *,
+        min_gap_bp: int = 100_000,
+        min_mapq: int = 30,
+        min_identity: float = 85.0,
+        min_alignment_length: int = 50_000,
+        limit: int = 500,
+    ) -> dict:
+        if not self.primary_paf.exists():
+            return {
+                "status": "missing",
+                "classification": "candidate-only",
+                "candidates": [],
+                "counts": {},
+                "message": "Primary natural-breakpoint PAF is missing; SV candidates cannot be estimated.",
+            }
+        records = [
+            record
+            for record in read_paf_records(self.primary_paf, limit=None, order="coordinate")
+            if record.mapping_quality >= min_mapq
+            and record.identity >= min_identity
+            and record.alignment_length >= min_alignment_length
+        ]
+        candidates: list[dict[str, Any]] = []
+        for record in records:
+            if record.strand == "-":
+                candidates.append(
+                    {
+                        "candidate_id": f"SVINV_{len(candidates) + 1:05d}",
+                        "type": "inversion_orientation",
+                        "evidence_level": "candidate",
+                        "chr_1": record.chr_1,
+                        "start_1": record.start_1,
+                        "end_1": record.end_1,
+                        "chr_2": record.chr_2,
+                        "start_2": record.start_2,
+                        "end_2": record.end_2,
+                        "strand": record.strand,
+                        "support": "single reverse-strand natural PAF block; requires breakpoint/flanking validation",
+                        "block_id": record.block_id,
+                    }
+                )
+
+        by_pair: dict[tuple[str, str], list[Any]] = {}
+        for record in records:
+            by_pair.setdefault((record.chr_1, record.chr_2), []).append(record)
+        for (chr_1, chr_2), group in by_pair.items():
+            ordered = sorted(group, key=lambda item: (item.start_1, item.start_2))
+            for left, right in zip(ordered, ordered[1:]):
+                q_gap = max(0, right.start_1 - left.end_1)
+                t_gap = max(0, right.start_2 - left.end_2)
+                gap_delta = abs(q_gap - t_gap)
+                if q_gap >= min_gap_bp or t_gap >= min_gap_bp or gap_delta >= min_gap_bp:
+                    candidates.append(
+                        {
+                            "candidate_id": f"SVGAP_{len(candidates) + 1:05d}",
+                            "type": "large_gap",
+                            "evidence_level": "candidate",
+                            "chr_1": chr_1,
+                            "start_1": left.end_1,
+                            "end_1": right.start_1,
+                            "chr_2": chr_2,
+                            "start_2": left.end_2,
+                            "end_2": right.start_2,
+                            "query_gap_bp": q_gap,
+                            "target_gap_bp": t_gap,
+                            "gap_delta_bp": gap_delta,
+                            "support": "gap between adjacent natural PAF blocks; not a validated SV call",
+                            "left_block_id": left.block_id,
+                            "right_block_id": right.block_id,
+                        }
+                    )
+                if len(candidates) >= limit:
+                    break
+            if len(candidates) >= limit:
+                break
+
+        counts: dict[str, int] = {}
+        for candidate in candidates:
+            counts[candidate["type"]] = counts.get(candidate["type"], 0) + 1
+        return {
+            "status": "available",
+            "classification": "candidate-only",
+            "min_gap_bp": min_gap_bp,
+            "candidate_count": len(candidates[:limit]),
+            "counts": counts,
+            "candidates": candidates[:limit],
+            "filters": {
+                "mapq_min": min_mapq,
+                "identity_min_percent": min_identity,
+                "alignment_length_min_bp": min_alignment_length,
+            },
+            "message": "SV candidates are exploratory evidence from PAF structure, not validated structural variant calls.",
         }
 
     def _read_tsv_rows(self, path: Path, limit: int) -> list[dict]:

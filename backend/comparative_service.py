@@ -82,6 +82,49 @@ class ComparativeService:
         )
         return records_to_dicts(records)
 
+    def get_alignment_block_result(
+        self,
+        assembly_1: str = "GRCg6a",
+        assembly_2: str = "GRCg7b",
+        mode: AlignmentMode = "natural",
+        chr_1: Optional[str] = None,
+        chr_2: Optional[str] = None,
+        min_quality: int = 30,
+        min_identity: float = 85.0,
+        min_alignment_length: int = 50_000,
+        limit: int = 5000,
+        order: Literal["coordinate", "score"] = "coordinate",
+    ) -> dict:
+        """Read alignment blocks with explicit truncation metadata."""
+        if {assembly_1, assembly_2} != {"GRCg6a", "GRCg7b"}:
+            return {
+                "blocks": [],
+                "returned_count": 0,
+                "total_count": 0,
+                "truncated": False,
+            }
+
+        path = self.get_alignment_paf_path(mode)
+        all_records = read_paf_records(
+            path,
+            assembly_1=assembly_1,
+            assembly_2=assembly_2,
+            chr_1=chr_1,
+            chr_2=chr_2,
+            min_mapq=min_quality,
+            min_identity=min_identity,
+            min_alignment_length=min_alignment_length,
+            limit=None,
+            order=order,
+        )
+        displayed_records = all_records[:limit]
+        return {
+            "blocks": records_to_dicts(displayed_records),
+            "returned_count": len(displayed_records),
+            "total_count": len(all_records),
+            "truncated": len(all_records) > len(displayed_records),
+        }
+
     def get_alignment_stats(
         self,
         assembly_1: str = "GRCg6a",
@@ -185,6 +228,14 @@ class ComparativeService:
     def get_micro_synteny_block_details(self, block_id: str) -> dict:
         """Return selected micro-synteny block summary and gene-pair details."""
         return self.gold_store.get_micro_synteny_block_details(block_id)
+
+    def get_citation_text(self) -> dict:
+        """Return citation-ready methods text and provenance summary."""
+        return self.gold_store.get_citation_text()
+
+    def get_sv_candidates(self, *, min_gap_bp: int = 100_000) -> dict:
+        """Return exploratory structural-variant candidates from natural PAF structure."""
+        return self.gold_store.get_sv_candidates(min_gap_bp=min_gap_bp)
 
     def get_base_level_records(
         self,

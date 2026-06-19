@@ -140,12 +140,13 @@ def normalize_chr(assembly: str, ref_name: str) -> str:
 
 
 def chromosome_sort_key(chr_name: str) -> tuple[int, int | str]:
-    if chr_name in PRIMARY_CHROMOSOMES:
-        return (0, PRIMARY_CHROMOSOMES.index(chr_name))
+    normalized = chr_name[3:] if chr_name.startswith("chr") else chr_name
+    if normalized in PRIMARY_CHROMOSOMES:
+        return (0, PRIMARY_CHROMOSOMES.index(normalized))
     try:
-        return (1, int(chr_name))
+        return (1, int(normalized))
     except ValueError:
-        return (2, chr_name)
+        return (2, normalized)
 
 
 def parse_paf_line(

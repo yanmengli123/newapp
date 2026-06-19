@@ -107,6 +107,22 @@ export interface AlignmentBlock {
   is_same_chromosome: boolean;
 }
 
+export interface AlignmentBlocksResponse {
+  mode: AlignmentMode;
+  blocks: AlignmentBlock[];
+  count: number;
+  returned_count: number;
+  total_count: number;
+  truncated: boolean;
+  limit: number;
+  filters: {
+    min_quality: number;
+    min_identity: number;
+    min_alignment_length: number;
+    order: "coordinate" | "score";
+  };
+}
+
 export interface AlignmentStats {
   dataset: AlignmentMode;
   source_path: string;
@@ -246,6 +262,48 @@ export interface MicroSyntenyBlockDetails {
   };
   pairs: Record<string, string>[];
   pair_count: number;
+  message: string;
+}
+
+export interface ComparativeCitation {
+  status: string;
+  methods_text: string;
+  provenance: Record<string, unknown>;
+  filters?: {
+    mapq_min: number;
+    identity_min_percent: number;
+    alignment_length_min_bp: number;
+    secondary_alignments: string;
+  };
+}
+
+export interface SvCandidate {
+  candidate_id: string;
+  type: string;
+  evidence_level: string;
+  chr_1: string;
+  start_1: number;
+  end_1: number;
+  chr_2: string;
+  start_2: number;
+  end_2: number;
+  strand?: string;
+  query_gap_bp?: number;
+  target_gap_bp?: number;
+  gap_delta_bp?: number;
+  support: string;
+  block_id?: string;
+  left_block_id?: string;
+  right_block_id?: string;
+}
+
+export interface SvCandidatesResponse {
+  status: string;
+  classification: "candidate-only" | string;
+  min_gap_bp: number;
+  candidate_count: number;
+  counts: Record<string, number>;
+  candidates: SvCandidate[];
   message: string;
 }
 
@@ -546,7 +604,7 @@ export async function getAlignmentBlocks(params: {
   min_alignment_length?: number;
   limit?: number;
   order?: "coordinate" | "score";
-} = {}): Promise<AlignmentBlock[]> {
+} = {}): Promise<AlignmentBlocksResponse> {
   const searchParams = new URLSearchParams();
   if (params.assembly_1) searchParams.set("assembly_1", params.assembly_1);
   if (params.assembly_2) searchParams.set("assembly_2", params.assembly_2);
@@ -559,10 +617,7 @@ export async function getAlignmentBlocks(params: {
   if (params.limit !== undefined) searchParams.set("limit", String(params.limit));
   if (params.order) searchParams.set("order", params.order);
 
-  const data = await apiFetch<{ blocks: AlignmentBlock[] }>(
-    `/comparative/alignment-blocks?${searchParams.toString()}`
-  );
-  return data.blocks;
+  return apiFetch<AlignmentBlocksResponse>(`/comparative/alignment-blocks?${searchParams.toString()}`);
 }
 
 export async function getAlignmentStats(params: {
@@ -616,6 +671,16 @@ export async function renderStaticFigureSvg(
 
 export async function getMicroSyntenyBlockDetails(blockId: string): Promise<MicroSyntenyBlockDetails> {
   return apiFetch<MicroSyntenyBlockDetails>(`/comparative/micro-synteny/${encodeURIComponent(blockId)}`);
+}
+
+export async function getComparativeCitation(): Promise<ComparativeCitation> {
+  return apiFetch<ComparativeCitation>("/comparative/citation");
+}
+
+export async function getSvCandidates(params: { min_gap_bp?: number } = {}): Promise<SvCandidatesResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.min_gap_bp !== undefined) searchParams.set("min_gap_bp", String(params.min_gap_bp));
+  return apiFetch<SvCandidatesResponse>(`/comparative/sv-candidates?${searchParams.toString()}`);
 }
 
 export async function getBaseLevelRecords(params: {

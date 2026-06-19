@@ -89,7 +89,7 @@ async def get_alignment_blocks(
 ):
     """Get natural-breakpoint PAF alignment blocks for scientific synteny views."""
     service = get_service()
-    blocks = service.get_alignment_blocks(
+    result = service.get_alignment_block_result(
         assembly_1=assembly_1,
         assembly_2=assembly_2,
         mode=mode,
@@ -103,8 +103,12 @@ async def get_alignment_blocks(
     )
     return {
         "mode": mode,
-        "blocks": blocks,
-        "count": len(blocks),
+        "blocks": result["blocks"],
+        "count": result["returned_count"],
+        "returned_count": result["returned_count"],
+        "total_count": result["total_count"],
+        "truncated": result["truncated"],
+        "limit": limit,
         "filters": {
             "min_quality": min_quality,
             "min_identity": min_identity,
@@ -192,6 +196,22 @@ async def get_micro_synteny_block_details(block_id: str):
     if result.get("status") != "available":
         raise HTTPException(status_code=404, detail=result.get("message", "Micro-synteny block is not available."))
     return result
+
+
+@router.get("/citation")
+async def get_comparative_citation():
+    """Get citation-ready methods text and provenance metadata."""
+    service = get_service()
+    return service.get_citation_text()
+
+
+@router.get("/sv-candidates")
+async def get_sv_candidates(
+    min_gap_bp: int = Query(100_000, ge=1_000, le=10_000_000),
+):
+    """Get exploratory structural-variant candidates from PAF structure."""
+    service = get_service()
+    return service.get_sv_candidates(min_gap_bp=min_gap_bp)
 
 
 @router.get("/base-level")

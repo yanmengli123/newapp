@@ -1,9 +1,11 @@
 """Tests for comparative PAF parsing and synteny dataset summaries."""
 
+import json
 from pathlib import Path
 import re
 
 from backend.comparative_paf import (
+    chromosome_sort_key,
     parse_paf_line,
     read_paf_records,
     summarize_paf_records,
@@ -89,6 +91,101 @@ def test_gold_standard_tabix_seqid_mapping(tmp_path: Path):
     assert store._tabix_seqid("target", "1") == "chr1"
     assert store._tabix_seqid("target", "chr1") == "chr1"
     assert store._tabix_seqid("target", "MT") == "chrMT"
+
+
+def test_chromosome_sort_key_keeps_chicken_karyotype_order():
+    chromosomes = ["1", "10", "2", "W", "Z", "MT", "32", "chr3"]
+
+    ordered = sorted(chromosomes, key=chromosome_sort_key)
+
+    assert ordered == ["1", "2", "chr3", "10", "32", "W", "Z", "MT"]
+
+
+def test_base_level_records_prefers_native_tabix_backend(tmp_path: Path, monkeypatch):
+    store = GoldStandardComparativeStore(tmp_path)
+    store.base_level_paf.parent.mkdir(parents=True, exist_ok=True)
+    store.base_level_paf.write_text("", encoding="utf-8")
+    store.base_level_query_index.write_text("", encoding="utf-8")
+    store.base_level_target_projection.write_text("", encoding="utf-8")
+    store.base_level_target_index.write_text("", encoding="utf-8")
+    paf_line = (
+        "NC_006088.5\t197608386\t100\t1000\t+\tchr1\t196449156\t200\t1100\t"
+        "850\t900\t60\tcs:Z::900"
+    )
+
+    def native_extract(**_kwargs):
+        return [paf_line], None, "native-tabix"
+
+    def wsl_extract(**_kwargs):
+        raise AssertionError("WSL tabix should not run when native extraction succeeds")
+
+    monkeypatch.setattr(store, "_extract_tabix_lines_native", native_extract)
+    monkeypatch.setattr(store, "_extract_tabix_lines_wsl", wsl_extract)
+
+    result = store.get_base_level_records(chr_name="1", start=0, end=2000)
+
+    assert result["status"] == "available"
+    assert result["extraction"] == "native-tabix"
+    assert result["records"][0]["has_cs"] is True
+
+
+def test_citation_text_includes_versions_filters_and_secondary_policy(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    provenance_path = tmp_path / "synteny" / "natural" / "grcg6a_vs_grcg7b.natural.asm5.provenance.json"
+    provenance_path.write_text(
+        json.dumps(
+            {
+                "tool": "minimap2",
+                "preset": "asm5",
+                "tool_versions": {"minimap2": "2.26-r1175", "seqkit": "2.8.2"},
+                "secondary_alignments": "disabled",
+                "default_display_filters": {
+                    "mapping_quality_min": 30,
+                    "identity_min_percent": 85,
+                    "alignment_length_min_bp": 50000,
+                },
+                "generated_at": "2026-06-19T00:00:00+08:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = GoldStandardComparativeStore(tmp_path)
+
+    citation = store.get_citation_text()
+
+    assert citation["status"] == "available"
+    assert "minimap2 2.26-r1175" in citation["methods_text"]
+    assert "asm5" in citation["methods_text"]
+    assert "mapQ >= 30" in citation["methods_text"]
+    assert "identity >= 85%" in citation["methods_text"]
+    assert "secondary alignments disabled" in citation["methods_text"]
+
+
+def test_sv_candidates_are_reported_as_candidates_not_validated_calls(tmp_path: Path):
+    natural_dir = tmp_path / "synteny" / "natural"
+    natural_dir.mkdir(parents=True)
+    natural_dir.joinpath("grcg6a_vs_grcg7b.natural.asm5.paf").write_text(
+        "\n".join(
+            [
+                "NC_006088.5\t20000000\t1000\t101000\t+\tchr1\t20000000\t2000\t102000\t99000\t100000\t60",
+                "NC_006088.5\t20000000\t151000\t251000\t-\tchr1\t20000000\t152000\t252000\t98000\t100000\t60",
+                "NC_006088.5\t20000000\t260000\t261000\t-\tchr1\t20000000\t262000\t263000\t990\t1000\t60",
+                "NC_006088.5\t20000000\t270000\t370000\t-\tchr1\t20000000\t272000\t372000\t98000\t100000\t20",
+                "NC_006088.5\t20000000\t401000\t501000\t+\tchr1\t20000000\t702000\t802000\t97000\t100000\t60",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    store = GoldStandardComparativeStore(tmp_path)
+
+    result = store.get_sv_candidates(min_gap_bp=100000)
+
+    assert result["status"] == "available"
+    assert result["classification"] == "candidate-only"
+    assert result["counts"]["inversion_orientation"] == 1
+    assert result["counts"]["large_gap"] >= 1
+    assert all(candidate["evidence_level"] == "candidate" for candidate in result["candidates"])
 
 
 def _write_static_figure_fixture(root: Path) -> None:
@@ -369,6 +466,59 @@ def test_comparative_service_forwards_gene_block_limit():
         "limit": 100,
         "block_limit": 5000,
     }
+
+
+def test_comparative_service_alignment_block_result_reports_truncation(tmp_path: Path):
+    from backend.comparative_service import ComparativeService
+
+    paf = tmp_path / "natural.paf"
+    paf.write_text(
+        "\n".join(
+            [
+                "NC_006088.5\t197608386\t1000\t101000\t+\tchr1\t196449156\t2000\t102000\t95000\t100000\t60",
+                "NC_006088.5\t197608386\t201000\t301000\t+\tchr1\t196449156\t202000\t302000\t95000\t100000\t60",
+                "NC_006088.5\t197608386\t401000\t501000\t+\tchr1\t196449156\t402000\t502000\t95000\t100000\t60",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    service = ComparativeService.__new__(ComparativeService)
+    service.get_alignment_paf_path = lambda _mode="natural": paf
+
+    result = service.get_alignment_block_result(
+        min_quality=0,
+        min_identity=0,
+        min_alignment_length=0,
+        limit=2,
+    )
+
+    assert result["returned_count"] == 2
+    assert result["total_count"] == 3
+    assert result["truncated"] is True
+
+
+def test_comparative_service_forwards_citation_and_sv_candidates():
+    from backend.comparative_service import ComparativeService
+
+    class FakeGoldStore:
+        def __init__(self):
+            self.min_gap_bp = None
+
+        def get_citation_text(self):
+            return {"status": "available"}
+
+        def get_sv_candidates(self, *, min_gap_bp: int = 100_000):
+            self.min_gap_bp = min_gap_bp
+            return {"status": "available", "min_gap_bp": min_gap_bp}
+
+    fake = FakeGoldStore()
+    service = ComparativeService.__new__(ComparativeService)
+    service.gold_store = fake
+
+    assert service.get_citation_text() == {"status": "available"}
+    assert service.get_sv_candidates(min_gap_bp=250000) == {"status": "available", "min_gap_bp": 250000}
+    assert fake.min_gap_bp == 250000
 
 
 def test_static_figure_svg_accepts_reproducible_style_settings(tmp_path: Path):

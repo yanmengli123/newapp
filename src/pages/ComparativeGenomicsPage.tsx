@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Badge,
   Button,
   Card,
   Container,
+  CopyButton,
   Divider,
   Grid,
   Group,
@@ -25,6 +26,7 @@ import {
 import {
   IconChartBar,
   IconChartDots,
+  IconCopy,
   IconDna,
   IconDownload,
   IconExternalLink,
@@ -41,20 +43,24 @@ import {
   getAlignmentStats,
   getBaseLevelRecords,
   getChromosomeMapping,
+  getComparativeCitation,
   getComparativeMethods,
   getGeneCollinearity,
   getGoldStandardStatus,
   getMicroSyntenyBlockDetails,
   getOrthologTable,
+  getSvCandidates,
   getStaticFigureCatalog,
   createDefaultFigureSettings,
   mapCoordinates,
   renderStaticFigureSvg,
   type AlignmentBlock,
+  type AlignmentBlocksResponse,
   type AlignmentMode,
   type AlignmentStats,
   type BaseLevelResponse,
   type ChromosomeMapping,
+  type ComparativeCitation,
   type ComparativeMethods,
   type GeneCoordinateMapping,
   type GeneCollinearityResponse,
@@ -62,10 +68,13 @@ import {
   type GoldStandardStatus,
   type FigureSettings,
   type MicroSyntenyBlockDetails,
+  type SvCandidatesResponse,
   type StaticFigureCatalog,
   type StaticFigureItem,
 } from "../lib/comparativeApi";
 import FigureSettingsDrawer from "../components/comparative/FigureSettingsDrawer";
+
+const Plot = lazy(() => import("react-plotly.js"));
 
 const CHROMOSOMES = [
   "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
@@ -116,8 +125,11 @@ export default function ComparativeGenomicsPage() {
   const [chrFilter, setChrFilter] = useState<string | null>(null);
 
   const [naturalBlocks, setNaturalBlocks] = useState<AlignmentBlock[]>([]);
+  const [naturalBlockMeta, setNaturalBlockMeta] = useState<AlignmentBlocksResponse | null>(null);
   const [naturalStats, setNaturalStats] = useState<AlignmentStats | null>(null);
   const [methods, setMethods] = useState<ComparativeMethods | null>(null);
+  const [citation, setCitation] = useState<ComparativeCitation | null>(null);
+  const [svCandidates, setSvCandidates] = useState<SvCandidatesResponse | null>(null);
   const [goldStatus, setGoldStatus] = useState<GoldStandardStatus | null>(null);
   const [staticFigures, setStaticFigures] = useState<StaticFigureCatalog | null>(null);
   const [baseLevel, setBaseLevel] = useState<BaseLevelResponse | null>(null);
@@ -131,44 +143,68 @@ export default function ComparativeGenomicsPage() {
   const [baseStart, setBaseStart] = useState("1");
   const [baseEnd, setBaseEnd] = useState("5000000");
   const [microBlockId, setMicroBlockId] = useState<string | null>(null);
+  const [selectedAlignmentBlock, setSelectedAlignmentBlock] = useState<AlignmentBlock | null>(null);
   const [baseLoading, setBaseLoading] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [orthologLoading, setOrthologLoading] = useState(false);
   const [error, setError] = useState("");
+  const [layerWarnings, setLayerWarnings] = useState<string[]>([]);
 
   const loadAlignmentData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const chrParam = chrFilter || undefined;
+      const warnings: string[] = [];
       const [
         naturalStatsRow,
-        naturalRows,
+        naturalBlockRows,
         methodRows,
+        citationRows,
         goldRows,
         staticFigureRows,
         geneCollinearityRows,
         mappingRows,
+        svRows,
       ] = await Promise.all([
         getAlignmentStats({ mode: "natural", ...NATURAL_FILTERS }),
         getAlignmentBlocks({ mode: "natural", chr_1: chrParam, order: "coordinate", ...NATURAL_FILTERS }),
         getComparativeMethods(),
+        getComparativeCitation().catch((err) => {
+          warnings.push(`Citation metadata unavailable: ${getErrorMessage(err)}`);
+          return null;
+        }),
         getGoldStandardStatus(),
         getStaticFigureCatalog(),
-        getGeneCollinearity({ chr: chrParam, limit: 100, block_limit: 5000 }).catch(() => null),
-        getChromosomeMapping("GRCg6a", "GRCg7b").catch(() => []),
+        getGeneCollinearity({ chr: chrParam, limit: 100, block_limit: 5000 }).catch((err) => {
+          warnings.push(`Gene collinearity unavailable: ${getErrorMessage(err)}`);
+          return null;
+        }),
+        getChromosomeMapping("GRCg6a", "GRCg7b").catch((err) => {
+          warnings.push(`Chromosome mapping unavailable: ${getErrorMessage(err)}`);
+          return [];
+        }),
+        getSvCandidates().catch((err) => {
+          warnings.push(`SV candidate layer unavailable: ${getErrorMessage(err)}`);
+          return null;
+        }),
       ]);
       setNaturalStats(naturalStatsRow);
-      setNaturalBlocks(naturalRows);
+      setNaturalBlocks(naturalBlockRows.blocks);
+      setNaturalBlockMeta(naturalBlockRows);
       setMethods(methodRows);
+      setCitation(citationRows);
       setGoldStatus(goldRows);
       setStaticFigures(staticFigureRows);
       setGeneCollinearity(geneCollinearityRows);
       setMicroBlockId((current) => current || geneCollinearityRows?.blocks?.[0]?.block_id || null);
       setChrMapping(mappingRows);
+      setSvCandidates(svRows);
+      setLayerWarnings(warnings);
     } catch (err) {
       setError(getErrorMessage(err));
+      setLayerWarnings([]);
     } finally {
       setLoading(false);
     }
@@ -310,6 +346,15 @@ export default function ComparativeGenomicsPage() {
             {error}
           </Alert>
         )}
+        {layerWarnings.length > 0 && (
+          <Alert color="yellow" title="Optional evidence layer warning">
+            <Stack gap={4}>
+              {layerWarnings.map((warning) => (
+                <Text key={warning} size="sm">{warning}</Text>
+              ))}
+            </Stack>
+          </Alert>
+        )}
 
         <Tabs value={activeTab} onChange={setActiveTab} keepMounted={false}>
           <Tabs.List>
@@ -320,6 +365,7 @@ export default function ComparativeGenomicsPage() {
             <Tabs.Tab value="figures" leftSection={<IconPhoto size={16} />}>Static Figures</Tabs.Tab>
             <Tabs.Tab value="baselevel" leftSection={<IconTable size={16} />}>Base-Level</Tabs.Tab>
             <Tabs.Tab value="collinearity" leftSection={<IconTable size={16} />}>Gene Collinearity</Tabs.Tab>
+            <Tabs.Tab value="sv" leftSection={<IconTransform size={16} />}>SV Candidates</Tabs.Tab>
             <Tabs.Tab value="genes" leftSection={<IconTable size={16} />}>Gene Layer</Tabs.Tab>
             <Tabs.Tab value="methods" leftSection={<IconInfoCircle size={16} />}>Methods</Tabs.Tab>
             <Tabs.Tab value="mapper" leftSection={<IconTransform size={16} />}>Coordinate Mapper</Tabs.Tab>
@@ -341,6 +387,7 @@ export default function ComparativeGenomicsPage() {
               title="Natural-Breakpoint Alignment Blocks"
               mode="natural"
               blocks={naturalBlocks}
+              meta={naturalBlockMeta}
               stats={naturalStats}
               loading={loading}
             />
@@ -351,7 +398,14 @@ export default function ComparativeGenomicsPage() {
                 <Badge color="green" variant="light">Natural PAF primary</Badge>
                 <Badge variant="light">{naturalStats?.dataset_classification || "natural"}</Badge>
               </Group>
-              <DotplotPanel data={naturalBlocks} loading={loading} mode="natural" stats={naturalStats} />
+              <DotplotPanel
+                data={naturalBlocks}
+                loading={loading}
+                mode="natural"
+                stats={naturalStats}
+                selectedBlock={selectedAlignmentBlock}
+                onSelectBlock={setSelectedAlignmentBlock}
+              />
             </Stack>
           </Tabs.Panel>
           <Tabs.Panel value="figures" pt="md">
@@ -382,6 +436,9 @@ export default function ComparativeGenomicsPage() {
           <Tabs.Panel value="collinearity" pt="md">
             <GeneCollinearityPanel result={geneCollinearity} layer={goldStatus?.layers.gene_collinearity || null} />
           </Tabs.Panel>
+          <Tabs.Panel value="sv" pt="md">
+            <SvCandidatesPanel result={svCandidates} loading={loading} />
+          </Tabs.Panel>
           <Tabs.Panel value="genes" pt="md">
             <GeneLayerPanel
               orthologs={orthologs}
@@ -392,7 +449,7 @@ export default function ComparativeGenomicsPage() {
             />
           </Tabs.Panel>
           <Tabs.Panel value="methods" pt="md">
-            <MethodsPanel methods={methods} naturalStats={naturalStats} />
+            <MethodsPanel methods={methods} naturalStats={naturalStats} citation={citation} />
           </Tabs.Panel>
           <Tabs.Panel value="mapper" pt="md">
             <CoordinateMapperPanel />
@@ -1021,6 +1078,40 @@ function downloadSvgText(svg: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+function csvCell(value: string | number | boolean | null | undefined) {
+  const text = value === null || value === undefined ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadAlignmentBlocksCsv(blocks: AlignmentBlock[]) {
+  const columns: Array<keyof AlignmentBlock> = [
+    "block_id",
+    "chr_1",
+    "start_1",
+    "end_1",
+    "chr_2",
+    "start_2",
+    "end_2",
+    "strand",
+    "alignment_length",
+    "mapping_quality",
+    "identity",
+    "residue_matches",
+  ];
+  const rows = [
+    columns.join(","),
+    ...blocks.map((block) => columns.map((column) => csvCell(block[column])).join(",")),
+  ].join("\n");
+  const url = URL.createObjectURL(new Blob([rows], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "grcg6a_grcg7b_natural_alignment_blocks_loaded.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 function StaticFigureCard({ figure, figureCode, previewHeight, microBlockId, blocks, onMicroBlockChange }: {
   figure: StaticFigureItem;
   figureCode?: string;
@@ -1233,15 +1324,19 @@ function AlignmentPanel({
   title,
   mode,
   blocks,
+  meta,
   stats,
   loading,
 }: {
   title: string;
   mode: AlignmentMode;
   blocks: AlignmentBlock[];
+  meta: AlignmentBlocksResponse | null;
   stats: AlignmentStats | null;
   loading: boolean;
 }) {
+  const totalCount = meta?.total_count ?? stats?.block_count ?? blocks.length;
+  const returnedCount = meta?.returned_count ?? blocks.length;
   return (
     <Card withBorder radius="sm" pos="relative">
       <LoadingOverlay visible={loading} />
@@ -1253,55 +1348,77 @@ function AlignmentPanel({
           </Text>
         </div>
         <Group gap="xs">
-          <Badge color="green">{blocks.length.toLocaleString()} rows</Badge>
+          <Badge color="green">{returnedCount.toLocaleString()} loaded</Badge>
+          <Badge variant="light">{totalCount.toLocaleString()} total</Badge>
           <Badge variant="light">{stats?.dataset_classification || mode}</Badge>
         </Group>
       </Group>
-      <AlignmentTable blocks={blocks} />
+      <AlignmentTable blocks={blocks} meta={meta} />
     </Card>
   );
 }
 
-function AlignmentTable({ blocks }: { blocks: AlignmentBlock[] }) {
+function AlignmentTable({ blocks, meta }: { blocks: AlignmentBlock[]; meta: AlignmentBlocksResponse | null }) {
   if (!blocks.length) {
     return <Alert color="gray">No alignment blocks are available for the selected filters.</Alert>;
   }
+  const tableRows = blocks.slice(0, 500);
+  const loadedCount = meta?.returned_count ?? blocks.length;
+  const totalCount = meta?.total_count ?? blocks.length;
+  const isTableTruncated = blocks.length > tableRows.length;
+  const isApiTruncated = Boolean(meta?.truncated);
 
   return (
-    <ScrollArea h={520}>
-      <Table striped highlightOnHover>
-        <Table.Thead>
-          <Table.Tr>
-            <Table.Th>Chr</Table.Th>
-            <Table.Th>Start</Table.Th>
-            <Table.Th>End</Table.Th>
-            <Table.Th>Target Chr</Table.Th>
-            <Table.Th>Start</Table.Th>
-            <Table.Th>End</Table.Th>
-            <Table.Th>Strand</Table.Th>
-            <Table.Th>Length</Table.Th>
-            <Table.Th>MapQ</Table.Th>
-            <Table.Th>Identity</Table.Th>
-          </Table.Tr>
-        </Table.Thead>
-        <Table.Tbody>
-          {blocks.slice(0, 500).map((b) => (
-            <Table.Tr key={b.block_id}>
-              <Table.Td><Badge size="sm" variant="light">{b.chr_1}</Badge></Table.Td>
-              <Table.Td>{displayStart(b.start_1)}</Table.Td>
-              <Table.Td>{displayEnd(b.end_1)}</Table.Td>
-              <Table.Td><Badge size="sm" variant="light">{b.chr_2}</Badge></Table.Td>
-              <Table.Td>{displayStart(b.start_2)}</Table.Td>
-              <Table.Td>{displayEnd(b.end_2)}</Table.Td>
-              <Table.Td><Badge color={b.strand === "+" ? "green" : "red"} variant="light">{b.strand}</Badge></Table.Td>
-              <Table.Td>{bp(b.alignment_length)}</Table.Td>
-              <Table.Td>{b.mapping_quality}</Table.Td>
-              <Table.Td>{dash(b.identity, 1)}%</Table.Td>
+    <Stack gap="sm">
+      {(isTableTruncated || isApiTruncated) && (
+        <Alert color="yellow" title="Displayed rows are intentionally bounded">
+          The browser table renders {tableRows.length.toLocaleString()} rows from {loadedCount.toLocaleString()} loaded blocks;
+          the filtered dataset contains {totalCount.toLocaleString()} blocks. Use CSV export for the loaded block set.
+        </Alert>
+      )}
+      <Group justify="space-between">
+        <Text size="xs" c="dimmed">
+          Showing {tableRows.length.toLocaleString()} table rows; source coordinates are PAF 0-based half-open and displayed as 1-based intervals.
+        </Text>
+        <Button size="xs" variant="light" leftSection={<IconDownload size={14} />} onClick={() => downloadAlignmentBlocksCsv(blocks)}>
+          Download Loaded CSV
+        </Button>
+      </Group>
+      <ScrollArea h={520}>
+        <Table striped highlightOnHover>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Chr</Table.Th>
+              <Table.Th>Start</Table.Th>
+              <Table.Th>End</Table.Th>
+              <Table.Th>Target Chr</Table.Th>
+              <Table.Th>Start</Table.Th>
+              <Table.Th>End</Table.Th>
+              <Table.Th>Strand</Table.Th>
+              <Table.Th>Length</Table.Th>
+              <Table.Th>MapQ</Table.Th>
+              <Table.Th>Identity</Table.Th>
             </Table.Tr>
-          ))}
-        </Table.Tbody>
-      </Table>
-    </ScrollArea>
+          </Table.Thead>
+          <Table.Tbody>
+            {tableRows.map((b) => (
+              <Table.Tr key={b.block_id}>
+                <Table.Td><Badge size="sm" variant="light">{b.chr_1}</Badge></Table.Td>
+                <Table.Td>{displayStart(b.start_1)}</Table.Td>
+                <Table.Td>{displayEnd(b.end_1)}</Table.Td>
+                <Table.Td><Badge size="sm" variant="light">{b.chr_2}</Badge></Table.Td>
+                <Table.Td>{displayStart(b.start_2)}</Table.Td>
+                <Table.Td>{displayEnd(b.end_2)}</Table.Td>
+                <Table.Td><Badge color={b.strand === "+" ? "green" : "red"} variant="light">{b.strand}</Badge></Table.Td>
+                <Table.Td>{bp(b.alignment_length)}</Table.Td>
+                <Table.Td>{b.mapping_quality}</Table.Td>
+                <Table.Td>{dash(b.identity, 1)}%</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </ScrollArea>
+    </Stack>
   );
 }
 
@@ -1310,11 +1427,15 @@ function DotplotPanel({
   loading,
   mode,
   stats,
+  selectedBlock,
+  onSelectBlock,
 }: {
   data: AlignmentBlock[];
   loading: boolean;
   mode: AlignmentMode;
   stats: AlignmentStats | null;
+  selectedBlock: AlignmentBlock | null;
+  onSelectBlock: (block: AlignmentBlock | null) => void;
 }) {
   if (loading) return <Paper withBorder p="xl" pos="relative" h={420}><LoadingOverlay visible /></Paper>;
   if (!data.length) return <Alert color="gray">No dotplot records are available for the selected filters.</Alert>;
@@ -1343,15 +1464,69 @@ function DotplotPanel({
 
   if (!totalQuery || !totalTarget) return <Alert color="gray">Dotplot coordinates are incomplete for this selection.</Alert>;
 
-  const width = 900;
-  const height = 760;
-  const margin = 56;
-  const plotWidth = width - 2 * margin;
-  const plotHeight = height - 2 * margin;
   const hasQuery = (chr: string) => Object.prototype.hasOwnProperty.call(queryOffsets, chr);
   const hasTarget = (chr: string) => Object.prototype.hasOwnProperty.call(targetOffsets, chr);
-  const scaleX = (chr: string, pos: number) => margin + ((queryOffsets[chr] + pos) / totalQuery) * plotWidth;
-  const scaleY = (chr: string, pos: number) => height - margin - ((targetOffsets[chr] + pos) / totalTarget) * plotHeight;
+  const cumulativeQuery = (chr: string, pos: number) => queryOffsets[chr] + pos;
+  const cumulativeTarget = (chr: string, pos: number) => targetOffsets[chr] + pos;
+  const traceFor = (strand: string, color: string) => {
+    const x: Array<number | null> = [];
+    const y: Array<number | null> = [];
+    const customdata: Array<number | null> = [];
+    const text: string[] = [];
+    data.forEach((block, index) => {
+      if (block.strand !== strand || !hasQuery(block.chr_1) || !hasTarget(block.chr_2)) return;
+      x.push(cumulativeQuery(block.chr_1, block.start_1), cumulativeQuery(block.chr_1, block.end_1), null);
+      y.push(cumulativeTarget(block.chr_2, block.start_2), cumulativeTarget(block.chr_2, block.end_2), null);
+      customdata.push(index, index, null);
+      const label = [
+        block.block_id,
+        `GRCg6a ${block.chr_1}:${displayStart(block.start_1)}-${displayEnd(block.end_1)}`,
+        `GRCg7b ${block.chr_2}:${displayStart(block.start_2)}-${displayEnd(block.end_2)}`,
+        `strand ${block.strand}`,
+        `identity ${dash(block.identity, 2)}%`,
+        `mapQ ${block.mapping_quality}`,
+      ].join("<br>");
+      text.push(label, label, "");
+    });
+    return {
+      x,
+      y,
+      customdata,
+      text,
+      type: "scattergl" as const,
+      mode: "lines" as const,
+      name: strand === "+" ? "Forward" : "Reverse",
+      hovertemplate: "%{text}<extra></extra>",
+      line: { color, width: 2 },
+    };
+  };
+  const queryShapes = CHROMOSOMES.filter(hasQuery).map((chr) => ({
+    type: "line" as const,
+    x0: queryOffsets[chr],
+    x1: queryOffsets[chr],
+    y0: 0,
+    y1: totalTarget,
+    line: { color: "#e9ecef", width: 1 },
+  }));
+  const targetShapes = CHROMOSOMES.filter(hasTarget).map((chr) => ({
+    type: "line" as const,
+    x0: 0,
+    x1: totalQuery,
+    y0: targetOffsets[chr],
+    y1: targetOffsets[chr],
+    line: { color: "#e9ecef", width: 1 },
+  }));
+  const selectedShape = selectedBlock && hasQuery(selectedBlock.chr_1) && hasTarget(selectedBlock.chr_2)
+    ? [{
+        type: "rect" as const,
+        x0: cumulativeQuery(selectedBlock.chr_1, selectedBlock.start_1),
+        x1: cumulativeQuery(selectedBlock.chr_1, selectedBlock.end_1),
+        y0: cumulativeTarget(selectedBlock.chr_2, selectedBlock.start_2),
+        y1: cumulativeTarget(selectedBlock.chr_2, selectedBlock.end_2),
+        line: { color: "#1c7ed6", width: 2 },
+        fillcolor: "rgba(28,126,214,0.08)",
+      }]
+    : [];
 
   return (
     <Card withBorder radius="sm">
@@ -1366,34 +1541,66 @@ function DotplotPanel({
           <Badge variant="light">{dash(stats?.weighted_identity, 1)}% weighted identity</Badge>
         </Group>
       </Group>
-      <ScrollArea>
-        <svg width={width} height={height} style={{ border: "1px solid #dee2e6", display: "block", background: "#fff" }}>
-          <rect x={margin} y={margin} width={plotWidth} height={plotHeight} fill="#fbfcfe" stroke="#ced4da" />
-          {CHROMOSOMES.map((chr) => hasQuery(chr) ? (
-            <line key={`v-${chr}`} x1={scaleX(chr, 0)} y1={margin} x2={scaleX(chr, 0)} y2={height - margin} stroke="#e9ecef" />
-          ) : null)}
-          {CHROMOSOMES.map((chr) => hasTarget(chr) ? (
-            <line key={`h-${chr}`} x1={margin} y1={scaleY(chr, 0)} x2={width - margin} y2={scaleY(chr, 0)} stroke="#e9ecef" />
-          ) : null)}
-          {data.map((d) => {
-            if (!hasQuery(d.chr_1) || !hasTarget(d.chr_2)) return null;
-            return (
-              <line
-                key={d.block_id}
-                x1={scaleX(d.chr_1, d.start_1)}
-                y1={scaleY(d.chr_2, d.start_2)}
-                x2={scaleX(d.chr_1, d.end_1)}
-                y2={scaleY(d.chr_2, d.end_2)}
-                stroke={d.strand === "+" ? "#2f9e44" : "#c92a2a"}
-                strokeWidth={1.6}
-                opacity={0.72}
-              />
-            );
-          })}
-          <text x={width / 2} y={height - 14} textAnchor="middle" fontSize={13}>GRCg6a query chromosomes</text>
-          <text x={18} y={height / 2} textAnchor="middle" fontSize={13} transform={`rotate(-90, 18, ${height / 2})`}>GRCg7b target chromosomes</text>
-        </svg>
-      </ScrollArea>
+      <Suspense fallback={<Paper withBorder p="xl" h={360}><Text size="sm" c="dimmed">Loading interactive dotplot...</Text></Paper>}>
+        <Plot
+          data={[traceFor("+", "#2f9e44"), traceFor("-", "#c92a2a")]}
+          layout={{
+            autosize: true,
+            height: 680,
+            margin: { l: 68, r: 24, t: 20, b: 64 },
+            dragmode: "zoom",
+            hovermode: "closest",
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#fbfcfe",
+            xaxis: {
+              title: { text: "GRCg6a cumulative genomic coordinate" },
+              range: [0, totalQuery],
+              zeroline: false,
+              constrain: "domain",
+            },
+            yaxis: {
+              title: { text: "GRCg7b cumulative genomic coordinate" },
+              range: [0, totalTarget],
+              zeroline: false,
+              scaleanchor: "x",
+              scaleratio: 1,
+              constrain: "domain",
+            },
+            shapes: [...queryShapes, ...targetShapes, ...selectedShape],
+            legend: { orientation: "h", y: 1.08 },
+          }}
+          config={{
+            responsive: true,
+            displaylogo: false,
+            modeBarButtonsToRemove: ["lasso2d", "select2d"],
+          }}
+          style={{ width: "100%" }}
+          onClick={(event: { points?: Array<{ customdata?: unknown }> }) => {
+            const point = event.points?.[0];
+            const index = Array.isArray(point?.customdata) ? undefined : point?.customdata;
+            if (typeof index === "number") onSelectBlock(data[index] || null);
+          }}
+        />
+      </Suspense>
+      {selectedBlock && (
+        <Alert color="blue" title="Selected DNA alignment block">
+          <Group justify="space-between" align="center">
+            <Text size="sm">
+              {selectedBlock.block_id}: GRCg6a {selectedBlock.chr_1}:{displayStart(selectedBlock.start_1)}-{displayEnd(selectedBlock.end_1)}
+              {" -> "}GRCg7b {selectedBlock.chr_2}:{displayStart(selectedBlock.start_2)}-{displayEnd(selectedBlock.end_2)}
+            </Text>
+            <Button
+              component={Link}
+              to={`/jbrowse?mode=comparative&loc=${encodeURIComponent(`${selectedBlock.chr_1}:${displayStart(selectedBlock.start_1)}-${displayEnd(selectedBlock.end_1)}`)}`}
+              size="xs"
+              variant="light"
+              leftSection={<IconExternalLink size={14} />}
+            >
+              Open Region
+            </Button>
+          </Group>
+        </Alert>
+      )}
     </Card>
   );
 }
@@ -1453,9 +1660,67 @@ function GeneLayerPanel({ orthologs, total, page, loading, onPageChange }: {
   );
 }
 
-function MethodsPanel({ methods, naturalStats }: {
+function SvCandidatesPanel({ result, loading }: { result: SvCandidatesResponse | null; loading: boolean }) {
+  if (loading) return <Paper withBorder p="xl" pos="relative" h={240}><LoadingOverlay visible /></Paper>;
+  if (!result) return <Alert color="gray">SV candidate metadata is not loaded.</Alert>;
+
+  return (
+    <Stack gap="md">
+      <Alert color="yellow" title="Candidate-only structural evidence">
+        {result.message}
+      </Alert>
+      <SimpleGrid cols={{ base: 1, md: 4 }}>
+        <MetricCard label="Candidate class" value={result.candidate_count} detail={result.classification} />
+        <MetricCard label="Inversion orientation" value={result.counts.inversion_orientation || 0} detail="Reverse-strand PAF block candidates" />
+        <MetricCard label="Large gap" value={result.counts.large_gap || 0} detail={`Gap threshold ${bp(result.min_gap_bp)}`} />
+        <MetricCard label="Evidence level" value={undefined} detail="candidate, not validated SV call" />
+      </SimpleGrid>
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="sm">
+          <Text fw={700}>PAF-Derived SV Candidates</Text>
+          <Badge color="yellow" variant="light">{result.classification}</Badge>
+        </Group>
+        {result.candidates.length ? (
+          <ScrollArea h={520}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>ID</Table.Th>
+                  <Table.Th>Type</Table.Th>
+                  <Table.Th>GRCg6a interval</Table.Th>
+                  <Table.Th>GRCg7b interval</Table.Th>
+                  <Table.Th>Query gap</Table.Th>
+                  <Table.Th>Target gap</Table.Th>
+                  <Table.Th>Support</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {result.candidates.map((candidate) => (
+                  <Table.Tr key={candidate.candidate_id}>
+                    <Table.Td><Text size="xs" ff="monospace">{candidate.candidate_id}</Text></Table.Td>
+                    <Table.Td><Badge color={candidate.type === "large_gap" ? "orange" : "red"} variant="light">{candidate.type}</Badge></Table.Td>
+                    <Table.Td>{candidate.chr_1}:{displayStart(candidate.start_1)}-{displayEnd(candidate.end_1)}</Table.Td>
+                    <Table.Td>{candidate.chr_2}:{displayStart(candidate.start_2)}-{displayEnd(candidate.end_2)}</Table.Td>
+                    <Table.Td>{bp(candidate.query_gap_bp)}</Table.Td>
+                    <Table.Td>{bp(candidate.target_gap_bp)}</Table.Td>
+                    <Table.Td><Text size="xs">{candidate.support}</Text></Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        ) : (
+          <Alert color="gray">No SV candidates pass the current candidate threshold.</Alert>
+        )}
+      </Card>
+    </Stack>
+  );
+}
+
+function MethodsPanel({ methods, naturalStats, citation }: {
   methods: ComparativeMethods | null;
   naturalStats: AlignmentStats | null;
+  citation: ComparativeCitation | null;
 }) {
   if (!methods) return <Alert color="gray">Methods metadata is not loaded.</Alert>;
   const provenance = methods.natural_alignment.provenance;
@@ -1486,6 +1751,31 @@ function MethodsPanel({ methods, naturalStats }: {
           </Text>
           <Text size="sm">Natural blocks shown: {dash(naturalStats?.block_count)}. Fixed-width window fallback is disabled for this gold-standard view.</Text>
         </Stack>
+      </Card>
+
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="sm">
+          <div>
+            <Text fw={700}>Cite This Analysis</Text>
+            <Text size="xs" c="dimmed">Citation-ready methods text generated from provenance and display filters.</Text>
+          </div>
+          {citation && (
+            <CopyButton value={citation.methods_text}>
+              {({ copied, copy }) => (
+                <Button size="xs" variant="light" leftSection={<IconCopy size={14} />} onClick={copy}>
+                  {copied ? "Copied" : "Copy Methods"}
+                </Button>
+              )}
+            </CopyButton>
+          )}
+        </Group>
+        {citation ? (
+          <Paper withBorder radius="sm" p="sm" bg="gray.0">
+            <Text size="sm" ff="monospace" style={{ whiteSpace: "pre-wrap" }}>{citation.methods_text}</Text>
+          </Paper>
+        ) : (
+          <Alert color="gray">Citation metadata is not loaded.</Alert>
+        )}
       </Card>
     </Stack>
   );

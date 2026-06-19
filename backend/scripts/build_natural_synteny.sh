@@ -15,6 +15,23 @@ TMP_LOG="${LOG}.tmp"
 PROVENANCE="${OUT_DIR}/grcg6a_vs_grcg7b.natural.asm5.provenance.json"
 TMP_PROVENANCE="${PROVENANCE}.tmp"
 STATS="${OUT_DIR}/input_fasta.seqkit_stats.tsv"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+json_escape() {
+  python3 -c 'import json,sys; print(json.dumps(sys.argv[1])[1:-1])' "$1"
+}
+
+tool_version() {
+  "$1" --version 2>&1 | head -n 1 || true
+}
+
+file_sha256() {
+  if [[ -s "$1" ]]; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    echo ""
+  fi
+}
 
 mkdir -p "${OUT_DIR}"
 rm -f "${TMP_PAF}"
@@ -40,6 +57,13 @@ mv "${TMP_PAF}" "${PAF}"
   wc -l < "${PAF}"
 } >> "${TMP_LOG}"
 
+MINIMAP2_VERSION="$(tool_version minimap2)"
+SEQKIT_VERSION="$(tool_version seqkit)"
+GIT_COMMIT="$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+QUERY_SHA256="$(file_sha256 "${QUERY_FASTA}")"
+TARGET_SHA256="$(file_sha256 "${TARGET_FASTA}")"
+PAF_SHA256="$(file_sha256 "${PAF}")"
+
 cat > "${TMP_PROVENANCE}" <<JSON
 {
   "dataset": "GRCg6a_vs_GRCg7b_natural_synteny",
@@ -52,6 +76,15 @@ cat > "${TMP_PROVENANCE}" <<JSON
   "log": "${LOG}",
   "tool": "minimap2",
   "preset": "asm5",
+  "tool_versions": {
+    "minimap2": "$(json_escape "${MINIMAP2_VERSION}")",
+    "seqkit": "$(json_escape "${SEQKIT_VERSION}")"
+  },
+  "command_line": "minimap2 ${MINIMAP2_ARGS[*]} ${TARGET_FASTA} ${QUERY_FASTA}",
+  "git_commit": "${GIT_COMMIT}",
+  "query_fasta_sha256": "${QUERY_SHA256}",
+  "target_fasta_sha256": "${TARGET_SHA256}",
+  "output_paf_sha256": "${PAF_SHA256}",
   "base_level_cigar": $([[ "${BASE_LEVEL_CIGAR}" == "1" || "${BASE_LEVEL_CIGAR}" == "true" ]] && echo true || echo false),
   "secondary_alignments": "disabled",
   "threads": ${THREADS},
