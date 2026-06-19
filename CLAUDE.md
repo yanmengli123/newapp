@@ -674,6 +674,17 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 | Karyotype Ribbon Overview | Chromosome-level ribbon overview (SVG) |
 | Micro-synteny | Selected block gene arrow diagram (SVG) |
 
+**Publication-Ready Layout** (A-B-C-D tiered layout):
+- **Tier 1 (Macro)**: DNA Dotplot (60%) + Karyotype Ribbon (40%)
+- **Tier 2 (Gene-level)**: Gene Collinearity Dotplot (full width)
+- **Tier 3 (Local)**: Micro-synteny Detail (full width, large canvas)
+
+**MicroSyntenyDetailsPanel** (`src/pages/ComparativeGenomicsPage.tsx`):
+- Displays block details: block ID, chromosome, coordinates, anchor count
+- Shows gene pairs table (first 20 pairs)
+- Links to block-specific SVG
+- Triggered by block selection in GlobalFigureControlBar
+
 **FigureSettingsDrawer** (`src/components/comparative/FigureSettingsDrawer.tsx`):
 - Size presets: 1200x800, 1600x1000, 2000x1200, 2400x1600
 - Color scheme: forward/reverse/low-confidence/background
