@@ -161,6 +161,34 @@ def test_citation_text_includes_versions_filters_and_secondary_policy(tmp_path: 
     assert "secondary alignments disabled" in citation["methods_text"]
 
 
+def test_citation_text_accepts_utf8_bom_provenance(tmp_path: Path):
+    _write_static_figure_fixture(tmp_path)
+    provenance_path = tmp_path / "synteny" / "natural" / "grcg6a_vs_grcg7b.natural.asm5.provenance.json"
+    provenance_path.write_text(
+        "\ufeff" + json.dumps(
+            {
+                "tool": "minimap2",
+                "preset": "asm5",
+                "tool_versions": {"minimap2": "2.26-r1175"},
+                "secondary_alignments": "disabled",
+                "default_display_filters": {
+                    "mapping_quality_min": 30,
+                    "identity_min_percent": 85,
+                    "alignment_length_min_bp": 50000,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = GoldStandardComparativeStore(tmp_path)
+
+    citation = store.get_citation_text()
+
+    assert citation["status"] == "available"
+    assert citation["provenance"].get("error") is None
+    assert "minimap2 2.26-r1175" in citation["methods_text"]
+
+
 def test_sv_candidates_are_reported_as_candidates_not_validated_calls(tmp_path: Path):
     natural_dir = tmp_path / "synteny" / "natural"
     natural_dir.mkdir(parents=True)
@@ -615,6 +643,8 @@ if __name__ == "__main__":
         test_static_figure_catalog_exposes_four_publication_figures(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_static_figure_svg_rendering_is_scientifically_labeled(Path(tmp))
+    with tempfile.TemporaryDirectory() as tmp:
+        test_citation_text_accepts_utf8_bom_provenance(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:
         test_static_figure_svg_accepts_reproducible_style_settings(Path(tmp))
     with tempfile.TemporaryDirectory() as tmp:

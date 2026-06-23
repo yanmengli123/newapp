@@ -738,7 +738,7 @@ class GoldStandardComparativeStore:
         if not self.primary_provenance.exists():
             return {}
         try:
-            return json.loads(self.primary_provenance.read_text(encoding="utf-8"))
+            return json.loads(self.primary_provenance.read_text(encoding="utf-8-sig"))
         except json.JSONDecodeError:
             return {"error": "Primary natural PAF provenance JSON could not be parsed."}
 

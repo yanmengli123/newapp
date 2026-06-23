@@ -11,6 +11,7 @@ import {
   Title,
 } from "@mantine/core";
 import { IconDownload, IconTable } from "@tabler/icons-react";
+import { API_BASE } from "../lib/apiClient";
 
 const CHARTS = [
   {
@@ -57,7 +58,7 @@ const CHARTS = [
 
 async function handleDownload(chartId: string) {
   try {
-    const res = await fetch(`/overview/${chartId}/csv`);
+    const res = await fetch(`${API_BASE}/overview/${chartId}/csv`);
     if (!res.ok) throw new Error(res.statusText);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);

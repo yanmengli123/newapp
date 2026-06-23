@@ -1,73 +1,81 @@
-# React + TypeScript + Vite
+# GRCg6a Bioinformatics Browser
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/TypeScript + FastAPI platform for the GRCg6a chicken genome, expression atlas, GO/KEGG annotation, genome analysis jobs, JBrowse2, and GRCg6a/GRCg7b comparative genomics.
 
-Currently, two official plugins are available:
+## Repository Layout
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- `src/` - Vite React frontend.
+- `backend/` - only supported FastAPI backend package.
+- `backend/api/` - route modules.
+- `backend/db/migrations/` - versioned PostgreSQL schema changes.
+- `backend/scripts/` - data import and comparative-genomics build scripts.
+- `D:\jbrowsedata\projectdata` - default external data root, not committed to this repo.
 
-## React Compiler
+Deprecated root-level backend entrypoints now exit with a message. Start only `backend.main:app`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Runtime Commands
 
-## Expanding the ESLint configuration
+```powershell
+npm run dev
+npm run build
+npm run lint
+npm run test:api-contract
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
+D:\soft\python310\python.exe -m backend.test_go_enrichment
+D:\soft\python310\python.exe -m backend.test_comparative_paf
+D:\soft\python310\python.exe -m backend.test_core_config
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Frontend dev server defaults to `http://localhost:5173`; backend defaults to `http://localhost:8001`.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Configuration
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+Backend paths are centralized in `backend/config.py`.
+
+| Variable | Default |
+| --- | --- |
+| `GRCG6A_BASE_DIR` | `D:\jbrowsedata\projectdata` |
+| `GRCG6A_DB_PATH` | `%GRCG6A_BASE_DIR%\grcg6a_nc.db` |
+| `GRCG6A_RAWDATA_ROOT` | `%GRCG6A_BASE_DIR%\rawdata` |
+| `GRCG6A_STATIC_ROOT` | `%GRCG6A_BASE_DIR%\static` |
+| `GRCG6A_BWDATA_ROOT` | `%GRCG6A_BASE_DIR%\bwdata` |
+| `DATABASE_URL` | `postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a` |
+
+Frontend API routing goes through `src/lib/apiClient.ts`. Components should pass relative backend paths to `apiFetch`; direct `fetch` calls must explicitly use `API_BASE`.
+
+## Comparative Genomics Evidence Policy
+
+The GRCg6a/GRCg7b page is evidence-layered:
+
+- Natural-breakpoint minimap2 `asm5` PAF is the primary synteny display.
+- Base-level `--cs` PAF is indexed and used for local block detail, not streamed wholesale.
+- Gene collinearity is a separate functional/gene-order layer.
+- Fixed-window PAF is not a fallback for the primary comparative display.
+- SV results are candidates unless independently validated.
+
+Current gold-standard status should be checked with:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8001/comparative/gold-standard
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8001/comparative/citation
+```
+
+## Verification Expectations
+
+Before reporting a code change as complete, run at least:
+
+```powershell
+D:\soft\python310\python.exe -m backend.test_comparative_paf
+D:\soft\python310\python.exe -m backend.test_go_enrichment
+D:\soft\python310\python.exe -m backend.test_core_config
+npm run test:api-contract
+npm run lint
+npm run build
+```
+
+For browser-visible changes, also verify the affected route in a browser and check backend health:
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8001/health
 ```

@@ -34,6 +34,7 @@ import type {
   TranscriptResult,
 } from "../lib/geneApi";
 import { getGenePage, getChromosome } from "../lib/geneApi";
+import { API_BASE } from "../lib/apiClient";
 import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
 import ExpressionSection from "../components/expression/ExpressionSection";
@@ -260,8 +261,7 @@ interface GenomicRegionResult {
 }
 
 async function fetchGenomicSeq(loc: string, revcomp = false): Promise<GenomicRegionResult> {
-  const base = import.meta.env.VITE_API_BASE || "";
-  const url = `${base}/genes/genomic?loc=${encodeURIComponent(loc)}${revcomp ? "&revcomp=true" : ""}`;
+  const url = `${API_BASE}/genes/genomic?loc=${encodeURIComponent(loc)}${revcomp ? "&revcomp=true" : ""}`;
   const res = await fetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));

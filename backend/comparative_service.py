@@ -169,7 +169,7 @@ class ComparativeService:
         provenance: dict[str, Any] = {}
         if provenance_path.exists():
             try:
-                provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+                provenance = json.loads(provenance_path.read_text(encoding="utf-8-sig"))
             except json.JSONDecodeError:
                 provenance = {"error": "Natural PAF provenance JSON could not be parsed."}
 

@@ -864,7 +864,7 @@ def _load_chr_nc_map() -> dict[str, str]:
             "chr10": "NC_006097.5", "chr11": "NC_006098.5", "chr12": "NC_006099.5",
             "chr13": "NC_006100.5", "chr14": "NC_006101.5", "chr15": "NC_006102.5",
             "chr16": "NC_006103.5", "chr17": "NC_006104.5", "chr18": "NC_006105.5",
-            "chr19": "NC_006107.5", "chr20": "NC_006107.5", "chr21": "NC_006108.5",
+            "chr19": "NC_006106.5", "chr20": "NC_006107.5", "chr21": "NC_006108.5",
             "chr22": "NC_006109.5", "chr23": "NC_006110.5", "chr24": "NC_006111.5",
             "chr25": "NC_006112.4", "chr26": "NC_006113.5", "chr27": "NC_006114.5",
             "chr28": "NC_006115.5", "chr29": "NC_008465.4", "chr30": "NC_028739.2",
@@ -972,4 +972,4 @@ def get_gene_page(gene_id: str, request: Request, include_sequences: bool = Quer
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8001, reload=False)

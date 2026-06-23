@@ -1,4 +1,4 @@
-import { API_BASE, apiFetch } from './apiClient';
+import { apiFetch } from './apiClient';
 
 // Types - inline to avoid import issues
 interface ChatRequest {
@@ -12,10 +12,8 @@ interface ChatResponse {
   data?: unknown;
 }
 
-const CHAT_API_URL = `${API_BASE}/api/chat`;
-
 export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
-  return apiFetch<ChatResponse>(CHAT_API_URL, {
+  return apiFetch<ChatResponse>('/api/chat', {
     method: 'POST',
     body: JSON.stringify(request),
   });

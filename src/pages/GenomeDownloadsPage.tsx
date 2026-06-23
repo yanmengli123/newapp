@@ -32,6 +32,9 @@ import {
   getSampleDownloads,
   buildGenomeDownloadUrl,
   buildChartUrl,
+  buildSampleChartUrl,
+  buildSampleFileUrl,
+  buildSampleTableUrl,
   type GenomeDownloadsResponse,
 } from '../lib/genomeApi';
 
@@ -76,7 +79,7 @@ function InteractiveChartViewer({
   const [iframeLoading, setIframeLoading] = useState(false);
 
   const htmlUrl = isSample
-    ? `http://localhost:8000/genome/sample/charts/${chartKey}/html`
+    ? buildSampleChartUrl(chartKey, 'html')
     : buildChartUrl(jobId, chartKey, 'html');
 
   const handleView = async () => {
@@ -175,7 +178,7 @@ function ChartCard({
               label="PNG"
               url={
                 isSample
-                  ? `http://localhost:8000/genome/sample/charts/${chart.chart_key}/png`
+                  ? buildSampleChartUrl(chart.chart_key, 'png')
                   : buildGenomeDownloadUrl(jobId, 'charts', `${chart.chart_key}.png`)
               }
               color="blue"
@@ -187,7 +190,7 @@ function ChartCard({
               label="SVG"
               url={
                 isSample
-                  ? `http://localhost:8000/genome/sample/charts/${chart.chart_key}/svg`
+                  ? buildSampleChartUrl(chart.chart_key, 'svg')
                   : buildGenomeDownloadUrl(jobId, 'charts', `${chart.chart_key}.svg`)
               }
               color="green"
@@ -199,7 +202,7 @@ function ChartCard({
               label="HTML"
               url={
                 isSample
-                  ? `http://localhost:8000/genome/sample/charts/${chart.chart_key}/html`
+                  ? buildSampleChartUrl(chart.chart_key, 'html')
                   : buildGenomeDownloadUrl(jobId, 'charts', `${chart.chart_key}.html`)
               }
               color="orange"
@@ -211,7 +214,7 @@ function ChartCard({
               label="JSON"
               url={
                 isSample
-                  ? `http://localhost:8000/genome/sample/charts/${chart.chart_key}/json`
+                  ? buildSampleChartUrl(chart.chart_key, 'json')
                   : buildGenomeDownloadUrl(jobId, 'charts', `${chart.chart_key}.json`)
               }
               color="gray"
@@ -248,7 +251,7 @@ function TableCard({
               label="CSV"
               url={
                 isSample
-                  ? `http://localhost:8000/genome/sample/tables/${table.name}/csv`
+                  ? buildSampleTableUrl(table.name, 'csv')
                   : buildGenomeDownloadUrl(jobId, 'tables', `${table.name}.csv`)
               }
               color="green"
@@ -260,7 +263,7 @@ function TableCard({
               label="XLSX"
               url={
                 isSample
-                  ? `http://localhost:8000/genome/sample/tables/${table.name}/xlsx`
+                  ? buildSampleTableUrl(table.name, 'xlsx')
                   : buildGenomeDownloadUrl(jobId, 'tables', `${table.name}.xlsx`)
               }
               color="blue"
@@ -493,7 +496,7 @@ export default function GenomeDownloadsPage() {
                         label="JSON"
                         url={
                           isSample
-                            ? `http://localhost:8000/genome/sample/result/${item.name}.json`
+                            ? buildSampleFileUrl('result', `${item.name}.json`)
                             : item.files.json
                         }
                         color="gray"
@@ -530,7 +533,7 @@ export default function GenomeDownloadsPage() {
                         label="JSON"
                         url={
                           isSample
-                            ? `http://localhost:8000/genome/sample/metadata/${item.name}.json`
+                            ? buildSampleFileUrl('metadata', `${item.name}.json`)
                             : item.files.json
                         }
                         color="gray"

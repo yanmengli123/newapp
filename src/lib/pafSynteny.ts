@@ -1,4 +1,5 @@
 import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
+import { API_BASE } from "./apiClient";
 
 const PAF_URL = "/comparative/paf/file?mode=natural&min_quality=30&min_identity=85&min_alignment_length=50000";
 const GENE_COLLINEARITY_URL = "/comparative/gene-collinearity?limit=20000";
@@ -96,8 +97,8 @@ const GRCG7B_REFSEQ_TO_CHR: Record<string, string> = {
 
 export async function loadPafSyntenyFeatures(): Promise<LoadedPafSynteny> {
   const [response, geneResponse] = await Promise.all([
-    fetch(PAF_URL),
-    fetch(GENE_COLLINEARITY_URL).catch(() => undefined),
+    fetch(`${API_BASE}${PAF_URL}`),
+    fetch(`${API_BASE}${GENE_COLLINEARITY_URL}`).catch(() => undefined),
   ]);
   if (!response.ok) {
     throw new Error(`Failed to load natural-breakpoint PAF synteny file: ${response.status}`);
