@@ -17,10 +17,13 @@ npm run build    # TypeScript check + production build
 npm run lint     # ESLint
 
 # Backend — ONLY supported way to start (from C root):
-D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
+# ⚠️ Git Bash on Windows treats backslashes as escape chars.
+#    Always use forward slashes AND quote the path, otherwise the
+#    command collapses to "D:softpython310python.exe" and fails.
+"D:/soft/python310/python.exe" -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
 
 # Backend tests (from C root):
-D:\soft\python310\python.exe -m backend.test_go_enrichment
+"D:/soft/python310/python.exe" -m backend.test_go_enrichment
 
 # Legacy ways (DEPRECATED — do not use):
 # python backend/main.py               ← wrong: uses old import style
@@ -621,6 +624,32 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 
 **Overview**: Cross-assembly comparison between GRCg6a (White Leghorn) and GRCg7b (Broiler) chicken genomes. Uses **LinearSyntenyView** for dual-panel visualization with synteny ribbons.
 
+**Recent additions** (commit `eef0e21`, 2026-06-22, not yet deeply documented elsewhere):
+- **SV Candidates tab** — `/comparative/sv-candidates` returns candidate-only evidence
+  (inversion orientation + large gap), explicitly **NOT** validated SV calls.
+  Inherits gold-standard filters (mapQ≥30, identity≥85%, length≥50kb).
+- **Cite This Analysis** — Methods tab now has a citation block generated from
+  provenance JSON via `/comparative/citation`. Currently shows
+  "minimap2 version not recorded" because of a known bug (see below).
+- **Plotly dotplot** — replaces inline SVG. Axes start at 0 via explicit `range`.
+
+**Known bugs in `backend/comparative_gold.py`** (verify before modifying):
+- Line ~586: WSL tabix fallback `process.kill(); break` is de-indented out of
+  the `if len(lines) >= limit:` block, so it always kills after reading 1 line.
+  Effect: on Windows where pysam is usually not installed, base-level queries
+  silently degrade to bounded_scan (full-file scan) instead of indexed lookup.
+- Line ~741: `read_text(encoding="utf-8")` fails on UTF-8 BOM in
+  `provenance.json`. Should be `encoding="utf-8-sig"` to auto-strip BOM. This
+  is why Methods tab shows "minimap2 version not recorded" even when
+  `build_natural_synteny.sh` records the version.
+
+**Off-disk MUMmer pipeline** (not in Git, not wired into `/comparative`):
+`D:\jbrowsedata\projectdata\comparative\mummer_chr1_dotplot\GRCg6a_vs_GRCg7b_chr1\`
+contains an MUMmer4 chr1 dotplot (97.6% coverage, 99.18% weighted identity).
+Toolchain: `nucmer --mum -l 100 -c 1000`, `delta-filter -1/-m`,
+`show-coords -THrcl`, matplotlib rendering (mummerplot unavailable due to
+gnuplot missing libtiff.so.5).
+
 **Data sources**:
 - GRCg6a: `GCF_000002315.6` (existing)
 - GRCg7b: `GCF_016699485.2` downloaded to `D:/jbrowsedata/projectdata/grcg7b/`
@@ -775,7 +804,8 @@ git push origin <branch>
 npm run dev
 
 # Backend (ONLY way — from C root) — runs on port 8001
-D:\soft\python310\python.exe -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
+# ⚠️ Git Bash: use forward slashes and quote (see top of Commands section)
+"D:/soft/python310/python.exe" -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
 
 # Restart all services (kill then start)
 taskkill //F //IM node.exe 2>/dev/null; taskkill //F //IM python.exe 2>/dev/null
@@ -792,6 +822,27 @@ netstat -ano | grep -E "5173|8001"
 # Quick health check
 curl -s http://localhost:5173 | head -3    # Frontend
 curl -s http://localhost:8001/health       # Backend
+```
+
+**Restart diagnostic sequence** (always check first before blindly restarting):
+```bash
+# 1. What's running right now?
+netstat -ano | grep -E ":5173|:8001|:5433"
+#   - 5433 only           → PG up, backend/frontend down — start them
+#   - 5433 missing        → PG Docker is down; /comparative, /go-enrichment,
+#                           /expression, /overview will silently degrade to
+#                           SQLite-only or status:"unavailable". Restart PG first.
+#   - all three missing   → full restart needed.
+
+# 2. If PG down: cd /d/jbrowsedata/projectdata && docker-compose up -d postgres
+
+# 3. Start backend, then frontend (separate shells):
+"D:/soft/python310/python.exe" -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
+npm run dev
+
+# 4. Verify:
+curl -s http://localhost:8001/health           # → {"ok":true,"gene_count":N}
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # → 200
 ```
 
 ## Backend Tests
