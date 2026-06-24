@@ -1539,6 +1539,79 @@ function AlignmentTable({ blocks, meta }: { blocks: AlignmentBlock[]; meta: Alig
   );
 }
 
+// Adaptive tick selection: only show labels for molecules that occupy
+// enough cumulative space to avoid label overlap. Smaller chromosomes get
+// a divider line but no label (visible via hover).
+const MIN_TICK_FRACTION = 0.025; // ~2.5% of axis width = ~30 px at typical sizes
+
+function selectTickPositions(
+  molecules: ComparativeMolecule[],
+  totalLength: number,
+): number[] {
+  if (!totalLength || !molecules.length) return [];
+  const minLength = totalLength * MIN_TICK_FRACTION;
+  const positions: number[] = [];
+  let cumulative = 0;
+  molecules.forEach((m) => {
+    const length = m.length || 0;
+    if (length >= minLength) {
+      positions.push(cumulative + length / 2);
+    }
+    cumulative += length;
+  });
+  return positions;
+}
+
+function selectTickLabels(
+  molecules: ComparativeMolecule[],
+  totalLength: number,
+): string[] {
+  if (!totalLength || !molecules.length) return [];
+  const minLength = totalLength * MIN_TICK_FRACTION;
+  const labels: string[] = [];
+  molecules.forEach((m) => {
+    const length = m.length || 0;
+    if (length >= minLength) {
+      labels.push(m.display_name || `chr${m.chr}`);
+    }
+  });
+  return labels;
+}
+
+function minorDividerShapes(
+  molecules: ComparativeMolecule[],
+  axis: "x" | "y",
+): { type: "line"; x0: number; x1: number; y0: number; y1: number; line: { color: string; width: number } }[] {
+  // Small chromosomes get a divider line + the major ones get a darker line.
+  if (!molecules.length) return [];
+  const offsets: Record<string, number> = {};
+  let total = 0;
+  molecules.forEach((m) => {
+    offsets[m.chr] = total;
+    total += m.length || 0;
+  });
+  const shapes: { type: "line"; x0: number; x1: number; y0: number; y1: number; line: { color: string; width: number } }[] = [];
+  molecules.forEach((m) => {
+    const pos = offsets[m.chr];
+    const length = m.length || 0;
+    const isMinor = length < total * MIN_TICK_FRACTION;
+    if (axis === "x") {
+      shapes.push({
+        type: "line",
+        x0: pos, x1: pos, y0: 0, y1: 1,
+        line: { color: isMinor ? "#e9ecef" : "#dee2e6", width: isMinor ? 1 : 2 },
+      });
+    } else {
+      shapes.push({
+        type: "line",
+        x0: 0, x1: 1, y0: pos, y1: pos,
+        line: { color: isMinor ? "#e9ecef" : "#dee2e6", width: isMinor ? 1 : 2 },
+      });
+    }
+  });
+  return shapes;
+}
+
 function DotplotPanel({
   data,
   loading,
@@ -1675,8 +1748,8 @@ function DotplotPanel({
           data={[traceFor("+", "#2f9e44"), traceFor("-", "#c92a2a")]}
           layout={{
             autosize: true,
-            height: 680,
-            margin: { l: 68, r: 24, t: 20, b: 64 },
+            minHeight: 520,
+            margin: { l: 96, r: 48, t: 32, b: 88 },
             dragmode: "zoom",
             hovermode: "closest",
             paper_bgcolor: "#ffffff",
@@ -1684,33 +1757,50 @@ function DotplotPanel({
             xaxis: {
               title: { text: "GRCg6a cumulative genomic coordinate" },
               range: [0, totalQuery],
-              tickvals: queryAxis.molecules.map((molecule) => queryAxis.centers[molecule.chr]),
-              ticktext: queryAxis.molecules.map((molecule) => molecule.display_name || `chr${molecule.chr}`),
+              tickmode: "array",
+              tickvals: selectTickPositions(queryAxis.molecules, totalQuery),
+              ticktext: selectTickLabels(queryAxis.molecules, totalQuery),
               tickangle: -45,
-              tickfont: { size: 9 },
+              tickfont: { size: 11 },
+              ticks: "outside",
+              ticklen: 4,
               zeroline: false,
               constrain: "domain",
             },
             yaxis: {
               title: { text: "GRCg7b cumulative genomic coordinate" },
               range: [0, totalTarget],
-              tickvals: targetAxis.molecules.map((molecule) => targetAxis.centers[molecule.chr]),
-              ticktext: targetAxis.molecules.map((molecule) => molecule.display_name || `chr${molecule.chr}`),
-              tickfont: { size: 9 },
+              tickmode: "array",
+              tickvals: selectTickPositions(targetAxis.molecules, totalTarget),
+              ticktext: selectTickLabels(targetAxis.molecules, totalTarget),
+              tickfont: { size: 11 },
+              ticks: "outside",
+              ticklen: 4,
               zeroline: false,
-              scaleanchor: "x",
-              scaleratio: 1,
-              constrain: "domain",
             },
-            shapes: [...queryShapes, ...targetShapes, ...selectedShape],
-            legend: { orientation: "h", y: 1.08 },
+            shapes: [
+              ...queryShapes,
+              ...targetShapes,
+              ...minorDividerShapes(queryAxis.molecules, "x"),
+              ...minorDividerShapes(targetAxis.molecules, "y"),
+              ...selectedShape,
+            ],
+            legend: { orientation: "h", y: 1.04, x: 0, xanchor: "left" },
+            hoverlabel: {
+              bgcolor: "#ffffff",
+              bordercolor: "#111827",
+              font: { size: 12, family: "ui-monospace, Menlo, monospace" },
+            },
           }}
           config={{
             responsive: true,
             displaylogo: false,
+            scrollZoom: true,
             modeBarButtonsToRemove: ["lasso2d", "select2d"],
+            toImageButtonOptions: { format: "png", filename: "dotplot", scale: 2, width: 1920, height: 1080 },
           }}
-          style={{ width: "100%" }}
+          useResizeHandler={true}
+          style={{ width: "100%", height: "calc(80vh)", minHeight: 560 }}
           onClick={(event: { points?: Array<{ customdata?: unknown }> }) => {
             const point = event.points?.[0];
             const index = Array.isArray(point?.customdata) ? undefined : point?.customdata;
