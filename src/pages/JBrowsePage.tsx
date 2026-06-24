@@ -55,7 +55,7 @@ const chromosomes = [
   { id: "chr26", name: "26", seqid: "NC_006113.5", length: 6055710 },
   { id: "chr27", name: "27", seqid: "NC_006114.5", length: 8080432 },
   { id: "chr28", name: "28", seqid: "NC_006115.5", length: 5116880 },
-  { id: "chr29", name: "29", seqid: "NC_008465.4", length: 7821666 },
+  { id: "chr33", name: "33", seqid: "NC_008465.4", length: 7821666 },
   { id: "chr30", name: "30", seqid: "NC_028739.2", length: 1818525 },
   { id: "chr31", name: "31", seqid: "NC_028740.2", length: 6153034 },
   { id: "chr32", name: "32", seqid: "NC_006119.4", length: 725831 },
@@ -74,7 +74,7 @@ const NC_TO_CHR: [string, string][] = [
   ["NC_006106.5", "chr19"], ["NC_006107.5", "chr20"], ["NC_006108.5", "chr21"],
   ["NC_006109.5", "chr22"], ["NC_006110.5", "chr23"], ["NC_006111.5", "chr24"],
   ["NC_006112.4", "chr25"], ["NC_006113.5", "chr26"], ["NC_006114.5", "chr27"],
-  ["NC_006115.5", "chr28"], ["NC_008465.4", "chr29"], ["NC_028739.2", "chr30"],
+  ["NC_006115.5", "chr28"], ["NC_008465.4", "chr33"], ["NC_028739.2", "chr30"],
   ["NC_028740.2", "chr31"], ["NC_006119.4", "chr32"], ["NC_006126.5", "chrW"],
   ["NC_006127.5", "chrZ"], ["NC_040902.1", "chrMT"],
 ];

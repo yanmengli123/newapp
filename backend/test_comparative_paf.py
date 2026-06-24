@@ -5,6 +5,8 @@ from pathlib import Path
 import re
 
 from backend.comparative_paf import (
+    GRCG6A_REFSEQ_TO_CHR,
+    PRIMARY_CHROMOSOMES,
     chromosome_sort_key,
     parse_paf_line,
     read_paf_records,
@@ -28,6 +30,27 @@ def test_parse_paf_line_normalizes_refseq_chromosomes():
     assert record.start_1 == 127045112
     assert record.end_1 == 128112455
     assert record.identity == 99.3
+
+
+def test_grcg6a_refseq_mapping_uses_actual_chr33_accession():
+    assert GRCG6A_REFSEQ_TO_CHR["NC_008465.4"] == "33"
+    assert "33" in PRIMARY_CHROMOSOMES
+
+
+def test_parse_paf_line_keeps_grcg6a_chr33_distinct_from_grcg7b_chr29():
+    line = (
+        "NC_008465.4\t7821666\t100\t1000\t+\t"
+        "NC_052560.1\t7821666\t200\t1100\t"
+        "850\t900\t60"
+    )
+
+    record = parse_paf_line(line, 0)
+
+    assert record is not None
+    assert record.chr_1 == "33"
+    assert record.chr_2 == "29"
+    assert record.is_primary_chromosome_pair is True
+    assert record.is_same_chromosome is False
 
 
 def test_summarize_paf_records_identifies_natural_dataset(tmp_path: Path):
@@ -87,6 +110,8 @@ def test_gold_standard_tabix_seqid_mapping(tmp_path: Path):
 
     assert store._tabix_seqid("query", "1") == "NC_006088.5"
     assert store._tabix_seqid("query", "chr1") == "NC_006088.5"
+    assert store._tabix_seqid("query", "33") == "NC_008465.4"
+    assert store._tabix_seqid("query", "chr33") == "NC_008465.4"
     assert store._tabix_seqid("query", "Z") == "NC_006127.5"
     assert store._tabix_seqid("target", "1") == "chr1"
     assert store._tabix_seqid("target", "chr1") == "chr1"

@@ -1,0 +1,215 @@
+Assembly Accession	Assembly-unit name	Chromosome name	GC Count	GC Percent	GenBank seq accession	Molecule type	Ordering	RefSeq seq accession	Role	Seq length	UCSC style name	Unlocalized Count	Sequence name
+GCF_016699485.2	Primary Assembly	1	79350093	40.5	CM028482.1	Chromosome		NC_052532.1	assembled-molecule	196449156		4	1
+GCF_016699485.2	Primary Assembly	2	59972157	40	CM028483.1	Chromosome		NC_052533.1	assembled-molecule	149539284			2
+GCF_016699485.2	Primary Assembly	3	44481653	40	CM028484.1	Chromosome		NC_052534.1	assembled-molecule	110642502			3
+GCF_016699485.2	Primary Assembly	4	36650493	40.5	CM028485.1	Chromosome		NC_052535.1	assembled-molecule	90861225		2	4
+GCF_016699485.2	Primary Assembly	5	24584920	41.5	CM028486.1	Chromosome		NC_052536.1	assembled-molecule	59506338			5
+GCF_016699485.2	Primary Assembly	6	15095265	42	CM028487.1	Chromosome		NC_052537.1	assembled-molecule	36220557			6
+GCF_016699485.2	Primary Assembly	7	15121914	41.5	CM028488.1	Chromosome		NC_052538.1	assembled-molecule	36382834			7
+GCF_016699485.2	Primary Assembly	8	12428611	42	CM028489.1	Chromosome		NC_052539.1	assembled-molecule	29578256			8
+GCF_016699485.2	Primary Assembly	9	10254543	43	CM028490.1	Chromosome		NC_052540.1	assembled-molecule	23733309			9
+GCF_016699485.2	Primary Assembly	10	8925140	43.5	CM028491.1	Chromosome		NC_052541.1	assembled-molecule	20453248			10
+GCF_016699485.2	Primary Assembly	11	8363937	42.5	CM028492.1	Chromosome		NC_052542.1	assembled-molecule	19638187			11
+GCF_016699485.2	Primary Assembly	12	8812105	44	CM028493.1	Chromosome		NC_052543.1	assembled-molecule	20119077			12
+GCF_016699485.2	Primary Assembly	13	8032652	45	CM028494.1	Chromosome		NC_052544.1	assembled-molecule	17905061			13
+GCF_016699485.2	Primary Assembly	14	7001942	45.5	CM028495.1	Chromosome		NC_052545.1	assembled-molecule	15331188			14
+GCF_016699485.2	Primary Assembly	15	5794974	45.5	CM028496.1	Chromosome		NC_052546.1	assembled-molecule	12703657			15
+GCF_016699485.2	Primary Assembly	16	1556163	57.5	CM028497.1	Chromosome		NC_052547.1	assembled-molecule	2706039		5	16
+GCF_016699485.2	Primary Assembly	17	5381605	48.5	CM028498.1	Chromosome		NC_052548.1	assembled-molecule	11092391			17
+GCF_016699485.2	Primary Assembly	18	5481526	47.5	CM028499.1	Chromosome		NC_052549.1	assembled-molecule	11623896			18
+GCF_016699485.2	Primary Assembly	19	4989468	47.5	CM028500.1	Chromosome		NC_052550.1	assembled-molecule	10455293			19
+GCF_016699485.2	Primary Assembly	20	6583104	46	CM028501.1	Chromosome		NC_052551.1	assembled-molecule	14265659			20
+GCF_016699485.2	Primary Assembly	21	3328750	48	CM028502.1	Chromosome		NC_052552.1	assembled-molecule	6970754			21
+GCF_016699485.2	Primary Assembly	22	2277640	48.5	CM028503.1	Chromosome		NC_052553.1	assembled-molecule	4686657			22
+GCF_016699485.2	Primary Assembly	23	3164137	51	CM028504.1	Chromosome		NC_052554.1	assembled-molecule	6253421			23
+GCF_016699485.2	Primary Assembly	24	3206790	49.5	CM028505.1	Chromosome		NC_052555.1	assembled-molecule	6478339			24
+GCF_016699485.2	Primary Assembly	25	1741052	57	CM028506.1	Chromosome		NC_052556.1	assembled-molecule	3067737			25
+GCF_016699485.2	Primary Assembly	26	2798822	52.5	CM028507.1	Chromosome		NC_052557.1	assembled-molecule	5349051			26
+GCF_016699485.2	Primary Assembly	27	2756705	52.5	CM028508.1	Chromosome		NC_052558.1	assembled-molecule	5228753			27
+GCF_016699485.2	Primary Assembly	28	2885731	53	CM028509.1	Chromosome		NC_052559.1	assembled-molecule	5437364			28
+GCF_016699485.2	Primary Assembly	29	298511	54	CM028510.1	Chromosome		NC_052560.1	assembled-molecule	726478		2	29
+GCF_016699485.2	Primary Assembly	30	447447	59.5	CM028511.1	Chromosome		NC_052561.1	assembled-molecule	755666			30
+GCF_016699485.2	Primary Assembly	31	1279791	52	CM028512.1	Chromosome		NC_052562.1	assembled-molecule	2457334		3	31
+GCF_016699485.2	Primary Assembly	32	69262	55	CM028513.1	Chromosome		NC_052563.1	assembled-molecule	125424		6	32
+GCF_016699485.2	Primary Assembly	33	1315611	49	CM028514.1	Chromosome		NC_052564.1	assembled-molecule	3839931		2	33
+GCF_016699485.2	Primary Assembly	34	1950060	57.5	CM028515.1	Chromosome		NC_052565.1	assembled-molecule	3469343			34
+GCF_016699485.2	Primary Assembly	35	313333	56.5	CM028516.1	Chromosome		NC_052566.1	assembled-molecule	554126		5	35
+GCF_016699485.2	Primary Assembly	36	208671	58.5	CM028517.1	Chromosome		NC_052567.1	assembled-molecule	358375		6	36
+GCF_016699485.2	Primary Assembly	37	87206	55.5	CM028518.1	Chromosome		NC_052568.1	assembled-molecule	157853		6	37
+GCF_016699485.2	Primary Assembly	38	414822	62	CM028519.1	Chromosome		NC_052569.1	assembled-molecule	667312			38
+GCF_016699485.2	Primary Assembly	39	112318	63.5	CM028520.1	Chromosome		NC_052570.1	assembled-molecule	177356		2	39
+GCF_016699485.2	Primary Assembly	W	4063530	46.5	CM028521.1	Chromosome		NC_052571.1	assembled-molecule	9109940		19	W
+GCF_016699485.2	Primary Assembly	Z	35179010	41.5	CM028522.1	Chromosome		NC_052572.1	assembled-molecule	86044486			Z
+GCF_016699485.2	Primary Assembly	1			JAENSK010000001.1	Chromosome		NW_024095932.1	unlocalized-scaffold	42181		4	1_unloc1
+GCF_016699485.2	Primary Assembly	1			JAENSK010000002.1	Chromosome		NW_024095933.1	unlocalized-scaffold	76880		4	1_unloc2
+GCF_016699485.2	Primary Assembly	1			JAENSK010000033.1	Chromosome		NW_024095934.1	unlocalized-scaffold	38338		4	1_unloc3
+GCF_016699485.2	Primary Assembly	1			JAENSK010000034.1	Chromosome		NW_024095935.1	unlocalized-scaffold	50781		4	1_unloc4
+GCF_016699485.2	Primary Assembly	4			JAENSK010000082.1	Chromosome		NW_024095936.1	unlocalized-scaffold	24491		2	4_unloc1
+GCF_016699485.2	Primary Assembly	4			JAENSK010000083.1	Chromosome		NW_024095937.1	unlocalized-scaffold	23670		2	4_unloc2
+GCF_016699485.2	Primary Assembly	16			JAENSK010000291.1	Chromosome		NW_024095938.1	unlocalized-scaffold	64959		5	16_unloc1
+GCF_016699485.2	Primary Assembly	16			JAENSK010000294.1	Chromosome		NW_024095940.1	unlocalized-scaffold	24076		5	16_unloc3
+GCF_016699485.2	Primary Assembly	16			JAENSK010000295.1	Chromosome		NW_024095941.1	unlocalized-scaffold	27394		5	16_unloc4
+GCF_016699485.2	Primary Assembly	16			JAENSK010000296.1	Chromosome		NW_024095942.1	unlocalized-scaffold	76531		5	16_unloc5
+GCF_016699485.2	Primary Assembly	16			MU179258.1	Chromosome		NW_024095939.1	unlocalized-scaffold	236755		5	16_unloc2
+GCF_016699485.2	Primary Assembly	29			JAENSK010000383.1	Chromosome		NW_024095943.1	unlocalized-scaffold	39239		2	29_unloc1
+GCF_016699485.2	Primary Assembly	29			JAENSK010000384.1	Chromosome		NW_024095944.1	unlocalized-scaffold	52620		2	29_unloc2
+GCF_016699485.2	Primary Assembly	31			JAENSK010000409.1	Chromosome		NW_024095945.1	unlocalized-scaffold	89875		3	31_unloc1
+GCF_016699485.2	Primary Assembly	31			JAENSK010000410.1	Chromosome		NW_024095946.1	unlocalized-scaffold	52746		3	31_unloc2
+GCF_016699485.2	Primary Assembly	31			MU179259.1	Chromosome		NW_024095947.1	unlocalized-scaffold	105159		3	31_unloc3
+GCF_016699485.2	Primary Assembly	32			JAENSK010000416.1	Chromosome		NW_024095949.1	unlocalized-scaffold	72078		6	32_unloc2
+GCF_016699485.2	Primary Assembly	32			JAENSK010000417.1	Chromosome		NW_024095950.1	unlocalized-scaffold	54963		6	32_unloc3
+GCF_016699485.2	Primary Assembly	32			JAENSK010000418.1	Chromosome		NW_024095951.1	unlocalized-scaffold	43198		6	32_unloc4
+GCF_016699485.2	Primary Assembly	32			JAENSK010000419.1	Chromosome		NW_024095952.1	unlocalized-scaffold	105149		6	32_unloc5
+GCF_016699485.2	Primary Assembly	32			JAENSK010000420.1	Chromosome		NW_024095953.1	unlocalized-scaffold	70221		6	32_unloc6
+GCF_016699485.2	Primary Assembly	32			MU179260.1	Chromosome		NW_024095948.1	unlocalized-scaffold	99000		6	32_unloc1
+GCF_016699485.2	Primary Assembly	33			JAENSK010000437.1	Chromosome		NW_024095954.1	unlocalized-scaffold	62499		2	33_unloc1
+GCF_016699485.2	Primary Assembly	33			JAENSK010000438.1	Chromosome		NW_024095955.1	unlocalized-scaffold	52169		2	33_unloc2
+GCF_016699485.2	Primary Assembly	35			JAENSK010000448.1	Chromosome		NW_024095957.1	unlocalized-scaffold	52716		5	35_unloc2
+GCF_016699485.2	Primary Assembly	35			JAENSK010000449.1	Chromosome		NW_024095958.1	unlocalized-scaffold	31960		5	35_unloc3
+GCF_016699485.2	Primary Assembly	35			JAENSK010000452.1	Chromosome		NW_024095960.1	unlocalized-scaffold	44029		5	35_unloc5
+GCF_016699485.2	Primary Assembly	35			MU179261.1	Chromosome		NW_024095956.1	unlocalized-scaffold	259507		5	35_unloc1
+GCF_016699485.2	Primary Assembly	35			MU179262.1	Chromosome		NW_024095959.1	unlocalized-scaffold	83545		5	35_unloc4
+GCF_016699485.2	Primary Assembly	36			JAENSK010000477.1	Chromosome		NW_024095963.1	unlocalized-scaffold	39716		6	36_unloc3
+GCF_016699485.2	Primary Assembly	36			JAENSK010000478.1	Chromosome		NW_024095964.1	unlocalized-scaffold	39622		6	36_unloc4
+GCF_016699485.2	Primary Assembly	36			JAENSK010000479.1	Chromosome		NW_024095965.1	unlocalized-scaffold	28486		6	36_unloc5
+GCF_016699485.2	Primary Assembly	36			MU179263.1	Chromosome		NW_024095961.1	unlocalized-scaffold	244274		6	36_unloc1
+GCF_016699485.2	Primary Assembly	36			MU179264.1	Chromosome		NW_024095962.1	unlocalized-scaffold	135931		6	36_unloc2
+GCF_016699485.2	Primary Assembly	36			MU179265.1	Chromosome		NW_024095966.1	unlocalized-scaffold	90962		6	36_unloc6
+GCF_016699485.2	Primary Assembly	37			JAENSK010000459.1	Chromosome		NW_024095967.1	unlocalized-scaffold	183934		6	37_unloc1
+GCF_016699485.2	Primary Assembly	37			JAENSK010000460.1	Chromosome		NW_024095968.1	unlocalized-scaffold	56170		6	37_unloc2
+GCF_016699485.2	Primary Assembly	37			JAENSK010000461.1	Chromosome		NW_024095969.1	unlocalized-scaffold	147375		6	37_unloc3
+GCF_016699485.2	Primary Assembly	37			JAENSK010000462.1	Chromosome		NW_024095970.1	unlocalized-scaffold	123103		6	37_unloc4
+GCF_016699485.2	Primary Assembly	37			JAENSK010000465.1	Chromosome		NW_024095971.1	unlocalized-scaffold	56291		6	37_unloc5
+GCF_016699485.2	Primary Assembly	37			JAENSK010000466.1	Chromosome		NW_024095972.1	unlocalized-scaffold	61860		6	37_unloc6
+GCF_016699485.2	Primary Assembly	39			JAENSK010000483.1	Chromosome		NW_024095973.1	unlocalized-scaffold	60241		2	39_unloc1
+GCF_016699485.2	Primary Assembly	39			JAENSK010000484.1	Chromosome		NW_024095974.1	unlocalized-scaffold	122554		2	39_unloc2
+GCF_016699485.2	Primary Assembly	W			JAENSK010000526.1	Chromosome		NW_024095975.1	unlocalized-scaffold	103662		19	W_unloc1
+GCF_016699485.2	Primary Assembly	W			JAENSK010000527.1	Chromosome		NW_024095976.1	unlocalized-scaffold	96352		19	W_unloc2
+GCF_016699485.2	Primary Assembly	W			JAENSK010000532.1	Chromosome		NW_024095979.1	unlocalized-scaffold	102867		19	W_unloc5
+GCF_016699485.2	Primary Assembly	W			JAENSK010000533.1	Chromosome		NW_024095980.1	unlocalized-scaffold	75790		19	W_unloc6
+GCF_016699485.2	Primary Assembly	W			JAENSK010000534.1	Chromosome		NW_024095981.1	unlocalized-scaffold	59700		19	W_unloc7
+GCF_016699485.2	Primary Assembly	W			JAENSK010000538.1	Chromosome		NW_024095983.1	unlocalized-scaffold	184108		19	W_unloc9
+GCF_016699485.2	Primary Assembly	W			JAENSK010000539.1	Chromosome		NW_024095984.1	unlocalized-scaffold	107179		19	W_unloc10
+GCF_016699485.2	Primary Assembly	W			JAENSK010000540.1	Chromosome		NW_024095985.1	unlocalized-scaffold	70535		19	W_unloc11
+GCF_016699485.2	Primary Assembly	W			JAENSK010000541.1	Chromosome		NW_024095986.1	unlocalized-scaffold	83855		19	W_unloc12
+GCF_016699485.2	Primary Assembly	W			JAENSK010000542.1	Chromosome		NW_024095987.1	unlocalized-scaffold	62949		19	W_unloc13
+GCF_016699485.2	Primary Assembly	W			JAENSK010000543.1	Chromosome		NW_024095988.1	unlocalized-scaffold	72665		19	W_unloc14
+GCF_016699485.2	Primary Assembly	W			JAENSK010000544.1	Chromosome		NW_024095989.1	unlocalized-scaffold	68472		19	W_unloc15
+GCF_016699485.2	Primary Assembly	W			JAENSK010000545.1	Chromosome		NW_024095990.1	unlocalized-scaffold	43858		19	W_unloc16
+GCF_016699485.2	Primary Assembly	W			JAENSK010000546.1	Chromosome		NW_024095991.1	unlocalized-scaffold	65185		19	W_unloc17
+GCF_016699485.2	Primary Assembly	W			JAENSK010000547.1	Chromosome		NW_024095992.1	unlocalized-scaffold	121826		19	W_unloc18
+GCF_016699485.2	Primary Assembly	W			MU179266.1	Chromosome		NW_024095977.1	unlocalized-scaffold	179921		19	W_unloc3
+GCF_016699485.2	Primary Assembly	W			MU179267.1	Chromosome		NW_024095978.1	unlocalized-scaffold	63726		19	W_unloc4
+GCF_016699485.2	Primary Assembly	W			MU179268.1	Chromosome		NW_024095982.1	unlocalized-scaffold	454552		19	W_unloc8
+GCF_016699485.2	Primary Assembly	W			MU179269.1	Chromosome		NW_024095993.1	unlocalized-scaffold	157377		19	W_unloc19
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000565.1	Chromosome		NW_024095998.1	unplaced-scaffold	172381			scaffold_46
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000568.1	Chromosome		NW_024096000.1	unplaced-scaffold	48159			scaffold_48
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000571.1	Chromosome		NW_024096002.1	unplaced-scaffold	56807			scaffold_50
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000572.1	Chromosome		NW_024096003.1	unplaced-scaffold	56774			scaffold_51
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000573.1	Chromosome		NW_024096004.1	unplaced-scaffold	121294			scaffold_52
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000576.1	Chromosome		NW_024096006.1	unplaced-scaffold	46453			scaffold_54
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000579.1	Chromosome		NW_024096008.1	unplaced-scaffold	76213			scaffold_56
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000580.1	Chromosome		NW_024096009.1	unplaced-scaffold	102453			scaffold_57
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000581.1	Chromosome		NW_024096010.1	unplaced-scaffold	51278			scaffold_58
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000584.1	Chromosome		NW_024096012.1	unplaced-scaffold	132137			scaffold_60
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000585.1	Chromosome		NW_024096013.1	unplaced-scaffold	82910			scaffold_61
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000586.1	Chromosome		NW_024096014.1	unplaced-scaffold	45339			scaffold_62
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000587.1	Chromosome		NW_024096015.1	unplaced-scaffold	37135			scaffold_63
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000588.1	Chromosome		NW_024096016.1	unplaced-scaffold	28217			scaffold_64
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000589.1	Chromosome		NW_024096017.1	unplaced-scaffold	27687			scaffold_65
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000592.1	Chromosome		NW_024096019.1	unplaced-scaffold	43833			scaffold_67
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000593.1	Chromosome		NW_024096020.1	unplaced-scaffold	37288			scaffold_68
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000594.1	Chromosome		NW_024096021.1	unplaced-scaffold	36282			scaffold_69
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000595.1	Chromosome		NW_024096022.1	unplaced-scaffold	35597			scaffold_70
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000596.1	Chromosome		NW_024096023.1	unplaced-scaffold	71264			scaffold_71
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000597.1	Chromosome		NW_024096024.1	unplaced-scaffold	35936			scaffold_72
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000598.1	Chromosome		NW_024096025.1	unplaced-scaffold	75927			scaffold_73
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000599.1	Chromosome		NW_024096026.1	unplaced-scaffold	54073			scaffold_74
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000600.1	Chromosome		NW_024096027.1	unplaced-scaffold	77924			scaffold_75
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000601.1	Chromosome		NW_024096028.1	unplaced-scaffold	91947			scaffold_76
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000602.1	Chromosome		NW_024096029.1	unplaced-scaffold	99652			scaffold_77
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000603.1	Chromosome		NW_024096030.1	unplaced-scaffold	128647			scaffold_78
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000604.1	Chromosome		NW_024096031.1	unplaced-scaffold	73711			scaffold_79
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000605.1	Chromosome		NW_024096032.1	unplaced-scaffold	50063			scaffold_80
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000606.1	Chromosome		NW_024096033.1	unplaced-scaffold	95042			scaffold_81
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000607.1	Chromosome		NW_024096034.1	unplaced-scaffold	94594			scaffold_82
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000608.1	Chromosome		NW_024096035.1	unplaced-scaffold	77453			scaffold_83
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000609.1	Chromosome		NW_024096036.1	unplaced-scaffold	73086			scaffold_84
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000610.1	Chromosome		NW_024096037.1	unplaced-scaffold	66990			scaffold_85
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000611.1	Chromosome		NW_024096038.1	unplaced-scaffold	64784			scaffold_86
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000612.1	Chromosome		NW_024096039.1	unplaced-scaffold	61262			scaffold_87
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000613.1	Chromosome		NW_024096040.1	unplaced-scaffold	60993			scaffold_88
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000614.1	Chromosome		NW_024096041.1	unplaced-scaffold	60148			scaffold_89
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000615.1	Chromosome		NW_024096042.1	unplaced-scaffold	58765			scaffold_90
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000616.1	Chromosome		NW_024096043.1	unplaced-scaffold	57327			scaffold_91
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000617.1	Chromosome		NW_024096044.1	unplaced-scaffold	57283			scaffold_92
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000618.1	Chromosome		NW_024096045.1	unplaced-scaffold	55004			scaffold_93
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000619.1	Chromosome		NW_024096046.1	unplaced-scaffold	51700			scaffold_94
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000620.1	Chromosome		NW_024096047.1	unplaced-scaffold	49878			scaffold_95
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000621.1	Chromosome		NW_024096048.1	unplaced-scaffold	49896			scaffold_96
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000622.1	Chromosome		NW_024096049.1	unplaced-scaffold	49236			scaffold_97
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000623.1	Chromosome		NW_024096050.1	unplaced-scaffold	48223			scaffold_98
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000624.1	Chromosome		NW_024096051.1	unplaced-scaffold	48023			scaffold_99
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000625.1	Chromosome		NW_024096052.1	unplaced-scaffold	47344			scaffold_100
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000626.1	Chromosome		NW_024096053.1	unplaced-scaffold	47336			scaffold_101
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000627.1	Chromosome		NW_024096054.1	unplaced-scaffold	45670			scaffold_102
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000628.1	Chromosome		NW_024096055.1	unplaced-scaffold	44737			scaffold_103
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000629.1	Chromosome		NW_024096056.1	unplaced-scaffold	44416			scaffold_104
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000630.1	Chromosome		NW_024096057.1	unplaced-scaffold	44091			scaffold_105
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000631.1	Chromosome		NW_024096058.1	unplaced-scaffold	43804			scaffold_106
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000632.1	Chromosome		NW_024096059.1	unplaced-scaffold	43447			scaffold_107
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000633.1	Chromosome		NW_024096060.1	unplaced-scaffold	41869			scaffold_108
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000634.1	Chromosome		NW_024096061.1	unplaced-scaffold	41187			scaffold_109
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000635.1	Chromosome		NW_024096062.1	unplaced-scaffold	40905			scaffold_110
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000636.1	Chromosome		NW_024096063.1	unplaced-scaffold	40485			scaffold_111
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000637.1	Chromosome		NW_024096064.1	unplaced-scaffold	38749			scaffold_112
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000638.1	Chromosome		NW_024096065.1	unplaced-scaffold	38267			scaffold_113
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000639.1	Chromosome		NW_024096066.1	unplaced-scaffold	38098			scaffold_114
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000640.1	Chromosome		NW_024096067.1	unplaced-scaffold	37156			scaffold_115
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000641.1	Chromosome		NW_024096068.1	unplaced-scaffold	36049			scaffold_116
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000642.1	Chromosome		NW_024096069.1	unplaced-scaffold	36169			scaffold_117
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000643.1	Chromosome		NW_024096070.1	unplaced-scaffold	34455			scaffold_118
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000644.1	Chromosome		NW_024096071.1	unplaced-scaffold	32761			scaffold_119
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000645.1	Chromosome		NW_024096072.1	unplaced-scaffold	32129			scaffold_120
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000646.1	Chromosome		NW_024096073.1	unplaced-scaffold	29996			scaffold_121
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000647.1	Chromosome		NW_024096074.1	unplaced-scaffold	29845			scaffold_122
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000648.1	Chromosome		NW_024096075.1	unplaced-scaffold	29612			scaffold_123
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000649.1	Chromosome		NW_024096076.1	unplaced-scaffold	27008			scaffold_124
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000650.1	Chromosome		NW_024096077.1	unplaced-scaffold	26690			scaffold_125
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000651.1	Chromosome		NW_024096078.1	unplaced-scaffold	26680			scaffold_126
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000652.1	Chromosome		NW_024096079.1	unplaced-scaffold	25600			scaffold_127
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000653.1	Chromosome		NW_024096080.1	unplaced-scaffold	25356			scaffold_128
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000654.1	Chromosome		NW_024096081.1	unplaced-scaffold	24872			scaffold_129
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000655.1	Chromosome		NW_024096082.1	unplaced-scaffold	24165			scaffold_130
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000656.1	Chromosome		NW_024096083.1	unplaced-scaffold	23651			scaffold_131
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000657.1	Chromosome		NW_024096084.1	unplaced-scaffold	22200			scaffold_132
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000658.1	Chromosome		NW_024096085.1	unplaced-scaffold	20719			scaffold_133
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000659.1	Chromosome		NW_024096086.1	unplaced-scaffold	20625			scaffold_134
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000660.1	Chromosome		NW_024096087.1	unplaced-scaffold	20391			scaffold_135
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000661.1	Chromosome		NW_024096088.1	unplaced-scaffold	20277			scaffold_136
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000662.1	Chromosome		NW_024096089.1	unplaced-scaffold	17176			scaffold_137
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000663.1	Chromosome		NW_024096090.1	unplaced-scaffold	16695			scaffold_138
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000664.1	Chromosome		NW_024096091.1	unplaced-scaffold	15631			scaffold_139
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000665.1	Chromosome		NW_024096092.1	unplaced-scaffold	13796			scaffold_140
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000666.1	Chromosome		NW_024096093.1	unplaced-scaffold	9587			scaffold_141
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000667.1	Chromosome		NW_024096094.1	unplaced-scaffold	9004			scaffold_142
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000668.1	Chromosome		NW_024096095.1	unplaced-scaffold	5394			scaffold_143
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000669.1	Chromosome		NW_024096096.1	unplaced-scaffold	4183			scaffold_144
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000670.1	Chromosome		NW_024096097.1	unplaced-scaffold	3676			scaffold_145
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000671.1	Chromosome		NW_024096098.1	unplaced-scaffold	3291			scaffold_146
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000672.1	Chromosome		NW_024096099.1	unplaced-scaffold	2948			scaffold_147
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000673.1	Chromosome		NW_024096100.1	unplaced-scaffold	2415			scaffold_148
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000674.1	Chromosome		NW_024096101.1	unplaced-scaffold	2044			scaffold_149
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000675.1	Chromosome		NW_024096102.1	unplaced-scaffold	1713			scaffold_150
+GCF_016699485.2	Primary Assembly	Un			JAENSK010000676.1	Chromosome		NW_024096103.1	unplaced-scaffold	1437			scaffold_151
+GCF_016699485.2	Primary Assembly	Un			MU179270.1	Chromosome		NW_024095994.1	unplaced-scaffold	139882			scaffold_42
+GCF_016699485.2	Primary Assembly	Un			MU179271.1	Chromosome		NW_024095995.1	unplaced-scaffold	88251			scaffold_43
+GCF_016699485.2	Primary Assembly	Un			MU179272.1	Chromosome		NW_024095996.1	unplaced-scaffold	447004			scaffold_44
+GCF_016699485.2	Primary Assembly	Un			MU179273.1	Chromosome		NW_024095997.1	unplaced-scaffold	279492			scaffold_45
+GCF_016699485.2	Primary Assembly	Un			MU179274.1	Chromosome		NW_024095999.1	unplaced-scaffold	219221			scaffold_47
+GCF_016699485.2	Primary Assembly	Un			MU179275.1	Chromosome		NW_024096001.1	unplaced-scaffold	142519			scaffold_49
+GCF_016699485.2	Primary Assembly	Un			MU179276.1	Chromosome		NW_024096005.1	unplaced-scaffold	145889			scaffold_53
+GCF_016699485.2	Primary Assembly	Un			MU179277.1	Chromosome		NW_024096007.1	unplaced-scaffold	243023			scaffold_55
+GCF_016699485.2	Primary Assembly	Un			MU179278.1	Chromosome		NW_024096011.1	unplaced-scaffold	239848			scaffold_59
+GCF_016699485.2	Primary Assembly	Un			MU179279.1	Chromosome		NW_024096018.1	unplaced-scaffold	92785			scaffold_66
+GCF_016699485.2	non-nuclear	MT	7713	46	CM028585.1	Mitochondrion		NC_053523.1	assembled-molecule	16784			MT

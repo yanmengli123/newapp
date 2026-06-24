@@ -1,0 +1,465 @@
+Assembly Accession	Assembly-unit name	Chromosome name	GC Count	GC Percent	GenBank seq accession	Molecule type	Ordering	RefSeq seq accession	Role	Seq length	UCSC style name	Unlocalized Count	Sequence name
+GCF_000002315.6	Primary Assembly	1	83917099	40.5	CM000093.5	Chromosome		NC_006088.5	assembled-molecule	197608386	chr1	7	1
+GCF_000002315.6	Primary Assembly	2	62313399	40	CM000094.5	Chromosome		NC_006089.5	assembled-molecule	149682049	chr2		2
+GCF_000002315.6	Primary Assembly	3	45770691	40	CM000095.5	Chromosome		NC_006090.5	assembled-molecule	110838418	chr3	4	3
+GCF_000002315.6	Primary Assembly	4	37459808	40.5	CM000096.5	Chromosome		NC_006091.5	assembled-molecule	91315245	chr4		4
+GCF_000002315.6	Primary Assembly	5	25524285	41.5	CM000097.5	Chromosome		NC_006092.5	assembled-molecule	59809098	chr5		5
+GCF_000002315.6	Primary Assembly	6	15468931	42	CM000098.5	Chromosome		NC_006093.5	assembled-molecule	36374701	chr6	6	6
+GCF_000002315.6	Primary Assembly	7	15473554	41.5	CM000099.5	Chromosome		NC_006094.5	assembled-molecule	36742308	chr7		7
+GCF_000002315.6	Primary Assembly	8	12704525	42	CM000100.5	Chromosome		NC_006095.5	assembled-molecule	30219446	chr8		8
+GCF_000002315.6	Primary Assembly	9	10597502	43	CM000101.5	Chromosome		NC_006096.5	assembled-molecule	24153086	chr9	1	9
+GCF_000002315.6	Primary Assembly	10	9090813	43.5	CM000102.5	Chromosome		NC_006097.5	assembled-molecule	21119840	chr10		10
+GCF_000002315.6	Primary Assembly	11	8740294	42.5	CM000103.5	Chromosome		NC_006098.5	assembled-molecule	20200042	chr11		11
+GCF_000002315.6	Primary Assembly	12	9566456	43.5	CM000104.5	Chromosome		NC_006099.5	assembled-molecule	20387278	chr12		12
+GCF_000002315.6	Primary Assembly	13	8726862	45.5	CM000105.5	Chromosome		NC_006100.5	assembled-molecule	19166714	chr13	1	13
+GCF_000002315.6	Primary Assembly	14	7613480	46	CM000106.5	Chromosome		NC_006101.5	assembled-molecule	16219308	chr14	1	14
+GCF_000002315.6	Primary Assembly	15	6327268	45.5	CM000107.5	Chromosome		NC_006102.5	assembled-molecule	13062184	chr15	1	15
+GCF_000002315.6	Primary Assembly	16	1291819	54.5	CM000108.5	Chromosome		NC_006103.5	assembled-molecule	2844601	chr16	1	16
+GCF_000002315.6	Primary Assembly	17	5019635	48	CM000109.5	Chromosome		NC_006104.5	assembled-molecule	10762512	chr17		17
+GCF_000002315.6	Primary Assembly	18	5617137	47	CM000110.5	Chromosome		NC_006105.5	assembled-molecule	11373140	chr18		18
+GCF_000002315.6	Primary Assembly	19	4900785	47.5	CM000111.5	Chromosome		NC_006106.5	assembled-molecule	10323212	chr19	1	19
+GCF_000002315.6	Primary Assembly	20	6778399	46.5	CM000112.5	Chromosome		NC_006107.5	assembled-molecule	13897287	chr20		20
+GCF_000002315.6	Primary Assembly	21	3282802	48	CM000113.5	Chromosome		NC_006108.5	assembled-molecule	6844979	chr21		21
+GCF_000002315.6	Primary Assembly	22	2447799	49.5	CM000114.5	Chromosome		NC_006109.5	assembled-molecule	5459462	chr22	1	22
+GCF_000002315.6	Primary Assembly	23	3146664	51	CM000115.5	Chromosome		NC_006110.5	assembled-molecule	6149580	chr23	6	23
+GCF_000002315.6	Primary Assembly	24	3215116	49.5	CM000116.5	Chromosome		NC_006111.5	assembled-molecule	6491222	chr24		24
+GCF_000002315.6	Primary Assembly	25	2357676	57	CM000124.5	Chromosome		NC_006112.4	assembled-molecule	3980610	chr25	1	25
+GCF_000002315.6	Primary Assembly	26	3194762	53	CM000117.5	Chromosome		NC_006113.5	assembled-molecule	6055710	chr26		26
+GCF_000002315.6	Primary Assembly	27	4060384	50.5	CM000118.5	Chromosome		NC_006114.5	assembled-molecule	8080432	chr27		27
+GCF_000002315.6	Primary Assembly	28	2709467	53	CM000119.5	Chromosome		NC_006115.5	assembled-molecule	5116882	chr28	1	28
+GCF_000002315.6	Primary Assembly	30	1122581	58.5	CM003637.2	Chromosome		NC_028739.2	assembled-molecule	1818525	chr30		30
+GCF_000002315.6	Primary Assembly	31	3214136	52.5	CM003638.2	Chromosome		NC_028740.2	assembled-molecule	6153034	chr31	3	31
+GCF_000002315.6	Primary Assembly	32	449093	62	CM000120.4	Chromosome		NC_006119.4	assembled-molecule	725831	chr32		32
+GCF_000002315.6	Primary Assembly	33	4216150	54	CM000123.5	Chromosome		NC_008465.4	assembled-molecule	7821666	chr33	1	33
+GCF_000002315.6	Primary Assembly	W	4978278	45.5	CM000121.5	Chromosome		NC_006126.5	assembled-molecule	6813114	chrW	52	W
+GCF_000002315.6	Primary Assembly	Z	49962312	41	CM000122.5	Chromosome		NC_006127.5	assembled-molecule	82529921	chrZ	1	Z
+GCF_000002315.6	Primary Assembly	1			AADN05001166.1	Chromosome		NW_020109739.1	unlocalized-scaffold	4675	chr1_NW_020109739v1_random	7	CHR1_123_RANDOM
+GCF_000002315.6	Primary Assembly	1			AADN05001175.1	Chromosome		NW_020109740.1	unlocalized-scaffold	5861	chr1_NW_020109740v1_random	7	CHR1_132_RANDOM
+GCF_000002315.6	Primary Assembly	1			AADN05001177.1	Chromosome		NW_020109737.1	unlocalized-scaffold	1765	chr1_NW_020109737v1_random	7	CHR1_134_RANDOM
+GCF_000002315.6	Primary Assembly	1			AADN05001290.1	Chromosome		NW_020109742.1	unlocalized-scaffold	21511	chr1_NW_020109742v1_random	7	CHR1_247_RANDOM
+GCF_000002315.6	Primary Assembly	1			AADN05001373.1	Chromosome		NW_020109741.1	unlocalized-scaffold	10869	chr1_NW_020109741v1_random	7	CHR1_330_RANDOM
+GCF_000002315.6	Primary Assembly	1			AADN05001390.1	Chromosome		NW_020109743.1	unlocalized-scaffold	22289	chr1_NW_020109743v1_random	7	CHR1_347_RANDOM
+GCF_000002315.6	Primary Assembly	1			AADN05001403.1	Chromosome		NW_020109738.1	unlocalized-scaffold	2384	chr1_NW_020109738v1_random	7	CHR1_360_RANDOM
+GCF_000002315.6	Primary Assembly	3			AADN05001148.1	Chromosome		NW_020109745.1	unlocalized-scaffold	1783	chr3_NW_020109745v1_random	4	CHR3_105_RANDOM
+GCF_000002315.6	Primary Assembly	3			AADN05001218.1	Chromosome		NW_020109746.1	unlocalized-scaffold	6272	chr3_NW_020109746v1_random	4	CHR3_175_RANDOM
+GCF_000002315.6	Primary Assembly	3			AADN05001230.1	Chromosome		NW_020109747.1	unlocalized-scaffold	7246	chr3_NW_020109747v1_random	4	CHR3_187_RANDOM
+GCF_000002315.6	Primary Assembly	3			AADN05001551.1	Chromosome		NW_020109744.1	unlocalized-scaffold	509	chr3_NW_020109744v1_random	4	CHR3_496_RANDOM
+GCF_000002315.6	Primary Assembly	6			AADN05001169.1	Chromosome		NW_020109750.1	unlocalized-scaffold	5224	chr6_NW_020109750v1_random	6	CHR6_126_RANDOM
+GCF_000002315.6	Primary Assembly	6			AADN05001217.1	Chromosome		NW_020109753.1	unlocalized-scaffold	18845	chr6_NW_020109753v1_random	6	CHR6_174_RANDOM
+GCF_000002315.6	Primary Assembly	6			AADN05001228.1	Chromosome		NW_020109751.1	unlocalized-scaffold	10724	chr6_NW_020109751v1_random	6	CHR6_185_RANDOM
+GCF_000002315.6	Primary Assembly	6			AADN05001229.1	Chromosome		NW_020109752.1	unlocalized-scaffold	10928	chr6_NW_020109752v1_random	6	CHR6_186_RANDOM
+GCF_000002315.6	Primary Assembly	6			AADN05001277.1	Chromosome		NW_020109748.1	unlocalized-scaffold	4087	chr6_NW_020109748v1_random	6	CHR6_234_RANDOM
+GCF_000002315.6	Primary Assembly	6			AADN05001479.1	Chromosome		NW_020109749.1	unlocalized-scaffold	4448	chr6_NW_020109749v1_random	6	CHR6_436_RANDOM
+GCF_000002315.6	Primary Assembly	9			AADN05000525.1	Chromosome		NW_020109754.1	unlocalized-scaffold	27963	chr9_NW_020109754v1_random	1	CHR9_48_RANDOM
+GCF_000002315.6	Primary Assembly	13			AADN05001554.1	Chromosome		NW_020109755.1	unlocalized-scaffold	2157	chr13_NW_020109755v1_random	1	CHR13_499_RANDOM
+GCF_000002315.6	Primary Assembly	14			AADN05001158.1	Chromosome		NW_020109756.1	unlocalized-scaffold	765	chr14_NW_020109756v1_random	1	CHR14_115_RANDOM
+GCF_000002315.6	Primary Assembly	15			AADN05001270.1	Chromosome		NW_020109757.1	unlocalized-scaffold	2034	chr15_NW_020109757v1_random	1	CHR15_227_RANDOM
+GCF_000002315.6	Primary Assembly	16			KZ626819.1	Chromosome		NW_020109758.1	unlocalized-scaffold	149503	chr16_NW_020109758v1_random	1	CHR16_MHCY_513_RANDOM
+GCF_000002315.6	Primary Assembly	19			AADN05001539.1	Chromosome		NW_020109759.1	unlocalized-scaffold	1131	chr19_NW_020109759v1_random	1	CHR19_484_RANDOM
+GCF_000002315.6	Primary Assembly	22			AADN05001282.1	Chromosome		NW_020109760.1	unlocalized-scaffold	918	chr22_NW_020109760v1_random	1	CHR22_239_RANDOM
+GCF_000002315.6	Primary Assembly	23			AADN05001160.1	Chromosome		NW_020109766.1	unlocalized-scaffold	18922	chr23_NW_020109766v1_random	6	CHR23_117_RANDOM
+GCF_000002315.6	Primary Assembly	23			AADN05001267.1	Chromosome		NW_020109765.1	unlocalized-scaffold	16157	chr23_NW_020109765v1_random	6	CHR23_224_RANDOM
+GCF_000002315.6	Primary Assembly	23			AADN05001389.1	Chromosome		NW_020109764.1	unlocalized-scaffold	15003	chr23_NW_020109764v1_random	6	CHR23_346_RANDOM
+GCF_000002315.6	Primary Assembly	23			AADN05001507.1	Chromosome		NW_020109763.1	unlocalized-scaffold	1662	chr23_NW_020109763v1_random	6	CHR23_464_RANDOM
+GCF_000002315.6	Primary Assembly	23			AADN05001548.1	Chromosome		NW_020109762.1	unlocalized-scaffold	1264	chr23_NW_020109762v1_random	6	CHR23_493_RANDOM
+GCF_000002315.6	Primary Assembly	23			AADN05001564.1	Chromosome		NW_020109761.1	unlocalized-scaffold	322	chr23_NW_020109761v1_random	6	CHR23_509_RANDOM
+GCF_000002315.6	Primary Assembly	25			AADN05001297.1	Chromosome		NW_020109767.1	unlocalized-scaffold	1884	chr25_NW_020109767v1_random	1	CHR25_254_RANDOM
+GCF_000002315.6	Primary Assembly	28			AADN05001153.1	Chromosome		NW_020109768.1	unlocalized-scaffold	1519	chr28_NW_020109768v1_random	1	CHR28_110_RANDOM
+GCF_000002315.6	Primary Assembly	31			AADN05001204.1	Chromosome		NW_020109769.1	unlocalized-scaffold	9481	chr31_NW_020109769v1_random	3	CHR31_161_RANDOM
+GCF_000002315.6	Primary Assembly	31			AADN05001362.1	Chromosome		NW_020109771.1	unlocalized-scaffold	11340	chr31_NW_020109771v1_random	3	CHR31_319_RANDOM
+GCF_000002315.6	Primary Assembly	31			AADN05001406.1	Chromosome		NW_020109770.1	unlocalized-scaffold	11305	chr31_NW_020109770v1_random	3	CHR31_363_RANDOM
+GCF_000002315.6	Primary Assembly	33			AADN05001549.1	Chromosome		NW_020109772.1	unlocalized-scaffold	182	chr33_NW_020109772v1_random	1	CHR33_494_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001154.1	Chromosome		NW_020109776.1	unlocalized-scaffold	2003	chrW_NW_020109776v1_random	52	CHRW_111_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001185.1	Chromosome		NW_020109805.1	unlocalized-scaffold	14047	chrW_NW_020109805v1_random	52	CHRW_142_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001192.1	Chromosome		NW_020109791.1	unlocalized-scaffold	9034	chrW_NW_020109791v1_random	52	CHRW_149_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001196.1	Chromosome		NW_020109777.1	unlocalized-scaffold	2092	chrW_NW_020109777v1_random	52	CHRW_153_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001237.1	Chromosome		NW_020109812.1	unlocalized-scaffold	17224	chrW_NW_020109812v1_random	52	CHRW_194_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001238.1	Chromosome		NW_020109800.1	unlocalized-scaffold	11068	chrW_NW_020109800v1_random	52	CHRW_195_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001265.1	Chromosome		NW_020109796.1	unlocalized-scaffold	10224	chrW_NW_020109796v1_random	52	CHRW_222_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001298.1	Chromosome		NW_020109778.1	unlocalized-scaffold	3094	chrW_NW_020109778v1_random	52	CHRW_255_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001370.1	Chromosome		NW_020109826.1	unlocalized-scaffold	28212	chrW_NW_020109826v1_random	52	CHRW_327_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001410.1	Chromosome		NW_020109804.1	unlocalized-scaffold	13829	chrW_NW_020109804v1_random	52	CHRW_367_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001412.1	Chromosome		NW_020109814.1	unlocalized-scaffold	17442	chrW_NW_020109814v1_random	52	CHRW_369_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001413.1	Chromosome		NW_020109782.1	unlocalized-scaffold	6929	chrW_NW_020109782v1_random	52	CHRW_370_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001423.1	Chromosome		NW_020109823.1	unlocalized-scaffold	23209	chrW_NW_020109823v1_random	52	CHRW_380_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001424.1	Chromosome		NW_020109822.1	unlocalized-scaffold	22964	chrW_NW_020109822v1_random	52	CHRW_381_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001425.1	Chromosome		NW_020109819.1	unlocalized-scaffold	19721	chrW_NW_020109819v1_random	52	CHRW_382_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001426.1	Chromosome		NW_020109793.1	unlocalized-scaffold	9607	chrW_NW_020109793v1_random	52	CHRW_383_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001427.1	Chromosome		NW_020109790.1	unlocalized-scaffold	8909	chrW_NW_020109790v1_random	52	CHRW_384_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001428.1	Chromosome		NW_020109781.1	unlocalized-scaffold	6830	chrW_NW_020109781v1_random	52	CHRW_385_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001429.1	Chromosome		NW_020109785.1	unlocalized-scaffold	7878	chrW_NW_020109785v1_random	52	CHRW_386_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001431.1	Chromosome		NW_020109802.1	unlocalized-scaffold	12728	chrW_NW_020109802v1_random	52	CHRW_388_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001433.1	Chromosome		NW_020109820.1	unlocalized-scaffold	19850	chrW_NW_020109820v1_random	52	CHRW_390_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001434.1	Chromosome		NW_020109817.1	unlocalized-scaffold	19204	chrW_NW_020109817v1_random	52	CHRW_391_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001435.1	Chromosome		NW_020109815.1	unlocalized-scaffold	18028	chrW_NW_020109815v1_random	52	CHRW_392_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001436.1	Chromosome		NW_020109810.1	unlocalized-scaffold	16320	chrW_NW_020109810v1_random	52	CHRW_393_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001438.1	Chromosome		NW_020109808.1	unlocalized-scaffold	15438	chrW_NW_020109808v1_random	52	CHRW_395_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001442.1	Chromosome		NW_020109801.1	unlocalized-scaffold	12127	chrW_NW_020109801v1_random	52	CHRW_399_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001445.1	Chromosome		NW_020109795.1	unlocalized-scaffold	10162	chrW_NW_020109795v1_random	52	CHRW_402_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001449.1	Chromosome		NW_020109789.1	unlocalized-scaffold	8559	chrW_NW_020109789v1_random	52	CHRW_406_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001450.1	Chromosome		NW_020109786.1	unlocalized-scaffold	8166	chrW_NW_020109786v1_random	52	CHRW_407_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001451.1	Chromosome		NW_020109784.1	unlocalized-scaffold	7765	chrW_NW_020109784v1_random	52	CHRW_408_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001452.1	Chromosome		NW_020109798.1	unlocalized-scaffold	10551	chrW_NW_020109798v1_random	52	CHRW_409_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001453.1	Chromosome		NW_020109797.1	unlocalized-scaffold	10371	chrW_NW_020109797v1_random	52	CHRW_410_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001457.1	Chromosome		NW_020109787.1	unlocalized-scaffold	8267	chrW_NW_020109787v1_random	52	CHRW_414_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001458.1	Chromosome		NW_020109779.1	unlocalized-scaffold	5587	chrW_NW_020109779v1_random	52	CHRW_415_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001459.1	Chromosome		NW_020109806.1	unlocalized-scaffold	14330	chrW_NW_020109806v1_random	52	CHRW_416_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001461.1	Chromosome		NW_020109818.1	unlocalized-scaffold	19471	chrW_NW_020109818v1_random	52	CHRW_418_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001462.1	Chromosome		NW_020109807.1	unlocalized-scaffold	14810	chrW_NW_020109807v1_random	52	CHRW_419_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001466.1	Chromosome		NW_020109825.1	unlocalized-scaffold	27808	chrW_NW_020109825v1_random	52	CHRW_423_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001467.1	Chromosome		NW_020109821.1	unlocalized-scaffold	19928	chrW_NW_020109821v1_random	52	CHRW_424_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001468.1	Chromosome		NW_020109813.1	unlocalized-scaffold	17321	chrW_NW_020109813v1_random	52	CHRW_425_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001469.1	Chromosome		NW_020109809.1	unlocalized-scaffold	16043	chrW_NW_020109809v1_random	52	CHRW_426_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001470.1	Chromosome		NW_020109799.1	unlocalized-scaffold	10871	chrW_NW_020109799v1_random	52	CHRW_427_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001471.1	Chromosome		NW_020109788.1	unlocalized-scaffold	8275	chrW_NW_020109788v1_random	52	CHRW_428_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001472.1	Chromosome		NW_020109775.1	unlocalized-scaffold	1568	chrW_NW_020109775v1_random	52	CHRW_429_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001480.1	Chromosome		NW_020109803.1	unlocalized-scaffold	13691	chrW_NW_020109803v1_random	52	CHRW_437_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001482.1	Chromosome		NW_020109816.1	unlocalized-scaffold	19032	chrW_NW_020109816v1_random	52	CHRW_439_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001499.1	Chromosome		NW_020109794.1	unlocalized-scaffold	10106	chrW_NW_020109794v1_random	52	CHRW_456_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001500.1	Chromosome		NW_020109780.1	unlocalized-scaffold	6668	chrW_NW_020109780v1_random	52	CHRW_457_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001501.1	Chromosome		NW_020109783.1	unlocalized-scaffold	7074	chrW_NW_020109783v1_random	52	CHRW_458_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001506.1	Chromosome		NW_020109811.1	unlocalized-scaffold	17217	chrW_NW_020109811v1_random	52	CHRW_463_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001518.1	Chromosome		NW_020109824.1	unlocalized-scaffold	24105	chrW_NW_020109824v1_random	52	CHRW_475_RANDOM
+GCF_000002315.6	Primary Assembly	W			AADN05001523.1	Chromosome		NW_020109792.1	unlocalized-scaffold	9182	chrW_NW_020109792v1_random	52	CHRW_480_RANDOM
+GCF_000002315.6	Primary Assembly	Z			AADN05001439.1	Chromosome		NW_020109829.1	unlocalized-scaffold	15587	chrZ_NW_020109829v1_random	1	CHRZ_396_RANDOM
+GCF_000002315.6	Primary Assembly	Un			AADN05000202.1	Chromosome		NW_020109839.1	unplaced-scaffold	33030	chrUn_NW_020109839v1		CHRUN_23
+GCF_000002315.6	Primary Assembly	Un			AADN05000232.1	Chromosome		NW_020110168.1	unplaced-scaffold	7419	chrUn_NW_020110168v1		CHRUN_25
+GCF_000002315.6	Primary Assembly	Un			AADN05000531.1	Chromosome		NW_020109833.1	unplaced-scaffold	28243	chrUn_NW_020109833v1		CHRUN_51
+GCF_000002315.6	Primary Assembly	Un			AADN05000623.1	Chromosome		NW_020109887.1	unplaced-scaffold	2149	chrUn_NW_020109887v1		CHRUN_60
+GCF_000002315.6	Primary Assembly	Un			AADN05001145.1	Chromosome		NW_020110117.1	unplaced-scaffold	20717	chrUn_NW_020110117v1		CHRUN_102
+GCF_000002315.6	Primary Assembly	Un			AADN05001146.1	Chromosome		NW_020110056.1	unplaced-scaffold	12537	chrUn_NW_020110056v1		CHRUN_103
+GCF_000002315.6	Primary Assembly	Un			AADN05001147.1	Chromosome		NW_020109854.1	unplaced-scaffold	644	chrUn_NW_020109854v1		CHRUN_104
+GCF_000002315.6	Primary Assembly	Un			AADN05001149.1	Chromosome		NW_020109971.1	unplaced-scaffold	6586	chrUn_NW_020109971v1		CHRUN_106
+GCF_000002315.6	Primary Assembly	Un			AADN05001150.1	Chromosome		NW_020109897.1	unplaced-scaffold	2566	chrUn_NW_020109897v1		CHRUN_107
+GCF_000002315.6	Primary Assembly	Un			AADN05001151.1	Chromosome		NW_020110030.1	unplaced-scaffold	10010	chrUn_NW_020110030v1		CHRUN_108
+GCF_000002315.6	Primary Assembly	Un			AADN05001152.1	Chromosome		NW_020109873.1	unplaced-scaffold	1643	chrUn_NW_020109873v1		CHRUN_109
+GCF_000002315.6	Primary Assembly	Un			AADN05001155.1	Chromosome		NW_020109927.1	unplaced-scaffold	3973	chrUn_NW_020109927v1		CHRUN_112
+GCF_000002315.6	Primary Assembly	Un			AADN05001156.1	Chromosome		NW_020109931.1	unplaced-scaffold	4198	chrUn_NW_020109931v1		CHRUN_113
+GCF_000002315.6	Primary Assembly	Un			AADN05001157.1	Chromosome		NW_020110002.1	unplaced-scaffold	8247	chrUn_NW_020110002v1		CHRUN_114
+GCF_000002315.6	Primary Assembly	Un			AADN05001159.1	Chromosome		NW_020109852.1	unplaced-scaffold	597	chrUn_NW_020109852v1		CHRUN_116
+GCF_000002315.6	Primary Assembly	Un			AADN05001161.1	Chromosome		NW_020110019.1	unplaced-scaffold	9568	chrUn_NW_020110019v1		CHRUN_118
+GCF_000002315.6	Primary Assembly	Un			AADN05001162.1	Chromosome		NW_020109889.1	unplaced-scaffold	2260	chrUn_NW_020109889v1		CHRUN_119
+GCF_000002315.6	Primary Assembly	Un			AADN05001163.1	Chromosome		NW_020109883.1	unplaced-scaffold	1935	chrUn_NW_020109883v1		CHRUN_120
+GCF_000002315.6	Primary Assembly	Un			AADN05001164.1	Chromosome		NW_020109911.1	unplaced-scaffold	2991	chrUn_NW_020109911v1		CHRUN_121
+GCF_000002315.6	Primary Assembly	Un			AADN05001165.1	Chromosome		NW_020110078.1	unplaced-scaffold	14494	chrUn_NW_020110078v1		CHRUN_122
+GCF_000002315.6	Primary Assembly	Un			AADN05001167.1	Chromosome		NW_020110074.1	unplaced-scaffold	14086	chrUn_NW_020110074v1		CHRUN_124
+GCF_000002315.6	Primary Assembly	Un			AADN05001168.1	Chromosome		NW_020109969.1	unplaced-scaffold	6539	chrUn_NW_020109969v1		CHRUN_125
+GCF_000002315.6	Primary Assembly	Un			AADN05001170.1	Chromosome		NW_020110073.1	unplaced-scaffold	14131	chrUn_NW_020110073v1		CHRUN_127
+GCF_000002315.6	Primary Assembly	Un			AADN05001171.1	Chromosome		NW_020110017.1	unplaced-scaffold	9308	chrUn_NW_020110017v1		CHRUN_128
+GCF_000002315.6	Primary Assembly	Un			AADN05001172.1	Chromosome		NW_020110126.1	unplaced-scaffold	21751	chrUn_NW_020110126v1		CHRUN_129
+GCF_000002315.6	Primary Assembly	Un			AADN05001173.1	Chromosome		NW_020109977.1	unplaced-scaffold	6824	chrUn_NW_020109977v1		CHRUN_130
+GCF_000002315.6	Primary Assembly	Un			AADN05001174.1	Chromosome		NW_020109953.1	unplaced-scaffold	5637	chrUn_NW_020109953v1		CHRUN_131
+GCF_000002315.6	Primary Assembly	Un			AADN05001176.1	Chromosome		NW_020109913.1	unplaced-scaffold	3346	chrUn_NW_020109913v1		CHRUN_133
+GCF_000002315.6	Primary Assembly	Un			AADN05001178.1	Chromosome		NW_020109890.1	unplaced-scaffold	2214	chrUn_NW_020109890v1		CHRUN_135
+GCF_000002315.6	Primary Assembly	Un			AADN05001179.1	Chromosome		NW_020110025.1	unplaced-scaffold	9858	chrUn_NW_020110025v1		CHRUN_136
+GCF_000002315.6	Primary Assembly	Un			AADN05001180.1	Chromosome		NW_020109923.1	unplaced-scaffold	3680	chrUn_NW_020109923v1		CHRUN_137
+GCF_000002315.6	Primary Assembly	Un			AADN05001181.1	Chromosome		NW_020109853.1	unplaced-scaffold	676	chrUn_NW_020109853v1		CHRUN_138
+GCF_000002315.6	Primary Assembly	Un			AADN05001182.1	Chromosome		NW_020109999.1	unplaced-scaffold	8242	chrUn_NW_020109999v1		CHRUN_139
+GCF_000002315.6	Primary Assembly	Un			AADN05001183.1	Chromosome		NW_020109955.1	unplaced-scaffold	5685	chrUn_NW_020109955v1		CHRUN_140
+GCF_000002315.6	Primary Assembly	Un			AADN05001184.1	Chromosome		NW_020109929.1	unplaced-scaffold	4040	chrUn_NW_020109929v1		CHRUN_141
+GCF_000002315.6	Primary Assembly	Un			AADN05001186.1	Chromosome		NW_020109908.1	unplaced-scaffold	2902	chrUn_NW_020109908v1		CHRUN_143
+GCF_000002315.6	Primary Assembly	Un			AADN05001187.1	Chromosome		NW_020109843.1	unplaced-scaffold	33802	chrUn_NW_020109843v1		CHRUN_144
+GCF_000002315.6	Primary Assembly	Un			AADN05001188.1	Chromosome		NW_020110149.1	unplaced-scaffold	34291	chrUn_NW_020110149v1		CHRUN_145
+GCF_000002315.6	Primary Assembly	Un			AADN05001189.1	Chromosome		NW_020109968.1	unplaced-scaffold	6349	chrUn_NW_020109968v1		CHRUN_146
+GCF_000002315.6	Primary Assembly	Un			AADN05001190.1	Chromosome		NW_020109885.1	unplaced-scaffold	2071	chrUn_NW_020109885v1		CHRUN_147
+GCF_000002315.6	Primary Assembly	Un			AADN05001191.1	Chromosome		NW_020110081.1	unplaced-scaffold	14773	chrUn_NW_020110081v1		CHRUN_148
+GCF_000002315.6	Primary Assembly	Un			AADN05001193.1	Chromosome		NW_020109836.1	unplaced-scaffold	30225	chrUn_NW_020109836v1		CHRUN_150
+GCF_000002315.6	Primary Assembly	Un			AADN05001194.1	Chromosome		NW_020109922.1	unplaced-scaffold	3647	chrUn_NW_020109922v1		CHRUN_151
+GCF_000002315.6	Primary Assembly	Un			AADN05001195.1	Chromosome		NW_020110065.1	unplaced-scaffold	13513	chrUn_NW_020110065v1		CHRUN_152
+GCF_000002315.6	Primary Assembly	Un			AADN05001197.1	Chromosome		NW_020110112.1	unplaced-scaffold	18989	chrUn_NW_020110112v1		CHRUN_154
+GCF_000002315.6	Primary Assembly	Un			AADN05001198.1	Chromosome		NW_020110008.1	unplaced-scaffold	8722	chrUn_NW_020110008v1		CHRUN_155
+GCF_000002315.6	Primary Assembly	Un			AADN05001199.1	Chromosome		NW_020110094.1	unplaced-scaffold	15929	chrUn_NW_020110094v1		CHRUN_156
+GCF_000002315.6	Primary Assembly	Un			AADN05001200.1	Chromosome		NW_020110058.1	unplaced-scaffold	12721	chrUn_NW_020110058v1		CHRUN_157
+GCF_000002315.6	Primary Assembly	Un			AADN05001201.1	Chromosome		NW_020110066.1	unplaced-scaffold	13240	chrUn_NW_020110066v1		CHRUN_158
+GCF_000002315.6	Primary Assembly	Un			AADN05001202.1	Chromosome		NW_020110109.1	unplaced-scaffold	18705	chrUn_NW_020110109v1		CHRUN_159
+GCF_000002315.6	Primary Assembly	Un			AADN05001203.1	Chromosome		NW_020110068.1	unplaced-scaffold	13599	chrUn_NW_020110068v1		CHRUN_160
+GCF_000002315.6	Primary Assembly	Un			AADN05001205.1	Chromosome		NW_020110088.1	unplaced-scaffold	15387	chrUn_NW_020110088v1		CHRUN_162
+GCF_000002315.6	Primary Assembly	Un			AADN05001206.1	Chromosome		NW_020109991.1	unplaced-scaffold	7923	chrUn_NW_020109991v1		CHRUN_163
+GCF_000002315.6	Primary Assembly	Un			AADN05001207.1	Chromosome		NW_020109937.1	unplaced-scaffold	4511	chrUn_NW_020109937v1		CHRUN_164
+GCF_000002315.6	Primary Assembly	Un			AADN05001208.1	Chromosome		NW_020109920.1	unplaced-scaffold	3581	chrUn_NW_020109920v1		CHRUN_165
+GCF_000002315.6	Primary Assembly	Un			AADN05001209.1	Chromosome		NW_020109932.1	unplaced-scaffold	4154	chrUn_NW_020109932v1		CHRUN_166
+GCF_000002315.6	Primary Assembly	Un			AADN05001210.1	Chromosome		NW_020109851.1	unplaced-scaffold	623	chrUn_NW_020109851v1		CHRUN_167
+GCF_000002315.6	Primary Assembly	Un			AADN05001211.1	Chromosome		NW_020109978.1	unplaced-scaffold	6814	chrUn_NW_020109978v1		CHRUN_168
+GCF_000002315.6	Primary Assembly	Un			AADN05001212.1	Chromosome		NW_020109949.1	unplaced-scaffold	5230	chrUn_NW_020109949v1		CHRUN_169
+GCF_000002315.6	Primary Assembly	Un			AADN05001213.1	Chromosome		NW_020109863.1	unplaced-scaffold	1115	chrUn_NW_020109863v1		CHRUN_170
+GCF_000002315.6	Primary Assembly	Un			AADN05001214.1	Chromosome		NW_020110090.1	unplaced-scaffold	15492	chrUn_NW_020110090v1		CHRUN_171
+GCF_000002315.6	Primary Assembly	Un			AADN05001215.1	Chromosome		NW_020109892.1	unplaced-scaffold	2262	chrUn_NW_020109892v1		CHRUN_172
+GCF_000002315.6	Primary Assembly	Un			AADN05001216.1	Chromosome		NW_020109982.1	unplaced-scaffold	6885	chrUn_NW_020109982v1		CHRUN_173
+GCF_000002315.6	Primary Assembly	Un			AADN05001219.1	Chromosome		NW_020110145.1	unplaced-scaffold	26595	chrUn_NW_020110145v1		CHRUN_176
+GCF_000002315.6	Primary Assembly	Un			AADN05001220.1	Chromosome		NW_020110147.1	unplaced-scaffold	26960	chrUn_NW_020110147v1		CHRUN_177
+GCF_000002315.6	Primary Assembly	Un			AADN05001221.1	Chromosome		NW_020110134.1	unplaced-scaffold	23766	chrUn_NW_020110134v1		CHRUN_178
+GCF_000002315.6	Primary Assembly	Un			AADN05001222.1	Chromosome		NW_020110127.1	unplaced-scaffold	22621	chrUn_NW_020110127v1		CHRUN_179
+GCF_000002315.6	Primary Assembly	Un			AADN05001223.1	Chromosome		NW_020110121.1	unplaced-scaffold	21586	chrUn_NW_020110121v1		CHRUN_180
+GCF_000002315.6	Primary Assembly	Un			AADN05001224.1	Chromosome		NW_020110122.1	unplaced-scaffold	21580	chrUn_NW_020110122v1		CHRUN_181
+GCF_000002315.6	Primary Assembly	Un			AADN05001225.1	Chromosome		NW_020110099.1	unplaced-scaffold	16464	chrUn_NW_020110099v1		CHRUN_182
+GCF_000002315.6	Primary Assembly	Un			AADN05001226.1	Chromosome		NW_020110085.1	unplaced-scaffold	15167	chrUn_NW_020110085v1		CHRUN_183
+GCF_000002315.6	Primary Assembly	Un			AADN05001227.1	Chromosome		NW_020110118.1	unplaced-scaffold	20496	chrUn_NW_020110118v1		CHRUN_184
+GCF_000002315.6	Primary Assembly	Un			AADN05001231.1	Chromosome		NW_020109957.1	unplaced-scaffold	5791	chrUn_NW_020109957v1		CHRUN_188
+GCF_000002315.6	Primary Assembly	Un			AADN05001232.1	Chromosome		NW_020110063.1	unplaced-scaffold	13224	chrUn_NW_020110063v1		CHRUN_189
+GCF_000002315.6	Primary Assembly	Un			AADN05001233.1	Chromosome		NW_020110087.1	unplaced-scaffold	15417	chrUn_NW_020110087v1		CHRUN_190
+GCF_000002315.6	Primary Assembly	Un			AADN05001234.1	Chromosome		NW_020110086.1	unplaced-scaffold	15134	chrUn_NW_020110086v1		CHRUN_191
+GCF_000002315.6	Primary Assembly	Un			AADN05001235.1	Chromosome		NW_020110150.1	unplaced-scaffold	42067	chrUn_NW_020110150v1		CHRUN_192
+GCF_000002315.6	Primary Assembly	Un			AADN05001236.1	Chromosome		NW_020109916.1	unplaced-scaffold	3436	chrUn_NW_020109916v1		CHRUN_193
+GCF_000002315.6	Primary Assembly	Un			AADN05001239.1	Chromosome		NW_020109941.1	unplaced-scaffold	4685	chrUn_NW_020109941v1		CHRUN_196
+GCF_000002315.6	Primary Assembly	Un			AADN05001240.1	Chromosome		NW_020109831.1	unplaced-scaffold	27130	chrUn_NW_020109831v1		CHRUN_197
+GCF_000002315.6	Primary Assembly	Un			AADN05001241.1	Chromosome		NW_020110136.1	unplaced-scaffold	24179	chrUn_NW_020110136v1		CHRUN_198
+GCF_000002315.6	Primary Assembly	Un			AADN05001242.1	Chromosome		NW_020110014.1	unplaced-scaffold	8915	chrUn_NW_020110014v1		CHRUN_199
+GCF_000002315.6	Primary Assembly	Un			AADN05001243.1	Chromosome		NW_020109963.1	unplaced-scaffold	6269	chrUn_NW_020109963v1		CHRUN_200
+GCF_000002315.6	Primary Assembly	Un			AADN05001244.1	Chromosome		NW_020109867.1	unplaced-scaffold	1381	chrUn_NW_020109867v1		CHRUN_201
+GCF_000002315.6	Primary Assembly	Un			AADN05001245.1	Chromosome		NW_020110045.1	unplaced-scaffold	11891	chrUn_NW_020110045v1		CHRUN_202
+GCF_000002315.6	Primary Assembly	Un			AADN05001246.1	Chromosome		NW_020109865.1	unplaced-scaffold	1173	chrUn_NW_020109865v1		CHRUN_203
+GCF_000002315.6	Primary Assembly	Un			AADN05001247.1	Chromosome		NW_020109940.1	unplaced-scaffold	4617	chrUn_NW_020109940v1		CHRUN_204
+GCF_000002315.6	Primary Assembly	Un			AADN05001248.1	Chromosome		NW_020110000.1	unplaced-scaffold	8189	chrUn_NW_020110000v1		CHRUN_205
+GCF_000002315.6	Primary Assembly	Un			AADN05001249.1	Chromosome		NW_020109972.1	unplaced-scaffold	6564	chrUn_NW_020109972v1		CHRUN_206
+GCF_000002315.6	Primary Assembly	Un			AADN05001250.1	Chromosome		NW_020110115.1	unplaced-scaffold	20494	chrUn_NW_020110115v1		CHRUN_207
+GCF_000002315.6	Primary Assembly	Un			AADN05001251.1	Chromosome		NW_020110011.1	unplaced-scaffold	8913	chrUn_NW_020110011v1		CHRUN_208
+GCF_000002315.6	Primary Assembly	Un			AADN05001252.1	Chromosome		NW_020109909.1	unplaced-scaffold	2979	chrUn_NW_020109909v1		CHRUN_209
+GCF_000002315.6	Primary Assembly	Un			AADN05001253.1	Chromosome		NW_020109868.1	unplaced-scaffold	1367	chrUn_NW_020109868v1		CHRUN_210
+GCF_000002315.6	Primary Assembly	Un			AADN05001254.1	Chromosome		NW_020109996.1	unplaced-scaffold	8110	chrUn_NW_020109996v1		CHRUN_211
+GCF_000002315.6	Primary Assembly	Un			AADN05001255.1	Chromosome		NW_020110067.1	unplaced-scaffold	13671	chrUn_NW_020110067v1		CHRUN_212
+GCF_000002315.6	Primary Assembly	Un			AADN05001256.1	Chromosome		NW_020110055.1	unplaced-scaffold	12562	chrUn_NW_020110055v1		CHRUN_213
+GCF_000002315.6	Primary Assembly	Un			AADN05001257.1	Chromosome		NW_020110036.1	unplaced-scaffold	10816	chrUn_NW_020110036v1		CHRUN_214
+GCF_000002315.6	Primary Assembly	Un			AADN05001258.1	Chromosome		NW_020110020.1	unplaced-scaffold	9469	chrUn_NW_020110020v1		CHRUN_215
+GCF_000002315.6	Primary Assembly	Un			AADN05001259.1	Chromosome		NW_020109992.1	unplaced-scaffold	7918	chrUn_NW_020109992v1		CHRUN_216
+GCF_000002315.6	Primary Assembly	Un			AADN05001260.1	Chromosome		NW_020109933.1	unplaced-scaffold	4245	chrUn_NW_020109933v1		CHRUN_217
+GCF_000002315.6	Primary Assembly	Un			AADN05001261.1	Chromosome		NW_020109903.1	unplaced-scaffold	2758	chrUn_NW_020109903v1		CHRUN_218
+GCF_000002315.6	Primary Assembly	Un			AADN05001262.1	Chromosome		NW_020109936.1	unplaced-scaffold	4266	chrUn_NW_020109936v1		CHRUN_219
+GCF_000002315.6	Primary Assembly	Un			AADN05001263.1	Chromosome		NW_020109944.1	unplaced-scaffold	4730	chrUn_NW_020109944v1		CHRUN_220
+GCF_000002315.6	Primary Assembly	Un			AADN05001264.1	Chromosome		NW_020110102.1	unplaced-scaffold	16505	chrUn_NW_020110102v1		CHRUN_221
+GCF_000002315.6	Primary Assembly	Un			AADN05001266.1	Chromosome		NW_020109905.1	unplaced-scaffold	2898	chrUn_NW_020109905v1		CHRUN_223
+GCF_000002315.6	Primary Assembly	Un			AADN05001268.1	Chromosome		NW_020109918.1	unplaced-scaffold	3516	chrUn_NW_020109918v1		CHRUN_225
+GCF_000002315.6	Primary Assembly	Un			AADN05001269.1	Chromosome		NW_020109906.1	unplaced-scaffold	2883	chrUn_NW_020109906v1		CHRUN_226
+GCF_000002315.6	Primary Assembly	Un			AADN05001271.1	Chromosome		NW_020110083.1	unplaced-scaffold	15132	chrUn_NW_020110083v1		CHRUN_228
+GCF_000002315.6	Primary Assembly	Un			AADN05001272.1	Chromosome		NW_020110005.1	unplaced-scaffold	8656	chrUn_NW_020110005v1		CHRUN_229
+GCF_000002315.6	Primary Assembly	Un			AADN05001273.1	Chromosome		NW_020109886.1	unplaced-scaffold	2033	chrUn_NW_020109886v1		CHRUN_230
+GCF_000002315.6	Primary Assembly	Un			AADN05001274.1	Chromosome		NW_020110028.1	unplaced-scaffold	9888	chrUn_NW_020110028v1		CHRUN_231
+GCF_000002315.6	Primary Assembly	Un			AADN05001275.1	Chromosome		NW_020110114.1	unplaced-scaffold	19536	chrUn_NW_020110114v1		CHRUN_232
+GCF_000002315.6	Primary Assembly	Un			AADN05001276.1	Chromosome		NW_020110043.1	unplaced-scaffold	11663	chrUn_NW_020110043v1		CHRUN_233
+GCF_000002315.6	Primary Assembly	Un			AADN05001278.1	Chromosome		NW_020110006.1	unplaced-scaffold	8637	chrUn_NW_020110006v1		CHRUN_235
+GCF_000002315.6	Primary Assembly	Un			AADN05001279.1	Chromosome		NW_020109884.1	unplaced-scaffold	1908	chrUn_NW_020109884v1		CHRUN_236
+GCF_000002315.6	Primary Assembly	Un			AADN05001280.1	Chromosome		NW_020109993.1	unplaced-scaffold	8038	chrUn_NW_020109993v1		CHRUN_237
+GCF_000002315.6	Primary Assembly	Un			AADN05001281.1	Chromosome		NW_020109960.1	unplaced-scaffold	5955	chrUn_NW_020109960v1		CHRUN_238
+GCF_000002315.6	Primary Assembly	Un			AADN05001283.1	Chromosome		NW_020110084.1	unplaced-scaffold	15049	chrUn_NW_020110084v1		CHRUN_240
+GCF_000002315.6	Primary Assembly	Un			AADN05001284.1	Chromosome		NW_020109959.1	unplaced-scaffold	6042	chrUn_NW_020109959v1		CHRUN_241
+GCF_000002315.6	Primary Assembly	Un			AADN05001285.1	Chromosome		NW_020109910.1	unplaced-scaffold	2948	chrUn_NW_020109910v1		CHRUN_242
+GCF_000002315.6	Primary Assembly	Un			AADN05001286.1	Chromosome		NW_020109859.1	unplaced-scaffold	950	chrUn_NW_020109859v1		CHRUN_243
+GCF_000002315.6	Primary Assembly	Un			AADN05001287.1	Chromosome		NW_020110137.1	unplaced-scaffold	25301	chrUn_NW_020110137v1		CHRUN_244
+GCF_000002315.6	Primary Assembly	Un			AADN05001288.1	Chromosome		NW_020110132.1	unplaced-scaffold	23190	chrUn_NW_020110132v1		CHRUN_245
+GCF_000002315.6	Primary Assembly	Un			AADN05001289.1	Chromosome		NW_020110091.1	unplaced-scaffold	15680	chrUn_NW_020110091v1		CHRUN_246
+GCF_000002315.6	Primary Assembly	Un			AADN05001291.1	Chromosome		NW_020110152.1	unplaced-scaffold	52554	chrUn_NW_020110152v1		CHRUN_248
+GCF_000002315.6	Primary Assembly	Un			AADN05001292.1	Chromosome		NW_020110142.1	unplaced-scaffold	25700	chrUn_NW_020110142v1		CHRUN_249
+GCF_000002315.6	Primary Assembly	Un			AADN05001293.1	Chromosome		NW_020110113.1	unplaced-scaffold	19903	chrUn_NW_020110113v1		CHRUN_250
+GCF_000002315.6	Primary Assembly	Un			AADN05001294.1	Chromosome		NW_020109926.1	unplaced-scaffold	3687	chrUn_NW_020109926v1		CHRUN_251
+GCF_000002315.6	Primary Assembly	Un			AADN05001295.1	Chromosome		NW_020109881.1	unplaced-scaffold	1840	chrUn_NW_020109881v1		CHRUN_252
+GCF_000002315.6	Primary Assembly	Un			AADN05001296.1	Chromosome		NW_020109928.1	unplaced-scaffold	3863	chrUn_NW_020109928v1		CHRUN_253
+GCF_000002315.6	Primary Assembly	Un			AADN05001299.1	Chromosome		NW_020109875.1	unplaced-scaffold	1748	chrUn_NW_020109875v1		CHRUN_256
+GCF_000002315.6	Primary Assembly	Un			AADN05001300.1	Chromosome		NW_020109870.1	unplaced-scaffold	1394	chrUn_NW_020109870v1		CHRUN_257
+GCF_000002315.6	Primary Assembly	Un			AADN05001301.1	Chromosome		NW_020109934.1	unplaced-scaffold	4206	chrUn_NW_020109934v1		CHRUN_258
+GCF_000002315.6	Primary Assembly	Un			AADN05001302.1	Chromosome		NW_020110079.1	unplaced-scaffold	14655	chrUn_NW_020110079v1		CHRUN_259
+GCF_000002315.6	Primary Assembly	Un			AADN05001303.1	Chromosome		NW_020109866.1	unplaced-scaffold	1167	chrUn_NW_020109866v1		CHRUN_260
+GCF_000002315.6	Primary Assembly	Un			AADN05001304.1	Chromosome		NW_020109919.1	unplaced-scaffold	3584	chrUn_NW_020109919v1		CHRUN_261
+GCF_000002315.6	Primary Assembly	Un			AADN05001305.1	Chromosome		NW_020109980.1	unplaced-scaffold	6824	chrUn_NW_020109980v1		CHRUN_262
+GCF_000002315.6	Primary Assembly	Un			AADN05001306.1	Chromosome		NW_020109830.1	unplaced-scaffold	27104	chrUn_NW_020109830v1		CHRUN_263
+GCF_000002315.6	Primary Assembly	Un			AADN05001307.1	Chromosome		NW_020110131.1	unplaced-scaffold	23748	chrUn_NW_020110131v1		CHRUN_264
+GCF_000002315.6	Primary Assembly	Un			AADN05001308.1	Chromosome		NW_020110104.1	unplaced-scaffold	17237	chrUn_NW_020110104v1		CHRUN_265
+GCF_000002315.6	Primary Assembly	Un			AADN05001309.1	Chromosome		NW_020110064.1	unplaced-scaffold	13157	chrUn_NW_020110064v1		CHRUN_266
+GCF_000002315.6	Primary Assembly	Un			AADN05001310.1	Chromosome		NW_020109895.1	unplaced-scaffold	2520	chrUn_NW_020109895v1		CHRUN_267
+GCF_000002315.6	Primary Assembly	Un			AADN05001311.1	Chromosome		NW_020110069.1	unplaced-scaffold	13798	chrUn_NW_020110069v1		CHRUN_268
+GCF_000002315.6	Primary Assembly	Un			AADN05001312.1	Chromosome		NW_020110089.1	unplaced-scaffold	15638	chrUn_NW_020110089v1		CHRUN_269
+GCF_000002315.6	Primary Assembly	Un			AADN05001313.1	Chromosome		NW_020110046.1	unplaced-scaffold	11743	chrUn_NW_020110046v1		CHRUN_270
+GCF_000002315.6	Primary Assembly	Un			AADN05001314.1	Chromosome		NW_020110018.1	unplaced-scaffold	9172	chrUn_NW_020110018v1		CHRUN_271
+GCF_000002315.6	Primary Assembly	Un			AADN05001315.1	Chromosome		NW_020109990.1	unplaced-scaffold	7655	chrUn_NW_020109990v1		CHRUN_272
+GCF_000002315.6	Primary Assembly	Un			AADN05001316.1	Chromosome		NW_020109952.1	unplaced-scaffold	5289	chrUn_NW_020109952v1		CHRUN_273
+GCF_000002315.6	Primary Assembly	Un			AADN05001317.1	Chromosome		NW_020109939.1	unplaced-scaffold	4621	chrUn_NW_020109939v1		CHRUN_274
+GCF_000002315.6	Primary Assembly	Un			AADN05001318.1	Chromosome		NW_020109893.1	unplaced-scaffold	2462	chrUn_NW_020109893v1		CHRUN_275
+GCF_000002315.6	Primary Assembly	Un			AADN05001319.1	Chromosome		NW_020110076.1	unplaced-scaffold	14205	chrUn_NW_020110076v1		CHRUN_276
+GCF_000002315.6	Primary Assembly	Un			AADN05001320.1	Chromosome		NW_020110049.1	unplaced-scaffold	12125	chrUn_NW_020110049v1		CHRUN_277
+GCF_000002315.6	Primary Assembly	Un			AADN05001321.1	Chromosome		NW_020109924.1	unplaced-scaffold	3660	chrUn_NW_020109924v1		CHRUN_278
+GCF_000002315.6	Primary Assembly	Un			AADN05001322.1	Chromosome		NW_020110038.1	unplaced-scaffold	10993	chrUn_NW_020110038v1		CHRUN_279
+GCF_000002315.6	Primary Assembly	Un			AADN05001323.1	Chromosome		NW_020110106.1	unplaced-scaffold	18034	chrUn_NW_020110106v1		CHRUN_280
+GCF_000002315.6	Primary Assembly	Un			AADN05001324.1	Chromosome		NW_020110062.1	unplaced-scaffold	13021	chrUn_NW_020110062v1		CHRUN_281
+GCF_000002315.6	Primary Assembly	Un			AADN05001325.1	Chromosome		NW_020109902.1	unplaced-scaffold	2610	chrUn_NW_020109902v1		CHRUN_282
+GCF_000002315.6	Primary Assembly	Un			AADN05001326.1	Chromosome		NW_020110129.1	unplaced-scaffold	22982	chrUn_NW_020110129v1		CHRUN_283
+GCF_000002315.6	Primary Assembly	Un			AADN05001327.1	Chromosome		NW_020110061.1	unplaced-scaffold	13139	chrUn_NW_020110061v1		CHRUN_284
+GCF_000002315.6	Primary Assembly	Un			AADN05001328.1	Chromosome		NW_020110024.1	unplaced-scaffold	9619	chrUn_NW_020110024v1		CHRUN_285
+GCF_000002315.6	Primary Assembly	Un			AADN05001329.1	Chromosome		NW_020109832.1	unplaced-scaffold	27830	chrUn_NW_020109832v1		CHRUN_286
+GCF_000002315.6	Primary Assembly	Un			AADN05001330.1	Chromosome		NW_020110123.1	unplaced-scaffold	21699	chrUn_NW_020110123v1		CHRUN_287
+GCF_000002315.6	Primary Assembly	Un			AADN05001331.1	Chromosome		NW_020110100.1	unplaced-scaffold	16245	chrUn_NW_020110100v1		CHRUN_288
+GCF_000002315.6	Primary Assembly	Un			AADN05001332.1	Chromosome		NW_020109869.1	unplaced-scaffold	1453	chrUn_NW_020109869v1		CHRUN_289
+GCF_000002315.6	Primary Assembly	Un			AADN05001333.1	Chromosome		NW_020109888.1	unplaced-scaffold	2087	chrUn_NW_020109888v1		CHRUN_290
+GCF_000002315.6	Primary Assembly	Un			AADN05001334.1	Chromosome		NW_020109872.1	unplaced-scaffold	1547	chrUn_NW_020109872v1		CHRUN_291
+GCF_000002315.6	Primary Assembly	Un			AADN05001335.1	Chromosome		NW_020109856.1	unplaced-scaffold	677	chrUn_NW_020109856v1		CHRUN_292
+GCF_000002315.6	Primary Assembly	Un			AADN05001336.1	Chromosome		NW_020109947.1	unplaced-scaffold	5075	chrUn_NW_020109947v1		CHRUN_293
+GCF_000002315.6	Primary Assembly	Un			AADN05001337.1	Chromosome		NW_020110059.1	unplaced-scaffold	12987	chrUn_NW_020110059v1		CHRUN_294
+GCF_000002315.6	Primary Assembly	Un			AADN05001338.1	Chromosome		NW_020109958.1	unplaced-scaffold	5694	chrUn_NW_020109958v1		CHRUN_295
+GCF_000002315.6	Primary Assembly	Un			AADN05001339.1	Chromosome		NW_020109994.1	unplaced-scaffold	8025	chrUn_NW_020109994v1		CHRUN_296
+GCF_000002315.6	Primary Assembly	Un			AADN05001340.1	Chromosome		NW_020109862.1	unplaced-scaffold	955	chrUn_NW_020109862v1		CHRUN_297
+GCF_000002315.6	Primary Assembly	Un			AADN05001341.1	Chromosome		NW_020109998.1	unplaced-scaffold	8152	chrUn_NW_020109998v1		CHRUN_298
+GCF_000002315.6	Primary Assembly	Un			AADN05001342.1	Chromosome		NW_020109974.1	unplaced-scaffold	6638	chrUn_NW_020109974v1		CHRUN_299
+GCF_000002315.6	Primary Assembly	Un			AADN05001343.1	Chromosome		NW_020110119.1	unplaced-scaffold	21427	chrUn_NW_020110119v1		CHRUN_300
+GCF_000002315.6	Primary Assembly	Un			AADN05001344.1	Chromosome		NW_020109876.1	unplaced-scaffold	1664	chrUn_NW_020109876v1		CHRUN_301
+GCF_000002315.6	Primary Assembly	Un			AADN05001345.1	Chromosome		NW_020110092.1	unplaced-scaffold	15663	chrUn_NW_020110092v1		CHRUN_302
+GCF_000002315.6	Primary Assembly	Un			AADN05001346.1	Chromosome		NW_020109850.1	unplaced-scaffold	555	chrUn_NW_020109850v1		CHRUN_303
+GCF_000002315.6	Primary Assembly	Un			AADN05001347.1	Chromosome		NW_020109987.1	unplaced-scaffold	7621	chrUn_NW_020109987v1		CHRUN_304
+GCF_000002315.6	Primary Assembly	Un			AADN05001348.1	Chromosome		NW_020110097.1	unplaced-scaffold	16233	chrUn_NW_020110097v1		CHRUN_305
+GCF_000002315.6	Primary Assembly	Un			AADN05001349.1	Chromosome		NW_020110148.1	unplaced-scaffold	34471	chrUn_NW_020110148v1		CHRUN_306
+GCF_000002315.6	Primary Assembly	Un			AADN05001350.1	Chromosome		NW_020110124.1	unplaced-scaffold	21677	chrUn_NW_020110124v1		CHRUN_307
+GCF_000002315.6	Primary Assembly	Un			AADN05001351.1	Chromosome		NW_020109997.1	unplaced-scaffold	8180	chrUn_NW_020109997v1		CHRUN_308
+GCF_000002315.6	Primary Assembly	Un			AADN05001352.1	Chromosome		NW_020109877.1	unplaced-scaffold	1756	chrUn_NW_020109877v1		CHRUN_309
+GCF_000002315.6	Primary Assembly	Un			AADN05001353.1	Chromosome		NW_020109840.1	unplaced-scaffold	33083	chrUn_NW_020109840v1		CHRUN_310
+GCF_000002315.6	Primary Assembly	Un			AADN05001354.1	Chromosome		NW_020109945.1	unplaced-scaffold	4808	chrUn_NW_020109945v1		CHRUN_311
+GCF_000002315.6	Primary Assembly	Un			AADN05001355.1	Chromosome		NW_020110120.1	unplaced-scaffold	21266	chrUn_NW_020110120v1		CHRUN_312
+GCF_000002315.6	Primary Assembly	Un			AADN05001356.1	Chromosome		NW_020110057.1	unplaced-scaffold	12789	chrUn_NW_020110057v1		CHRUN_313
+GCF_000002315.6	Primary Assembly	Un			AADN05001357.1	Chromosome		NW_020110139.1	unplaced-scaffold	25466	chrUn_NW_020110139v1		CHRUN_314
+GCF_000002315.6	Primary Assembly	Un			AADN05001358.1	Chromosome		NW_020109954.1	unplaced-scaffold	5521	chrUn_NW_020109954v1		CHRUN_315
+GCF_000002315.6	Primary Assembly	Un			AADN05001359.1	Chromosome		NW_020109948.1	unplaced-scaffold	5044	chrUn_NW_020109948v1		CHRUN_316
+GCF_000002315.6	Primary Assembly	Un			AADN05001360.1	Chromosome		NW_020109907.1	unplaced-scaffold	2928	chrUn_NW_020109907v1		CHRUN_317
+GCF_000002315.6	Primary Assembly	Un			AADN05001361.1	Chromosome		NW_020110146.1	unplaced-scaffold	26310	chrUn_NW_020110146v1		CHRUN_318
+GCF_000002315.6	Primary Assembly	Un			AADN05001363.1	Chromosome		NW_020109956.1	unplaced-scaffold	5662	chrUn_NW_020109956v1		CHRUN_320
+GCF_000002315.6	Primary Assembly	Un			AADN05001364.1	Chromosome		NW_020109962.1	unplaced-scaffold	6066	chrUn_NW_020109962v1		CHRUN_321
+GCF_000002315.6	Primary Assembly	Un			AADN05001365.1	Chromosome		NW_020110051.1	unplaced-scaffold	12152	chrUn_NW_020110051v1		CHRUN_322
+GCF_000002315.6	Primary Assembly	Un			AADN05001366.1	Chromosome		NW_020110110.1	unplaced-scaffold	18507	chrUn_NW_020110110v1		CHRUN_323
+GCF_000002315.6	Primary Assembly	Un			AADN05001367.1	Chromosome		NW_020110047.1	unplaced-scaffold	11985	chrUn_NW_020110047v1		CHRUN_324
+GCF_000002315.6	Primary Assembly	Un			AADN05001368.1	Chromosome		NW_020110029.1	unplaced-scaffold	10056	chrUn_NW_020110029v1		CHRUN_325
+GCF_000002315.6	Primary Assembly	Un			AADN05001369.1	Chromosome		NW_020110040.1	unplaced-scaffold	11204	chrUn_NW_020110040v1		CHRUN_326
+GCF_000002315.6	Primary Assembly	Un			AADN05001371.1	Chromosome		NW_020109838.1	unplaced-scaffold	30818	chrUn_NW_020109838v1		CHRUN_328
+GCF_000002315.6	Primary Assembly	Un			AADN05001372.1	Chromosome		NW_020110096.1	unplaced-scaffold	16106	chrUn_NW_020110096v1		CHRUN_329
+GCF_000002315.6	Primary Assembly	Un			AADN05001374.1	Chromosome		NW_020110033.1	unplaced-scaffold	10691	chrUn_NW_020110033v1		CHRUN_331
+GCF_000002315.6	Primary Assembly	Un			AADN05001375.1	Chromosome		NW_020110048.1	unplaced-scaffold	11970	chrUn_NW_020110048v1		CHRUN_332
+GCF_000002315.6	Primary Assembly	Un			AADN05001376.1	Chromosome		NW_020110035.1	unplaced-scaffold	10984	chrUn_NW_020110035v1		CHRUN_333
+GCF_000002315.6	Primary Assembly	Un			AADN05001377.1	Chromosome		NW_020110101.1	unplaced-scaffold	17007	chrUn_NW_020110101v1		CHRUN_334
+GCF_000002315.6	Primary Assembly	Un			AADN05001378.1	Chromosome		NW_020110093.1	unplaced-scaffold	16031	chrUn_NW_020110093v1		CHRUN_335
+GCF_000002315.6	Primary Assembly	Un			AADN05001379.1	Chromosome		NW_020109912.1	unplaced-scaffold	2985	chrUn_NW_020109912v1		CHRUN_336
+GCF_000002315.6	Primary Assembly	Un			AADN05001380.1	Chromosome		NW_020109914.1	unplaced-scaffold	3019	chrUn_NW_020109914v1		CHRUN_337
+GCF_000002315.6	Primary Assembly	Un			AADN05001381.1	Chromosome		NW_020110004.1	unplaced-scaffold	8464	chrUn_NW_020110004v1		CHRUN_338
+GCF_000002315.6	Primary Assembly	Un			AADN05001382.1	Chromosome		NW_020109989.1	unplaced-scaffold	7675	chrUn_NW_020109989v1		CHRUN_339
+GCF_000002315.6	Primary Assembly	Un			AADN05001383.1	Chromosome		NW_020109880.1	unplaced-scaffold	1782	chrUn_NW_020109880v1		CHRUN_340
+GCF_000002315.6	Primary Assembly	Un			AADN05001384.1	Chromosome		NW_020109925.1	unplaced-scaffold	3847	chrUn_NW_020109925v1		CHRUN_341
+GCF_000002315.6	Primary Assembly	Un			AADN05001385.1	Chromosome		NW_020110151.1	unplaced-scaffold	39545	chrUn_NW_020110151v1		CHRUN_342
+GCF_000002315.6	Primary Assembly	Un			AADN05001386.1	Chromosome		NW_020110075.1	unplaced-scaffold	14298	chrUn_NW_020110075v1		CHRUN_343
+GCF_000002315.6	Primary Assembly	Un			AADN05001387.1	Chromosome		NW_020110169.1	unplaced-scaffold	4840	chrUn_NW_020110169v1		CHRUN_344
+GCF_000002315.6	Primary Assembly	Un			AADN05001388.1	Chromosome		NW_020110052.1	unplaced-scaffold	12129	chrUn_NW_020110052v1		CHRUN_345
+GCF_000002315.6	Primary Assembly	Un			AADN05001391.1	Chromosome		NW_020110166.1	unplaced-scaffold	4360	chrUn_NW_020110166v1		CHRUN_348
+GCF_000002315.6	Primary Assembly	Un			AADN05001392.1	Chromosome		NW_020109901.1	unplaced-scaffold	2615	chrUn_NW_020109901v1		CHRUN_349
+GCF_000002315.6	Primary Assembly	Un			AADN05001393.1	Chromosome		NW_020110144.1	unplaced-scaffold	26150	chrUn_NW_020110144v1		CHRUN_350
+GCF_000002315.6	Primary Assembly	Un			AADN05001394.1	Chromosome		NW_020109981.1	unplaced-scaffold	6925	chrUn_NW_020109981v1		CHRUN_351
+GCF_000002315.6	Primary Assembly	Un			AADN05001395.1	Chromosome		NW_020109965.1	unplaced-scaffold	6324	chrUn_NW_020109965v1		CHRUN_352
+GCF_000002315.6	Primary Assembly	Un			AADN05001396.1	Chromosome		NW_020109930.1	unplaced-scaffold	4037	chrUn_NW_020109930v1		CHRUN_353
+GCF_000002315.6	Primary Assembly	Un			AADN05001397.1	Chromosome		NW_020109915.1	unplaced-scaffold	3504	chrUn_NW_020109915v1		CHRUN_354
+GCF_000002315.6	Primary Assembly	Un			AADN05001398.1	Chromosome		NW_020109943.1	unplaced-scaffold	4766	chrUn_NW_020109943v1		CHRUN_355
+GCF_000002315.6	Primary Assembly	Un			AADN05001399.1	Chromosome		NW_020110143.1	unplaced-scaffold	26298	chrUn_NW_020110143v1		CHRUN_356
+GCF_000002315.6	Primary Assembly	Un			AADN05001400.1	Chromosome		NW_020110141.1	unplaced-scaffold	26131	chrUn_NW_020110141v1		CHRUN_357
+GCF_000002315.6	Primary Assembly	Un			AADN05001401.1	Chromosome		NW_020109975.1	unplaced-scaffold	6808	chrUn_NW_020109975v1		CHRUN_358
+GCF_000002315.6	Primary Assembly	Un			AADN05001402.1	Chromosome		NW_020110070.1	unplaced-scaffold	13793	chrUn_NW_020110070v1		CHRUN_359
+GCF_000002315.6	Primary Assembly	Un			AADN05001404.1	Chromosome		NW_020109984.1	unplaced-scaffold	6958	chrUn_NW_020109984v1		CHRUN_361
+GCF_000002315.6	Primary Assembly	Un			AADN05001405.1	Chromosome		NW_020110128.1	unplaced-scaffold	22381	chrUn_NW_020110128v1		CHRUN_362
+GCF_000002315.6	Primary Assembly	Un			AADN05001407.1	Chromosome		NW_020110044.1	unplaced-scaffold	11473	chrUn_NW_020110044v1		CHRUN_364
+GCF_000002315.6	Primary Assembly	Un			AADN05001408.1	Chromosome		NW_020109986.1	unplaced-scaffold	7298	chrUn_NW_020109986v1		CHRUN_365
+GCF_000002315.6	Primary Assembly	Un			AADN05001409.1	Chromosome		NW_020109973.1	unplaced-scaffold	6698	chrUn_NW_020109973v1		CHRUN_366
+GCF_000002315.6	Primary Assembly	Un			AADN05001411.1	Chromosome		NW_020110015.1	unplaced-scaffold	9118	chrUn_NW_020110015v1		CHRUN_368
+GCF_000002315.6	Primary Assembly	Un			AADN05001414.1	Chromosome		NW_020109834.1	unplaced-scaffold	29697	chrUn_NW_020109834v1		CHRUN_371
+GCF_000002315.6	Primary Assembly	Un			AADN05001415.1	Chromosome		NW_020110050.1	unplaced-scaffold	12040	chrUn_NW_020110050v1		CHRUN_372
+GCF_000002315.6	Primary Assembly	Un			AADN05001416.1	Chromosome		NW_020110105.1	unplaced-scaffold	18101	chrUn_NW_020110105v1		CHRUN_373
+GCF_000002315.6	Primary Assembly	Un			AADN05001417.1	Chromosome		NW_020110060.1	unplaced-scaffold	12986	chrUn_NW_020110060v1		CHRUN_374
+GCF_000002315.6	Primary Assembly	Un			AADN05001418.1	Chromosome		NW_020110010.1	unplaced-scaffold	8788	chrUn_NW_020110010v1		CHRUN_375
+GCF_000002315.6	Primary Assembly	Un			AADN05001419.1	Chromosome		NW_020109966.1	unplaced-scaffold	6318	chrUn_NW_020109966v1		CHRUN_376
+GCF_000002315.6	Primary Assembly	Un			AADN05001420.1	Chromosome		NW_020109837.1	unplaced-scaffold	30439	chrUn_NW_020109837v1		CHRUN_377
+GCF_000002315.6	Primary Assembly	Un			AADN05001421.1	Chromosome		NW_020110054.1	unplaced-scaffold	12389	chrUn_NW_020110054v1		CHRUN_378
+GCF_000002315.6	Primary Assembly	Un			AADN05001422.1	Chromosome		NW_020110111.1	unplaced-scaffold	19095	chrUn_NW_020110111v1		CHRUN_379
+GCF_000002315.6	Primary Assembly	Un			AADN05001430.1	Chromosome		NW_020110032.1	unplaced-scaffold	10066	chrUn_NW_020110032v1		CHRUN_387
+GCF_000002315.6	Primary Assembly	Un			AADN05001432.1	Chromosome		NW_020110135.1	unplaced-scaffold	24315	chrUn_NW_020110135v1		CHRUN_389
+GCF_000002315.6	Primary Assembly	Un			AADN05001437.1	Chromosome		NW_020110095.1	unplaced-scaffold	16129	chrUn_NW_020110095v1		CHRUN_394
+GCF_000002315.6	Primary Assembly	Un			AADN05001440.1	Chromosome		NW_020110077.1	unplaced-scaffold	14604	chrUn_NW_020110077v1		CHRUN_397
+GCF_000002315.6	Primary Assembly	Un			AADN05001441.1	Chromosome		NW_020110080.1	unplaced-scaffold	14613	chrUn_NW_020110080v1		CHRUN_398
+GCF_000002315.6	Primary Assembly	Un			AADN05001443.1	Chromosome		NW_020110039.1	unplaced-scaffold	11212	chrUn_NW_020110039v1		CHRUN_400
+GCF_000002315.6	Primary Assembly	Un			AADN05001444.1	Chromosome		NW_020110037.1	unplaced-scaffold	11066	chrUn_NW_020110037v1		CHRUN_401
+GCF_000002315.6	Primary Assembly	Un			AADN05001446.1	Chromosome		NW_020110031.1	unplaced-scaffold	10371	chrUn_NW_020110031v1		CHRUN_403
+GCF_000002315.6	Primary Assembly	Un			AADN05001447.1	Chromosome		NW_020110027.1	unplaced-scaffold	9935	chrUn_NW_020110027v1		CHRUN_404
+GCF_000002315.6	Primary Assembly	Un			AADN05001448.1	Chromosome		NW_020110021.1	unplaced-scaffold	9617	chrUn_NW_020110021v1		CHRUN_405
+GCF_000002315.6	Primary Assembly	Un			AADN05001454.1	Chromosome		NW_020110013.1	unplaced-scaffold	8999	chrUn_NW_020110013v1		CHRUN_411
+GCF_000002315.6	Primary Assembly	Un			AADN05001455.1	Chromosome		NW_020110053.1	unplaced-scaffold	12430	chrUn_NW_020110053v1		CHRUN_412
+GCF_000002315.6	Primary Assembly	Un			AADN05001456.1	Chromosome		NW_020109961.1	unplaced-scaffold	6185	chrUn_NW_020109961v1		CHRUN_413
+GCF_000002315.6	Primary Assembly	Un			AADN05001460.1	Chromosome		NW_020110130.1	unplaced-scaffold	22641	chrUn_NW_020110130v1		CHRUN_417
+GCF_000002315.6	Primary Assembly	Un			AADN05001463.1	Chromosome		NW_020110007.1	unplaced-scaffold	8749	chrUn_NW_020110007v1		CHRUN_420
+GCF_000002315.6	Primary Assembly	Un			AADN05001464.1	Chromosome		NW_020110138.1	unplaced-scaffold	24712	chrUn_NW_020110138v1		CHRUN_421
+GCF_000002315.6	Primary Assembly	Un			AADN05001465.1	Chromosome		NW_020110003.1	unplaced-scaffold	8516	chrUn_NW_020110003v1		CHRUN_422
+GCF_000002315.6	Primary Assembly	Un			AADN05001473.1	Chromosome		NW_020109946.1	unplaced-scaffold	4777	chrUn_NW_020109946v1		CHRUN_430
+GCF_000002315.6	Primary Assembly	Un			AADN05001474.1	Chromosome		NW_020110034.1	unplaced-scaffold	10473	chrUn_NW_020110034v1		CHRUN_431
+GCF_000002315.6	Primary Assembly	Un			AADN05001475.1	Chromosome		NW_020109976.1	unplaced-scaffold	6764	chrUn_NW_020109976v1		CHRUN_432
+GCF_000002315.6	Primary Assembly	Un			AADN05001476.1	Chromosome		NW_020110140.1	unplaced-scaffold	25409	chrUn_NW_020110140v1		CHRUN_433
+GCF_000002315.6	Primary Assembly	Un			AADN05001477.1	Chromosome		NW_020110071.1	unplaced-scaffold	13985	chrUn_NW_020110071v1		CHRUN_434
+GCF_000002315.6	Primary Assembly	Un			AADN05001478.1	Chromosome		NW_020110103.1	unplaced-scaffold	17402	chrUn_NW_020110103v1		CHRUN_435
+GCF_000002315.6	Primary Assembly	Un			AADN05001481.1	Chromosome		NW_020109964.1	unplaced-scaffold	6243	chrUn_NW_020109964v1		CHRUN_438
+GCF_000002315.6	Primary Assembly	Un			AADN05001483.1	Chromosome		NW_020110116.1	unplaced-scaffold	20270	chrUn_NW_020110116v1		CHRUN_440
+GCF_000002315.6	Primary Assembly	Un			AADN05001484.1	Chromosome		NW_020110022.1	unplaced-scaffold	9579	chrUn_NW_020110022v1		CHRUN_441
+GCF_000002315.6	Primary Assembly	Un			AADN05001485.1	Chromosome		NW_020109894.1	unplaced-scaffold	2402	chrUn_NW_020109894v1		CHRUN_442
+GCF_000002315.6	Primary Assembly	Un			AADN05001486.1	Chromosome		NW_020110026.1	unplaced-scaffold	9696	chrUn_NW_020110026v1		CHRUN_443
+GCF_000002315.6	Primary Assembly	Un			AADN05001487.1	Chromosome		NW_020110009.1	unplaced-scaffold	8846	chrUn_NW_020110009v1		CHRUN_444
+GCF_000002315.6	Primary Assembly	Un			AADN05001488.1	Chromosome		NW_020109970.1	unplaced-scaffold	6414	chrUn_NW_020109970v1		CHRUN_445
+GCF_000002315.6	Primary Assembly	Un			AADN05001489.1	Chromosome		NW_020110041.1	unplaced-scaffold	11376	chrUn_NW_020110041v1		CHRUN_446
+GCF_000002315.6	Primary Assembly	Un			AADN05001490.1	Chromosome		NW_020109864.1	unplaced-scaffold	1086	chrUn_NW_020109864v1		CHRUN_447
+GCF_000002315.6	Primary Assembly	Un			AADN05001491.1	Chromosome		NW_020110016.1	unplaced-scaffold	9032	chrUn_NW_020110016v1		CHRUN_448
+GCF_000002315.6	Primary Assembly	Un			AADN05001492.1	Chromosome		NW_020109935.1	unplaced-scaffold	4359	chrUn_NW_020109935v1		CHRUN_449
+GCF_000002315.6	Primary Assembly	Un			AADN05001493.1	Chromosome		NW_020109942.1	unplaced-scaffold	4652	chrUn_NW_020109942v1		CHRUN_450
+GCF_000002315.6	Primary Assembly	Un			AADN05001494.1	Chromosome		NW_020109950.1	unplaced-scaffold	5199	chrUn_NW_020109950v1		CHRUN_451
+GCF_000002315.6	Primary Assembly	Un			AADN05001495.1	Chromosome		NW_020109874.1	unplaced-scaffold	1589	chrUn_NW_020109874v1		CHRUN_452
+GCF_000002315.6	Primary Assembly	Un			AADN05001496.1	Chromosome		NW_020110108.1	unplaced-scaffold	18344	chrUn_NW_020110108v1		CHRUN_453
+GCF_000002315.6	Primary Assembly	Un			AADN05001497.1	Chromosome		NW_020110098.1	unplaced-scaffold	16140	chrUn_NW_020110098v1		CHRUN_454
+GCF_000002315.6	Primary Assembly	Un			AADN05001498.1	Chromosome		NW_020109835.1	unplaced-scaffold	30157	chrUn_NW_020109835v1		CHRUN_455
+GCF_000002315.6	Primary Assembly	Un			AADN05001502.1	Chromosome		NW_020109898.1	unplaced-scaffold	2555	chrUn_NW_020109898v1		CHRUN_459
+GCF_000002315.6	Primary Assembly	Un			AADN05001503.1	Chromosome		NW_020110107.1	unplaced-scaffold	18412	chrUn_NW_020110107v1		CHRUN_460
+GCF_000002315.6	Primary Assembly	Un			AADN05001504.1	Chromosome		NW_020110133.1	unplaced-scaffold	23907	chrUn_NW_020110133v1		CHRUN_461
+GCF_000002315.6	Primary Assembly	Un			AADN05001505.1	Chromosome		NW_020110125.1	unplaced-scaffold	22379	chrUn_NW_020110125v1		CHRUN_462
+GCF_000002315.6	Primary Assembly	Un			AADN05001508.1	Chromosome		NW_020110012.1	unplaced-scaffold	8891	chrUn_NW_020110012v1		CHRUN_465
+GCF_000002315.6	Primary Assembly	Un			AADN05001509.1	Chromosome		NW_020109900.1	unplaced-scaffold	2568	chrUn_NW_020109900v1		CHRUN_466
+GCF_000002315.6	Primary Assembly	Un			AADN05001510.1	Chromosome		NW_020109985.1	unplaced-scaffold	7336	chrUn_NW_020109985v1		CHRUN_467
+GCF_000002315.6	Primary Assembly	Un			AADN05001511.1	Chromosome		NW_020109917.1	unplaced-scaffold	3531	chrUn_NW_020109917v1		CHRUN_468
+GCF_000002315.6	Primary Assembly	Un			AADN05001512.1	Chromosome		NW_020110072.1	unplaced-scaffold	13913	chrUn_NW_020110072v1		CHRUN_469
+GCF_000002315.6	Primary Assembly	Un			AADN05001513.1	Chromosome		NW_020109842.1	unplaced-scaffold	33531	chrUn_NW_020109842v1		CHRUN_470
+GCF_000002315.6	Primary Assembly	Un			AADN05001514.1	Chromosome		NW_020109878.1	unplaced-scaffold	1752	chrUn_NW_020109878v1		CHRUN_471
+GCF_000002315.6	Primary Assembly	Un			AADN05001515.1	Chromosome		NW_020109871.1	unplaced-scaffold	1579	chrUn_NW_020109871v1		CHRUN_472
+GCF_000002315.6	Primary Assembly	Un			AADN05001516.1	Chromosome		NW_020110001.1	unplaced-scaffold	8294	chrUn_NW_020110001v1		CHRUN_473
+GCF_000002315.6	Primary Assembly	Un			AADN05001517.1	Chromosome		NW_020109995.1	unplaced-scaffold	8118	chrUn_NW_020109995v1		CHRUN_474
+GCF_000002315.6	Primary Assembly	Un			AADN05001519.1	Chromosome		NW_020110023.1	unplaced-scaffold	9688	chrUn_NW_020110023v1		CHRUN_476
+GCF_000002315.6	Primary Assembly	Un			AADN05001520.1	Chromosome		NW_020109951.1	unplaced-scaffold	5419	chrUn_NW_020109951v1		CHRUN_477
+GCF_000002315.6	Primary Assembly	Un			AADN05001521.1	Chromosome		NW_020110042.1	unplaced-scaffold	11254	chrUn_NW_020110042v1		CHRUN_478
+GCF_000002315.6	Primary Assembly	Un			AADN05001522.1	Chromosome		NW_020109983.1	unplaced-scaffold	7090	chrUn_NW_020109983v1		CHRUN_479
+GCF_000002315.6	Primary Assembly	Un			AADN05001524.1	Chromosome		NW_020110082.1	unplaced-scaffold	14715	chrUn_NW_020110082v1		CHRUN_481
+GCF_000002315.6	Primary Assembly	Un			AADN05001525.1	Chromosome		NW_020109988.1	unplaced-scaffold	7511	chrUn_NW_020109988v1		CHRUN_482
+GCF_000002315.6	Primary Assembly	Un			AADN05001540.1	Chromosome		NW_020109879.1	unplaced-scaffold	1800	chrUn_NW_020109879v1		CHRUN_485
+GCF_000002315.6	Primary Assembly	Un			AADN05001541.1	Chromosome		NW_020109858.1	unplaced-scaffold	791	chrUn_NW_020109858v1		CHRUN_486
+GCF_000002315.6	Primary Assembly	Un			AADN05001542.1	Chromosome		NW_020109979.1	unplaced-scaffold	6881	chrUn_NW_020109979v1		CHRUN_487
+GCF_000002315.6	Primary Assembly	Un			AADN05001543.1	Chromosome		NW_020109967.1	unplaced-scaffold	6378	chrUn_NW_020109967v1		CHRUN_488
+GCF_000002315.6	Primary Assembly	Un			AADN05001544.1	Chromosome		NW_020109904.1	unplaced-scaffold	2663	chrUn_NW_020109904v1		CHRUN_489
+GCF_000002315.6	Primary Assembly	Un			AADN05001545.1	Chromosome		NW_020109848.1	unplaced-scaffold	342	chrUn_NW_020109848v1		CHRUN_490
+GCF_000002315.6	Primary Assembly	Un			AADN05001546.1	Chromosome		NW_020109845.1	unplaced-scaffold	246	chrUn_NW_020109845v1		CHRUN_491
+GCF_000002315.6	Primary Assembly	Un			AADN05001547.1	Chromosome		NW_020109846.1	unplaced-scaffold	195	chrUn_NW_020109846v1		CHRUN_492
+GCF_000002315.6	Primary Assembly	Un			AADN05001550.1	Chromosome		NW_020109896.1	unplaced-scaffold	2481	chrUn_NW_020109896v1		CHRUN_495
+GCF_000002315.6	Primary Assembly	Un			AADN05001552.1	Chromosome		NW_020109860.1	unplaced-scaffold	848	chrUn_NW_020109860v1		CHRUN_497
+GCF_000002315.6	Primary Assembly	Un			AADN05001553.1	Chromosome		NW_020109847.1	unplaced-scaffold	345	chrUn_NW_020109847v1		CHRUN_498
+GCF_000002315.6	Primary Assembly	Un			AADN05001555.1	Chromosome		NW_020109861.1	unplaced-scaffold	966	chrUn_NW_020109861v1		CHRUN_500
+GCF_000002315.6	Primary Assembly	Un			AADN05001556.1	Chromosome		NW_020109921.1	unplaced-scaffold	3657	chrUn_NW_020109921v1		CHRUN_501
+GCF_000002315.6	Primary Assembly	Un			AADN05001557.1	Chromosome		NW_020109857.1	unplaced-scaffold	806	chrUn_NW_020109857v1		CHRUN_502
+GCF_000002315.6	Primary Assembly	Un			AADN05001558.1	Chromosome		NW_020109849.1	unplaced-scaffold	579	chrUn_NW_020109849v1		CHRUN_503
+GCF_000002315.6	Primary Assembly	Un			AADN05001559.1	Chromosome		NW_020109882.1	unplaced-scaffold	1834	chrUn_NW_020109882v1		CHRUN_504
+GCF_000002315.6	Primary Assembly	Un			AADN05001560.1	Chromosome		NW_020109891.1	unplaced-scaffold	2308	chrUn_NW_020109891v1		CHRUN_505
+GCF_000002315.6	Primary Assembly	Un			AADN05001561.1	Chromosome		NW_020109855.1	unplaced-scaffold	678	chrUn_NW_020109855v1		CHRUN_506
+GCF_000002315.6	Primary Assembly	Un			AADN05001562.1	Chromosome		NW_020109844.1	unplaced-scaffold	87	chrUn_NW_020109844v1		CHRUN_507
+GCF_000002315.6	Primary Assembly	Un			AADN05001563.1	Chromosome		NW_020109899.1	unplaced-scaffold	2599	chrUn_NW_020109899v1		CHRUN_508
+GCF_000002315.6	Primary Assembly	Un			KZ626824.1	Chromosome		NW_020109841.1	unplaced-scaffold	33731	chrUn_NW_020109841v1		CHRUN_80
+GCF_000002315.6	Primary Assembly	Un			KZ626825.1	Chromosome		NW_020109938.1	unplaced-scaffold	4451	chrUn_NW_020109938v1		CHRUN_13
+GCF_000002315.6	Primary Assembly	Un			KZ626826.1	Chromosome		NW_020110153.1	unplaced-scaffold	48347	chrUn_NW_020110153v1		CHRUN_20
+GCF_000002315.6	Primary Assembly	Un			KZ626827.1	Chromosome		NW_020110154.1	unplaced-scaffold	61939	chrUn_NW_020110154v1		CHRUN_7
+GCF_000002315.6	Primary Assembly	Un			KZ626828.1	Chromosome		NW_020110155.1	unplaced-scaffold	53716	chrUn_NW_020110155v1		CHRUN_17
+GCF_000002315.6	Primary Assembly	Un			KZ626829.1	Chromosome		NW_020110156.1	unplaced-scaffold	177577	chrUn_NW_020110156v1		CHRUN_50
+GCF_000002315.6	Primary Assembly	Un			KZ626830.1	Chromosome		NW_020110157.1	unplaced-scaffold	94788	chrUn_NW_020110157v1		CHRUN_15
+GCF_000002315.6	Primary Assembly	Un			KZ626831.1	Chromosome		NW_020110158.1	unplaced-scaffold	468536	chrUn_NW_020110158v1		CHRUN_53
+GCF_000002315.6	Primary Assembly	Un			KZ626832.1	Chromosome		NW_020110159.1	unplaced-scaffold	199634	chrUn_NW_020110159v1		CHRUN_33
+GCF_000002315.6	Primary Assembly	Un			KZ626833.1	Chromosome		NW_020110160.1	unplaced-scaffold	696307	chrUn_NW_020110160v1		CHRUN_96
+GCF_000002315.6	Primary Assembly	Un			KZ626834.1	Chromosome		NW_020110161.1	unplaced-scaffold	665899	chrUn_NW_020110161v1		CHRUN_43
+GCF_000002315.6	Primary Assembly	Un			KZ626835.1	Chromosome		NW_020110162.1	unplaced-scaffold	1222195	chrUn_NW_020110162v1		CHRUN_27
+GCF_000002315.6	Primary Assembly	Un			KZ626836.1	Chromosome		NW_020110163.1	unplaced-scaffold	900507	chrUn_NW_020110163v1		CHRUN_59
+GCF_000002315.6	Primary Assembly	Un			KZ626837.1	Chromosome		NW_020110164.1	unplaced-scaffold	2003471	chrUn_NW_020110164v1		CHRUN_56
+GCF_000002315.6	Primary Assembly	Un			KZ626838.1	Chromosome		NW_020110165.1	unplaced-scaffold	1977309	chrUn_NW_020110165v1		CHRUN_24
+GCF_000002315.6	Primary Assembly	Un			KZ626839.1	Chromosome		NW_020110167.1	unplaced-scaffold	2023903	chrUn_NW_020110167v1		CHRUN_26
+GCF_000002315.6	non-nuclear	MT			GU261716.1	Mitochondrion		NC_040902.1	assembled-molecule	16784			MT

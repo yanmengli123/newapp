@@ -7,7 +7,10 @@ Import Comparative Genomics Data
 
 import sys
 import os
+import csv
 import gzip
+from dataclasses import dataclass
+from pathlib import Path
 import psycopg2
 from psycopg2.extras import execute_values
 
@@ -16,7 +19,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import GRCG6A_PG_DSN as PG_DSN
 
 
-# Chromosome mapping: GRCg6a -> GRCg7b
+# Legacy fallback mapping: GRCg6a -> GRCg7b shared chromosome names.
+# Prefer NCBI sequence_report.tsv inputs for chromosome authority.
 CHR_MAPPING = {
     'NC_006088.5': ('1', 'NC_052532.1'),
     'NC_006089.5': ('2', 'NC_052533.1'),
@@ -46,14 +50,115 @@ CHR_MAPPING = {
     'NC_006113.5': ('26', 'NC_052557.1'),
     'NC_006114.5': ('27', 'NC_052558.1'),
     'NC_006115.5': ('28', 'NC_052559.1'),
-    'NC_008465.4': ('29', 'NC_052560.1'),
+    'NC_008465.4': ('33', 'NC_052564.1'),
     'NC_028739.2': ('30', 'NC_052561.1'),
     'NC_028740.2': ('31', 'NC_052562.1'),
     'NC_006119.4': ('32', 'NC_052563.1'),
     'NC_006126.5': ('W', 'NC_052571.1'),
     'NC_006127.5': ('Z', 'NC_052572.1'),
-    'NC_040902.1': ('MT', 'NC_024088.1'),
+    'NC_040902.1': ('MT', 'NC_053523.1'),
 }
+
+GRCG7B_REFSEQ_TO_CHR = {
+    'NC_052560.1': '29',
+    'NC_052564.1': '33',
+    'NC_052565.1': '34',
+    'NC_052566.1': '35',
+    'NC_052567.1': '36',
+    'NC_052568.1': '37',
+    'NC_052569.1': '38',
+    'NC_052570.1': '39',
+    'NC_053523.1': 'MT',
+}
+
+
+@dataclass(frozen=True)
+class PrimaryMolecule:
+    chr_name: str
+    refseq_accession: str
+    genbank_accession: str
+    seq_length: int
+
+
+MappingRow = tuple[str, str, str, str, str, str, str | None, str | None, str, float]
+
+
+def chromosome_sort_key(chr_name: str) -> tuple[int, int | str]:
+    if chr_name.isdigit():
+        return (0, int(chr_name))
+    special_order = {"W": 1, "Z": 2, "MT": 3}
+    return (1, special_order.get(chr_name, chr_name))
+
+
+def load_primary_molecules(report_tsv: str | Path) -> dict[str, PrimaryMolecule]:
+    """Load assembled chromosome/mitochondrial molecules from NCBI sequence_report.tsv."""
+    molecules: dict[str, PrimaryMolecule] = {}
+    with Path(report_tsv).open(newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh, delimiter="\t")
+        for row in reader:
+            if row.get("Role", "").strip() != "assembled-molecule":
+                continue
+            if row.get("Molecule type", "").strip() not in {"Chromosome", "Mitochondrion"}:
+                continue
+            chr_name = row.get("Chromosome name", "").strip()
+            refseq = row.get("RefSeq seq accession", "").strip()
+            if not chr_name or not refseq:
+                continue
+            molecules[chr_name] = PrimaryMolecule(
+                chr_name=chr_name,
+                refseq_accession=refseq,
+                genbank_accession=row.get("GenBank seq accession", "").strip(),
+                seq_length=int(row.get("Seq length", "0")),
+            )
+    return molecules
+
+
+def build_chromosome_mapping_rows(
+    grcg6a_report: str | Path | None = None,
+    grcg7b_report: str | Path | None = None,
+) -> list[MappingRow]:
+    """Build chromosome_mapping rows, preferably from NCBI sequence reports."""
+    if bool(grcg6a_report) != bool(grcg7b_report):
+        raise ValueError("Provide both GRCg6a and GRCg7b sequence reports, or neither.")
+
+    if grcg6a_report and grcg7b_report:
+        grcg6a = load_primary_molecules(grcg6a_report)
+        grcg7b = load_primary_molecules(grcg7b_report)
+        shared_chr_names = sorted(set(grcg6a) & set(grcg7b), key=chromosome_sort_key)
+        return [
+            (
+                "GRCg6a",
+                "GRCg7b",
+                chr_name,
+                chr_name,
+                grcg6a[chr_name].refseq_accession,
+                grcg7b[chr_name].refseq_accession,
+                grcg6a[chr_name].genbank_accession or None,
+                grcg7b[chr_name].genbank_accession or None,
+                "+",
+                1.0,
+            )
+            for chr_name in shared_chr_names
+        ]
+
+    rows: list[MappingRow] = []
+    for nc6a, (chr_name, nc7b) in sorted(
+        CHR_MAPPING.items(),
+        key=lambda item: chromosome_sort_key(item[1][0]),
+    ):
+        rows.append((
+            "GRCg6a",
+            "GRCg7b",
+            chr_name,
+            normalize_chr7b(nc7b),
+            nc6a,
+            nc7b,
+            None,
+            None,
+            "+",
+            1.0,
+        ))
+    return rows
 
 
 def normalize_chr(nc_accession: str) -> str:
@@ -69,6 +174,9 @@ def normalize_chr(nc_accession: str) -> str:
 
 def normalize_chr7b(nc_accession: str) -> str:
     """Convert GRCg7b NC_ accession to chromosome name"""
+    for refseq, chr_name in GRCG7B_REFSEQ_TO_CHR.items():
+        if refseq == nc_accession or refseq.split('.')[0] == nc_accession.split('.')[0]:
+            return chr_name
     for nc, (chr_name, refseq) in CHR_MAPPING.items():
         if refseq.split('.')[0] == nc_accession.split('.')[0]:
             return chr_name
@@ -77,20 +185,27 @@ def normalize_chr7b(nc_accession: str) -> str:
     return nc_accession
 
 
-def import_chromosome_mapping(conn):
+def import_chromosome_mapping(
+    conn,
+    *,
+    reset_mapping_table: bool = False,
+    grcg6a_report: str | Path | None = None,
+    grcg7b_report: str | Path | None = None,
+):
     """Import chromosome mapping between assemblies"""
     print("Importing chromosome mapping...")
     cur = conn.cursor()
 
-    rows = []
-    for nc6a, (chr_name, nc7b) in CHR_MAPPING.items():
-        rows.append((
-            'GRCg6a', 'GRCg7b',
-            chr_name, chr_name,
-            nc6a, nc7b,
-            None, None,  # GenBank accessions
-            '+', 1.0
-        ))
+    rows = build_chromosome_mapping_rows(grcg6a_report, grcg7b_report)
+    if reset_mapping_table:
+        cur.execute(
+            """
+            DELETE FROM chromosome_mapping
+            WHERE assembly_from = %s AND assembly_to = %s
+            """,
+            ("GRCg6a", "GRCg7b"),
+        )
+        print(f"  Deleted {cur.rowcount} existing GRCg6a -> GRCg7b chromosome mappings")
 
     execute_values(cur, """
         INSERT INTO chromosome_mapping (
@@ -331,13 +446,25 @@ def main():
     parser.add_argument('--gff6a', help='GRCg6a GFF file')
     parser.add_argument('--gff7b', help='GRCg7b GFF file')
     parser.add_argument('--chr-only', action='store_true', help='Only import chromosome mapping')
+    parser.add_argument(
+        '--reset-mapping-table',
+        action='store_true',
+        help='Delete existing GRCg6a -> GRCg7b chromosome mappings before import',
+    )
+    parser.add_argument('--grcg6a-report', help='NCBI GRCg6a sequence_report.tsv')
+    parser.add_argument('--grcg7b-report', help='NCBI GRCg7b sequence_report.tsv')
     parser.add_argument('--dsn', default=PG_DSN, help='PostgreSQL DSN')
     args = parser.parse_args()
 
     conn = psycopg2.connect(args.dsn)
 
     # Always import chromosome mapping
-    import_chromosome_mapping(conn)
+    import_chromosome_mapping(
+        conn,
+        reset_mapping_table=args.reset_mapping_table,
+        grcg6a_report=args.grcg6a_report,
+        grcg7b_report=args.grcg7b_report,
+    )
 
     if not args.chr_only:
         if args.blast:
