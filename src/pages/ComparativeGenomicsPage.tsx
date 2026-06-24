@@ -45,6 +45,9 @@ import {
   getChromosomeMapping,
   getComparativeCitation,
   getComparativeMethods,
+  getComparativeOverview,
+  getComparativeRegistry,
+  getDotplotMetadata,
   getGeneCollinearity,
   getGoldStandardStatus,
   getMicroSyntenyBlockDetails,
@@ -62,6 +65,10 @@ import {
   type ChromosomeMapping,
   type ComparativeCitation,
   type ComparativeMethods,
+  type ComparativeMolecule,
+  type ComparativeOverview,
+  type ComparativeRegistry,
+  type DotplotMetadata,
   type GeneCoordinateMapping,
   type GeneCollinearityResponse,
   type GoldStandardLayer,
@@ -75,13 +82,6 @@ import {
 import FigureSettingsDrawer from "../components/comparative/FigureSettingsDrawer";
 
 const Plot = lazy(() => import("react-plotly.js"));
-
-const CHROMOSOMES = [
-  "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-  "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
-  "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
-  "31", "32", "W", "Z", "MT",
-];
 
 const PAGE_SIZE = 50;
 const NATURAL_FILTERS = {
@@ -128,6 +128,9 @@ export default function ComparativeGenomicsPage() {
   const [naturalBlockMeta, setNaturalBlockMeta] = useState<AlignmentBlocksResponse | null>(null);
   const [naturalStats, setNaturalStats] = useState<AlignmentStats | null>(null);
   const [methods, setMethods] = useState<ComparativeMethods | null>(null);
+  const [registry, setRegistry] = useState<ComparativeRegistry | null>(null);
+  const [overview, setOverview] = useState<ComparativeOverview | null>(null);
+  const [dotplotMetadata, setDotplotMetadata] = useState<DotplotMetadata | null>(null);
   const [citation, setCitation] = useState<ComparativeCitation | null>(null);
   const [svCandidates, setSvCandidates] = useState<SvCandidatesResponse | null>(null);
   const [goldStatus, setGoldStatus] = useState<GoldStandardStatus | null>(null);
@@ -151,6 +154,22 @@ export default function ComparativeGenomicsPage() {
   const [error, setError] = useState("");
   const [layerWarnings, setLayerWarnings] = useState<string[]>([]);
 
+  const queryMolecules = useMemo(
+    () => dotplotMetadata?.axes?.query?.molecules || registry?.dotplot_axes?.query?.molecules || [],
+    [dotplotMetadata, registry],
+  );
+  const targetMolecules = useMemo(
+    () => dotplotMetadata?.axes?.target?.molecules || registry?.dotplot_axes?.target?.molecules || [],
+    [dotplotMetadata, registry],
+  );
+  const queryChromosomes = useMemo(() => queryMolecules.map((molecule) => molecule.chr), [queryMolecules]);
+  const targetChromosomes = useMemo(() => targetMolecules.map((molecule) => molecule.chr), [targetMolecules]);
+  const chromosomeFilterOptions = useMemo(() => queryChromosomes.length ? queryChromosomes : ["1"], [queryChromosomes]);
+  const baseChromosomeOptions = useMemo(
+    () => (baseSide === "query" ? chromosomeFilterOptions : (targetChromosomes.length ? targetChromosomes : ["1"])),
+    [baseSide, chromosomeFilterOptions, targetChromosomes],
+  );
+
   const loadAlignmentData = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -161,6 +180,9 @@ export default function ComparativeGenomicsPage() {
         naturalStatsRow,
         naturalBlockRows,
         methodRows,
+        registryRows,
+        overviewRows,
+        dotplotMetadataRows,
         citationRows,
         goldRows,
         staticFigureRows,
@@ -171,6 +193,18 @@ export default function ComparativeGenomicsPage() {
         getAlignmentStats({ mode: "natural", ...NATURAL_FILTERS }),
         getAlignmentBlocks({ mode: "natural", chr_1: chrParam, order: "coordinate", ...NATURAL_FILTERS }),
         getComparativeMethods(),
+        getComparativeRegistry().catch((err) => {
+          warnings.push(`Assembly registry unavailable: ${getErrorMessage(err)}`);
+          return null;
+        }),
+        getComparativeOverview().catch((err) => {
+          warnings.push(`Comparative overview unavailable: ${getErrorMessage(err)}`);
+          return null;
+        }),
+        getDotplotMetadata().catch((err) => {
+          warnings.push(`Dotplot metadata unavailable: ${getErrorMessage(err)}`);
+          return null;
+        }),
         getComparativeCitation().catch((err) => {
           warnings.push(`Citation metadata unavailable: ${getErrorMessage(err)}`);
           return null;
@@ -194,6 +228,9 @@ export default function ComparativeGenomicsPage() {
       setNaturalBlocks(naturalBlockRows.blocks);
       setNaturalBlockMeta(naturalBlockRows);
       setMethods(methodRows);
+      setRegistry(registryRows);
+      setOverview(overviewRows);
+      setDotplotMetadata(dotplotMetadataRows);
       setCitation(citationRows);
       setGoldStatus(goldRows);
       setStaticFigures(staticFigureRows);
@@ -235,6 +272,12 @@ export default function ComparativeGenomicsPage() {
   useEffect(() => {
     loadAlignmentData();
   }, [loadAlignmentData]);
+
+  useEffect(() => {
+    if (baseChromosomeOptions.length && !baseChromosomeOptions.includes(baseChr)) {
+      setBaseChr(baseChromosomeOptions[0]);
+    }
+  }, [baseChr, baseChromosomeOptions]);
 
   useEffect(() => {
     if (activeTab === "genes") loadOrthologs(0);
@@ -325,7 +368,7 @@ export default function ComparativeGenomicsPage() {
                 label="Chromosome"
                 value={chrFilter}
                 onChange={setChrFilter}
-                data={CHROMOSOMES}
+                data={chromosomeFilterOptions}
                 clearable
                 placeholder="All primary"
                 w={150}
@@ -375,7 +418,10 @@ export default function ComparativeGenomicsPage() {
             <OverviewPanel
               naturalStats={naturalStats}
               methods={methods}
+              registry={registry}
+              overview={overview}
               chrMapping={chrMapping}
+              targetOnly={registry?.target_only_molecules || []}
               loading={loading}
             />
           </Tabs.Panel>
@@ -403,6 +449,7 @@ export default function ComparativeGenomicsPage() {
                 loading={loading}
                 mode="natural"
                 stats={naturalStats}
+                metadata={dotplotMetadata}
                 selectedBlock={selectedAlignmentBlock}
                 onSelectBlock={setSelectedAlignmentBlock}
               />
@@ -425,6 +472,7 @@ export default function ComparativeGenomicsPage() {
               start={baseStart}
               end={baseEnd}
               loading={baseLoading}
+              chromosomes={baseChromosomeOptions}
               onSideChange={setBaseSide}
               onChrChange={setBaseChr}
               onStartChange={setBaseStart}
@@ -479,14 +527,22 @@ function MetricCard({ label, value, detail, suffix = "", digits }: {
 function OverviewPanel({
   naturalStats,
   methods,
+  registry,
+  overview,
   chrMapping,
+  targetOnly,
   loading,
 }: {
   naturalStats: AlignmentStats | null;
   methods: ComparativeMethods | null;
+  registry: ComparativeRegistry | null;
+  overview: ComparativeOverview | null;
   chrMapping: ChromosomeMapping[];
+  targetOnly: ComparativeMolecule[];
   loading: boolean;
 }) {
+  const registryStatus = overview?.validation.status || registry?.validation.status || "unknown";
+
   return (
     <Stack gap="md">
       <Card withBorder radius="sm" pos="relative">
@@ -514,6 +570,32 @@ function OverviewPanel({
             </Text>
           </Paper>
         </SimpleGrid>
+      </Card>
+
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>Assembly Registry</Text>
+          <Badge color={registryStatus === "passed" ? "green" : "yellow"} variant="light">{registryStatus}</Badge>
+        </Group>
+        <SimpleGrid cols={{ base: 1, md: 4 }} spacing="xs">
+          <SmallStat
+            label="GRCg6a primary"
+            value={String(overview?.assemblies.GRCg6a?.assembled_molecule_count || registry?.dotplot_axes.query.molecule_count || "-")}
+          />
+          <SmallStat
+            label="GRCg7b primary"
+            value={String(overview?.assemblies.GRCg7b?.assembled_molecule_count || registry?.dotplot_axes.target.molecule_count || "-")}
+          />
+          <SmallStat label="Shared mapping" value={String(overview?.shared_molecule_count || chrMapping.length || "-")} />
+          <SmallStat label="GRCg7b-only" value={String(overview?.target_only_count || targetOnly.length || "-")} />
+        </SimpleGrid>
+        {(overview?.validation.errors.length || registry?.validation.errors.length) ? (
+          <Alert color="yellow" mt="sm" title="Registry validation warnings">
+            {(overview?.validation.errors || registry?.validation.errors || []).map((message) => (
+              <Text key={message} size="sm">{message}</Text>
+            ))}
+          </Alert>
+        ) : null}
       </Card>
 
       <Card withBorder radius="sm">
@@ -546,6 +628,39 @@ function OverviewPanel({
           </ScrollArea>
         ) : (
           <Alert color="gray">Chromosome mapping table is not loaded from the database, but PAF-based synteny remains available.</Alert>
+        )}
+      </Card>
+
+      <Card withBorder radius="sm">
+        <Group justify="space-between" mb="md">
+          <Text fw={700}>GRCg7b-Only Assembled Molecules</Text>
+          <Badge color="blue" variant="light">{targetOnly.length.toLocaleString()} target-only</Badge>
+        </Group>
+        {targetOnly.length ? (
+          <ScrollArea h={260}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Chr</Table.Th>
+                  <Table.Th>GRCg7b RefSeq</Table.Th>
+                  <Table.Th>Length</Table.Th>
+                  <Table.Th>Interpretation</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {targetOnly.map((molecule) => (
+                  <Table.Tr key={molecule.refseq}>
+                    <Table.Td><Badge variant="light">chr{molecule.chr}</Badge></Table.Td>
+                    <Table.Td><Text size="sm" ff="monospace">{molecule.refseq}</Text></Table.Td>
+                    <Table.Td>{bp(molecule.length)}</Table.Td>
+                    <Table.Td><Text size="sm">{molecule.interpretation || "GRCg7b-only assembled molecule"}</Text></Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        ) : (
+          <Alert color="gray">Target-only molecule registry is not loaded yet.</Alert>
         )}
       </Card>
     </Stack>
@@ -648,6 +763,7 @@ function BaseLevelPanel({
   start,
   end,
   loading,
+  chromosomes,
   layer,
   onSideChange,
   onChrChange,
@@ -661,6 +777,7 @@ function BaseLevelPanel({
   start: string;
   end: string;
   loading: boolean;
+  chromosomes: string[];
   layer: GoldStandardLayer | null;
   onSideChange: (value: "query" | "target") => void;
   onChrChange: (value: string) => void;
@@ -685,7 +802,7 @@ function BaseLevelPanel({
             ]}
             w={180}
           />
-          <Select label="Chr" value={chr} onChange={(value) => value && onChrChange(value)} data={CHROMOSOMES} w={120} />
+          <Select label="Chr" value={chr} onChange={(value) => value && onChrChange(value)} data={chromosomes} w={120} />
           <TextInput label="Start (1-based)" value={start} onChange={(event) => onStartChange(event.currentTarget.value)} w={150} />
           <TextInput label="End" value={end} onChange={(event) => onEndChange(event.currentTarget.value)} w={150} />
           <Button onClick={onRun} loading={loading}>Query Details</Button>
@@ -1427,6 +1544,7 @@ function DotplotPanel({
   loading,
   mode,
   stats,
+  metadata,
   selectedBlock,
   onSelectBlock,
 }: {
@@ -1434,6 +1552,7 @@ function DotplotPanel({
   loading: boolean;
   mode: AlignmentMode;
   stats: AlignmentStats | null;
+  metadata: DotplotMetadata | null;
   selectedBlock: AlignmentBlock | null;
   onSelectBlock: (block: AlignmentBlock | null) => void;
 }) {
@@ -1447,20 +1566,30 @@ function DotplotPanel({
     targetLengths[d.chr_2] = Math.max(targetLengths[d.chr_2] || 0, d.target_length);
   });
 
-  const queryOffsets: Record<string, number> = {};
-  const targetOffsets: Record<string, number> = {};
-  let totalQuery = 0;
-  let totalTarget = 0;
-  CHROMOSOMES.forEach((chr) => {
-    if (queryLengths[chr]) {
-      queryOffsets[chr] = totalQuery;
-      totalQuery += queryLengths[chr];
-    }
-    if (targetLengths[chr]) {
-      targetOffsets[chr] = totalTarget;
-      totalTarget += targetLengths[chr];
-    }
-  });
+  const buildAxis = (molecules: ComparativeMolecule[] | undefined, fallbackLengths: Record<string, number>) => {
+    const axisMolecules = molecules?.length
+      ? molecules.filter((molecule) => molecule.length > 0)
+      : Object.entries(fallbackLengths).map(([chr, length]) => ({
+          chr,
+          display_name: `chr${chr}`,
+          refseq: chr,
+          length,
+        }));
+    const offsets: Record<string, number> = {};
+    const centers: Record<string, number> = {};
+    let total = 0;
+    axisMolecules.forEach((molecule) => {
+      offsets[molecule.chr] = total;
+      centers[molecule.chr] = total + molecule.length / 2;
+      total += molecule.length;
+    });
+    return { molecules: axisMolecules, offsets, centers, total };
+  };
+
+  const queryAxis = buildAxis(metadata?.axes?.query?.molecules, queryLengths);
+  const targetAxis = buildAxis(metadata?.axes?.target?.molecules, targetLengths);
+  const { offsets: queryOffsets, total: totalQuery } = queryAxis;
+  const { offsets: targetOffsets, total: totalTarget } = targetAxis;
 
   if (!totalQuery || !totalTarget) return <Alert color="gray">Dotplot coordinates are incomplete for this selection.</Alert>;
 
@@ -1500,7 +1629,7 @@ function DotplotPanel({
       line: { color, width: 2 },
     };
   };
-  const queryShapes = CHROMOSOMES.filter(hasQuery).map((chr) => ({
+  const queryShapes = queryAxis.molecules.map((molecule) => molecule.chr).filter(hasQuery).map((chr) => ({
     type: "line" as const,
     x0: queryOffsets[chr],
     x1: queryOffsets[chr],
@@ -1508,7 +1637,7 @@ function DotplotPanel({
     y1: totalTarget,
     line: { color: "#e9ecef", width: 1 },
   }));
-  const targetShapes = CHROMOSOMES.filter(hasTarget).map((chr) => ({
+  const targetShapes = targetAxis.molecules.map((molecule) => molecule.chr).filter(hasTarget).map((chr) => ({
     type: "line" as const,
     x0: 0,
     x1: totalQuery,
@@ -1555,12 +1684,19 @@ function DotplotPanel({
             xaxis: {
               title: { text: "GRCg6a cumulative genomic coordinate" },
               range: [0, totalQuery],
+              tickvals: queryAxis.molecules.map((molecule) => queryAxis.centers[molecule.chr]),
+              ticktext: queryAxis.molecules.map((molecule) => molecule.display_name || `chr${molecule.chr}`),
+              tickangle: -45,
+              tickfont: { size: 9 },
               zeroline: false,
               constrain: "domain",
             },
             yaxis: {
               title: { text: "GRCg7b cumulative genomic coordinate" },
               range: [0, totalTarget],
+              tickvals: targetAxis.molecules.map((molecule) => targetAxis.centers[molecule.chr]),
+              ticktext: targetAxis.molecules.map((molecule) => molecule.display_name || `chr${molecule.chr}`),
+              tickfont: { size: 9 },
               zeroline: false,
               scaleanchor: "x",
               scaleratio: 1,

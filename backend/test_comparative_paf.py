@@ -6,6 +6,8 @@ import re
 
 from backend.comparative_paf import (
     GRCG6A_REFSEQ_TO_CHR,
+    GRCG7B_PRIMARY_CHROMOSOMES,
+    GRCG7B_REFSEQ_TO_CHR,
     PRIMARY_CHROMOSOMES,
     chromosome_sort_key,
     parse_paf_line,
@@ -51,6 +53,43 @@ def test_parse_paf_line_keeps_grcg6a_chr33_distinct_from_grcg7b_chr29():
     assert record.chr_2 == "29"
     assert record.is_primary_chromosome_pair is True
     assert record.is_same_chromosome is False
+
+
+def test_grcg7b_refseq_mapping_covers_42_primary_molecules():
+    assert GRCG7B_PRIMARY_CHROMOSOMES == [
+        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+        "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+        "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+        "31", "32", "33", "34", "35", "36", "37", "38", "39", "W", "Z", "MT",
+    ]
+    assert GRCG7B_REFSEQ_TO_CHR["NC_052564.1"] == "33"
+    assert GRCG7B_REFSEQ_TO_CHR["NC_052565.1"] == "34"
+    assert GRCG7B_REFSEQ_TO_CHR["NC_052570.1"] == "39"
+
+
+def test_parse_paf_line_uses_assembly_specific_primary_sets():
+    target_only_line = (
+        "NC_006088.5\t197608386\t100\t1000\t+\t"
+        "NC_052565.1\t1200000\t200\t1100\t"
+        "850\t900\t60"
+    )
+    invalid_query_line = (
+        "chr29\t1000000\t100\t1000\t+\t"
+        "NC_052560.1\t1200000\t200\t1100\t"
+        "850\t900\t60"
+    )
+
+    target_only = parse_paf_line(target_only_line, 0)
+    invalid_query = parse_paf_line(invalid_query_line, 1)
+
+    assert target_only is not None
+    assert target_only.chr_1 == "1"
+    assert target_only.chr_2 == "34"
+    assert target_only.is_primary_chromosome_pair is True
+    assert invalid_query is not None
+    assert invalid_query.chr_1 == "29"
+    assert invalid_query.chr_2 == "29"
+    assert invalid_query.is_primary_chromosome_pair is False
 
 
 def test_summarize_paf_records_identifies_natural_dataset(tmp_path: Path):

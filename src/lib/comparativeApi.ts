@@ -27,6 +27,91 @@ export interface ChromosomeMapping {
   score: number;
 }
 
+export interface ComparativeMolecule {
+  chr: string;
+  display_name: string;
+  refseq: string;
+  genbank?: string;
+  length: number;
+  molecule_type?: string;
+  aliases?: string[];
+  interpretation?: string;
+}
+
+export interface ComparativeAxis {
+  assembly: string;
+  molecule_count: number;
+  molecules: ComparativeMolecule[];
+}
+
+export interface ComparativeRegistry {
+  version: string;
+  pair: {
+    assembly_1: string;
+    assembly_2: string;
+    comparison_id: string;
+    species?: string;
+  };
+  assemblies: Record<string, {
+    assembled_molecule_count?: number;
+    chromosome_count?: number;
+    organelle_count?: number;
+    total_length?: number;
+    molecules?: ComparativeMolecule[];
+    validation?: { status: string; errors: string[] };
+  }>;
+  shared_molecules: string[];
+  query_only_molecules?: string[];
+  target_only_molecules: ComparativeMolecule[];
+  chromosome_mapping: Array<{
+    chr: string;
+    chr_from: string;
+    chr_to: string;
+    refseq_from: string;
+    refseq_to: string;
+    genbank_from?: string;
+    genbank_to?: string;
+    length_from: number;
+    length_to: number;
+    strand: string;
+    mapping_type: string;
+  }>;
+  dotplot_axes: {
+    query: ComparativeAxis;
+    target: ComparativeAxis;
+  };
+  validation: { status: string; errors: string[] };
+}
+
+export interface ComparativeOverview {
+  version: string;
+  pair: ComparativeRegistry["pair"];
+  assemblies: Record<string, {
+    assembled_molecule_count: number;
+    chromosome_count: number;
+    organelle_count: number;
+    total_length: number;
+  }>;
+  shared_molecule_count: number;
+  shared_molecules: string[];
+  target_only_count: number;
+  target_only_molecules: string[];
+  validation: { status: string; errors: string[] };
+}
+
+export interface DotplotMetadata {
+  version: string;
+  pair: ComparativeRegistry["pair"];
+  axes: ComparativeRegistry["dotplot_axes"];
+  alignment_layers: Array<{
+    id: string;
+    label: string;
+    role: string;
+    source: string;
+  }>;
+  validation: { status: string; errors: string[] };
+}
+
 export interface SyntenyBlock {
   block_id: number;
   assembly_1: string;
@@ -533,6 +618,34 @@ export async function getChromosomeMapping(
     `/comparative/chromosome-mapping?assembly_from=${assemblyFrom}&assembly_to=${assemblyTo}`
   );
   return data.mapping;
+}
+
+export async function getComparativeRegistry(): Promise<ComparativeRegistry> {
+  return apiFetch<ComparativeRegistry>("/comparative/registry");
+}
+
+export async function getComparativeOverview(): Promise<ComparativeOverview> {
+  return apiFetch<ComparativeOverview>("/comparative/overview");
+}
+
+export async function getTargetOnlyMolecules(): Promise<{
+  version: string;
+  assembly: string;
+  molecules: ComparativeMolecule[];
+  count: number;
+  validation: { status: string; errors: string[] };
+}> {
+  return apiFetch<{
+    version: string;
+    assembly: string;
+    molecules: ComparativeMolecule[];
+    count: number;
+    validation: { status: string; errors: string[] };
+  }>("/comparative/target-only-molecules");
+}
+
+export async function getDotplotMetadata(): Promise<DotplotMetadata> {
+  return apiFetch<DotplotMetadata>("/comparative/dotplot/metadata");
 }
 
 export async function getSyntenyBlocks(params: {

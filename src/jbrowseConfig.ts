@@ -55,14 +55,14 @@ export const grcg6aAssembly = {
     trackId: "GRCg6a-ReferenceSequenceTrack",
     adapter: {
       type: "IndexedFastaAdapter",
-      fastaLocation: { uri: "/genome/GCF_000002315.6_GRCg6a_genomic.chr.fna" },
-      faiLocation: { uri: "/genome/GCF_000002315.6_GRCg6a_genomic.chr.fna.fai" },
+      fastaLocation: { uri: "/genome/GCF_000002315.6_GRCg6a_primary_35.fna" },
+      faiLocation: { uri: "/genome/GCF_000002315.6_GRCg6a_primary_35.fna.fai" },
     },
   },
   refNameAliases: {
     adapter: {
       type: "RefNameAliasAdapter",
-      uri: "/genome/aliases.txt",
+      uri: "/genome/grcg6a_primary_35_aliases.txt",
     },
   },
 };
@@ -76,14 +76,14 @@ export const grcg7bAssembly = {
     trackId: "GRCg7b-ReferenceSequenceTrack",
     adapter: {
       type: "IndexedFastaAdapter",
-      fastaLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_main_chr.fna" },
-      faiLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_main_chr.fna.fai" },
+      fastaLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_primary_42.fna" },
+      faiLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_primary_42.fna.fai" },
     },
   },
   refNameAliases: {
     adapter: {
       type: "RefNameAliasAdapter",
-      uri: "/genome/grcg7b_main_aliases.txt",
+      uri: "/genome/grcg7b_primary_42_aliases.txt",
     },
   },
 };
@@ -96,7 +96,7 @@ export const geneTrackGRCg6a = {
   assemblyNames: ["GRCg6a"],
   adapter: {
     type: "Gff3Adapter",
-    gffLocation: { uri: "/genome/GCF_000002315.6_GRCg6a_genomic.gff" },
+    gffLocation: { uri: "/genome/GCF_000002315.6_GRCg6a_primary_35.gff.gz" },
   },
 };
 
@@ -107,7 +107,7 @@ export const geneTrackGRCg7b = {
   assemblyNames: ["GRCg7b"],
   adapter: {
     type: "Gff3Adapter",
-    gffLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_main_chr.gff.gz" },
+    gffLocation: { uri: "/genome/GCF_016699485.2_GRCg7b_primary_42.gff.gz" },
   },
 };
 

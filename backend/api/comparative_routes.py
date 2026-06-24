@@ -42,6 +42,27 @@ async def get_assembly_info(assembly_name: str):
     return info
 
 
+@router.get("/registry")
+async def get_comparative_registry():
+    """Get registry-driven GRCg6a/GRCg7b assembly metadata."""
+    service = get_service()
+    return service.get_comparative_registry()
+
+
+@router.get("/overview")
+async def get_comparative_overview():
+    """Get registry-backed comparative overview counts."""
+    service = get_service()
+    return service.get_comparative_overview()
+
+
+@router.get("/target-only-molecules")
+async def get_target_only_molecules():
+    """Get GRCg7b primary molecules without shared GRCg6a chromosome names."""
+    service = get_service()
+    return service.get_target_only_molecules()
+
+
 @router.get("/chromosome-mapping")
 async def get_chromosome_mapping(
     assembly_from: str = Query("GRCg6a"),
@@ -51,6 +72,13 @@ async def get_chromosome_mapping(
     service = get_service()
     mapping = service.get_chromosome_mapping(assembly_from, assembly_to)
     return {"mapping": mapping, "count": len(mapping)}
+
+
+@router.get("/dotplot/metadata")
+async def get_dotplot_metadata():
+    """Get registry-backed dotplot axes and available alignment layers."""
+    service = get_service()
+    return service.get_dotplot_metadata()
 
 
 @router.get("/synteny")

@@ -16,6 +16,7 @@ from backend.comparative_paf import (
     records_to_dicts,
     summarize_paf_records,
 )
+from backend.comparative_registry import build_pair_registry
 from backend.comparative_gold import CoordinateSide, GoldStandardComparativeStore
 from backend.config import GRCG6A_RAWDATA_ROOT
 
@@ -37,18 +38,184 @@ class ComparativeService:
     def _project_root(self) -> Path:
         return GRCG6A_RAWDATA_ROOT.parent
 
+    def _registry_path(self) -> Path:
+        return self._project_root() / "comparative" / "registry" / "assembly_registry.json"
+
+    def _repo_root(self) -> Path:
+        return Path(__file__).resolve().parents[1]
+
+    def _first_existing(self, *paths: Path) -> Path | None:
+        for path in paths:
+            if path.exists():
+                return path
+        return None
+
+    def _build_registry_from_local_inputs(self) -> dict:
+        project_root = self._project_root()
+        repo_root = self._repo_root()
+        grcg6a_report = self._first_existing(
+            project_root / "GRCg6a_sequence_report.tsv",
+            repo_root / "GRCg6a_sequence_report.tsv",
+        )
+        grcg7b_report = self._first_existing(
+            project_root / "GRCg7b_sequence_report.tsv",
+            repo_root / "GRCg7b_sequence_report.tsv",
+        )
+        if grcg6a_report is None or grcg7b_report is None:
+            return {
+                "version": "comparative_gold_v1",
+                "pair": {"assembly_1": "GRCg6a", "assembly_2": "GRCg7b", "comparison_id": "GRCg6a__GRCg7b"},
+                "assemblies": {},
+                "shared_molecules": [],
+                "target_only_molecules": [],
+                "chromosome_mapping": [],
+                "dotplot_axes": {
+                    "query": {"assembly": "GRCg6a", "molecule_count": 0, "molecules": []},
+                    "target": {"assembly": "GRCg7b", "molecule_count": 0, "molecules": []},
+                },
+                "validation": {
+                    "status": "missing",
+                    "errors": ["NCBI sequence_report.tsv files are not available for registry construction"],
+                },
+            }
+        grcg6a_fasta = self._first_existing(
+            project_root / "GCF_000002315.6_GRCg6a_primary_35.fna",
+            project_root / "GCF_000002315.6_GRCg6a_genomic.chr.fna",
+        )
+        grcg6a_gff = self._first_existing(
+            project_root / "GCF_000002315.6_GRCg6a_primary_35.gff.gz",
+            project_root / "GCF_000002315.6_GRCg6a_genomic.gff",
+        )
+        grcg7b_fasta = self._first_existing(
+            project_root / "GCF_016699485.2_GRCg7b_primary_42.fna",
+            project_root / "GCF_016699485.2_GRCg7b_main_chr.fna",
+            project_root / "GCF_016699485.2_GRCg7b_genomic.fna.gz",
+            project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_genomic.fna.gz",
+        )
+        grcg7b_gff = self._first_existing(
+            project_root / "GCF_016699485.2_GRCg7b_primary_42.gff.gz",
+            project_root / "GCF_016699485.2_GRCg7b_main_chr.gff.gz",
+            project_root / "GCF_016699485.2_GRCg7b_genomic.gff.gz",
+            project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_genomic.gff.gz",
+        )
+        return build_pair_registry(
+            grcg6a_report=grcg6a_report,
+            grcg7b_report=grcg7b_report,
+            grcg6a_fasta=grcg6a_fasta,
+            grcg7b_fasta=grcg7b_fasta,
+            grcg6a_fai=Path(f"{grcg6a_fasta}.fai") if grcg6a_fasta else None,
+            grcg7b_fai=Path(f"{grcg7b_fasta}.fai") if grcg7b_fasta else None,
+            grcg6a_gff=grcg6a_gff,
+            grcg7b_gff=grcg7b_gff,
+            expected_grcg6a_molecules=35,
+            expected_grcg7b_molecules=42,
+        )
+
+    def get_comparative_registry(self) -> dict:
+        cached = getattr(self, "_registry_cache", None)
+        if cached is not None:
+            return cached
+        registry_path = self._registry_path()
+        if registry_path.exists():
+            registry = json.loads(registry_path.read_text(encoding="utf-8-sig"))
+        else:
+            registry = self._build_registry_from_local_inputs()
+        self._registry_cache = registry
+        return registry
+
+    def get_comparative_overview(self) -> dict:
+        registry = self.get_comparative_registry()
+        assemblies = registry.get("assemblies", {})
+        return {
+            "version": registry.get("version", "comparative_gold_v1"),
+            "pair": registry.get("pair", {}),
+            "assemblies": {
+                name: {
+                    "assembled_molecule_count": row.get("assembled_molecule_count", 0),
+                    "chromosome_count": row.get("chromosome_count", 0),
+                    "organelle_count": row.get("organelle_count", 0),
+                    "total_length": row.get("total_length", 0),
+                }
+                for name, row in assemblies.items()
+            },
+            "shared_molecule_count": len(registry.get("shared_molecules", [])),
+            "shared_molecules": registry.get("shared_molecules", []),
+            "target_only_count": len(registry.get("target_only_molecules", [])),
+            "target_only_molecules": [row.get("chr") for row in registry.get("target_only_molecules", [])],
+            "validation": registry.get("validation", {}),
+        }
+
+    def get_target_only_molecules(self) -> dict:
+        registry = self.get_comparative_registry()
+        molecules = registry.get("target_only_molecules", [])
+        return {
+            "version": registry.get("version", "comparative_gold_v1"),
+            "assembly": registry.get("pair", {}).get("assembly_2", "GRCg7b"),
+            "molecules": molecules,
+            "count": len(molecules),
+            "validation": registry.get("validation", {}),
+        }
+
+    def get_dotplot_metadata(self) -> dict:
+        registry = self.get_comparative_registry()
+        dna_root = self._project_root() / "comparative" / "pairwise" / "GRCg6a__GRCg7b" / "dna_alignment"
+        return {
+            "version": registry.get("version", "comparative_gold_v1"),
+            "pair": registry.get("pair", {}),
+            "axes": registry.get("dotplot_axes", {}),
+            "alignment_layers": [
+                {
+                    "id": "clean_primary",
+                    "label": "Clean primary PAF",
+                    "role": "default_dotplot",
+                    "source": str(self.get_alignment_paf_path("natural")),
+                },
+                {
+                    "id": "all_primary",
+                    "label": "All primary PAF",
+                    "role": "review_archive",
+                    "source": str(dna_root / "GRCg6a_to_GRCg7b.primary.asm5.all.paf"),
+                },
+                {
+                    "id": "grcg7b_extra_micro_evidence",
+                    "label": "GRCg7b-only microchromosome evidence",
+                    "role": "target_only_evidence",
+                    "source": str(dna_root / "GRCg7b_extra_micro_to_GRCg6a_full.asm10.evidence.paf"),
+                },
+                {
+                    "id": "gene_collinearity",
+                    "label": "Gene collinearity anchors",
+                    "role": "gene_order_evidence",
+                    "source": str(self.gold_store.anchors) if hasattr(self, "gold_store") else "",
+                },
+            ],
+            "validation": registry.get("validation", {}),
+        }
+
     def get_alignment_paf_path(self, mode: AlignmentMode = "natural") -> Path:
         """Return the source PAF file for a comparative alignment layer."""
-        base = self._project_root() / "synteny"
-        return base / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf"
+        project_root = self._project_root()
+        dna_root = project_root / "comparative" / "pairwise" / "GRCg6a__GRCg7b" / "dna_alignment"
+        candidates = [
+            dna_root / "primary.asm5.paf",
+            dna_root / "GRCg6a_to_GRCg7b.primary.asm5.clean.paf",
+            project_root / "synteny" / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path
+        return candidates[0]
 
     def get_alignment_provenance_path(self) -> Path:
-        return (
-            self._project_root()
-            / "synteny"
-            / "natural"
-            / "grcg6a_vs_grcg7b.natural.asm5.provenance.json"
-        )
+        project_root = self._project_root()
+        candidates = [
+            project_root / "comparative" / "pairwise" / "GRCg6a__GRCg7b" / "dna_alignment" / "provenance.json",
+            project_root / "synteny" / "natural" / "grcg6a_vs_grcg7b.natural.asm5.provenance.json",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path
+        return candidates[0]
 
     def get_alignment_blocks(
         self,
@@ -359,6 +526,25 @@ class ComparativeService:
         self, assembly_from: str, assembly_to: str
     ) -> list[dict]:
         """Get chromosome-level mapping between assemblies"""
+        if assembly_from == "GRCg6a" and assembly_to == "GRCg7b":
+            registry = self.get_comparative_registry()
+            if registry.get("chromosome_mapping"):
+                return [
+                    {
+                        "mapping_id": index,
+                        "assembly_from": assembly_from,
+                        "assembly_to": assembly_to,
+                        "chr_from": row["chr_from"],
+                        "chr_to": row["chr_to"],
+                        "refseq_from": row["refseq_from"],
+                        "refseq_to": row["refseq_to"],
+                        "genbank_from": row.get("genbank_from"),
+                        "genbank_to": row.get("genbank_to"),
+                        "strand": row.get("strand", "+"),
+                        "score": 1.0,
+                    }
+                    for index, row in enumerate(registry["chromosome_mapping"], start=1)
+                ]
         conn, cur = self._get_cursor()
         try:
             cur.execute("""

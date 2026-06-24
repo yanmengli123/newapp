@@ -203,11 +203,26 @@ class GoldStandardComparativeStore:
 
     @property
     def primary_paf(self) -> Path:
-        return self.synteny_root / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf"
+        candidates = [
+            self.dna_alignment_root / "primary.asm5.paf",
+            self.dna_alignment_root / "GRCg6a_to_GRCg7b.primary.asm5.clean.paf",
+            self.synteny_root / "natural" / "grcg6a_vs_grcg7b.natural.asm5.paf",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path
+        return candidates[0]
 
     @property
     def primary_provenance(self) -> Path:
-        return self.synteny_root / "natural" / "grcg6a_vs_grcg7b.natural.asm5.provenance.json"
+        candidates = [
+            self.dna_alignment_root / "provenance.json",
+            self.synteny_root / "natural" / "grcg6a_vs_grcg7b.natural.asm5.provenance.json",
+        ]
+        for path in candidates:
+            if path.exists():
+                return path
+        return candidates[0]
 
     @property
     def dna_alignment_root(self) -> Path:
@@ -385,18 +400,24 @@ class GoldStandardComparativeStore:
     def _assembly_files(self) -> dict:
         assemblies = {
             "GRCg6a": {
-                "genome": self.project_root / "GCF_000002315.6_GRCg6a_genomic.chr.fna",
-                "annotation": self.project_root / "GCF_000002315.6_GRCg6a_genomic.gff",
+                "genome": self.project_root / "GCF_000002315.6_GRCg6a_primary_35.fna",
+                "annotation": self.project_root / "GCF_000002315.6_GRCg6a_primary_35.gff.gz",
+                "aliases": self.project_root / "grcg6a_primary_35_aliases.txt",
                 "protein": self.project_root / "GCF_000002315.6_GRCg6a_protein.faa.gz",
                 "cds": self.project_root / "GCF_000002315.6_GRCg6a_cds_from_genomic.fna.gz",
+                "sequence_report": self.project_root / "GRCg6a_sequence_report.tsv",
                 "assembly_report": self.project_root / "GCF_000002315.6_GRCg6a_assembly_report.txt",
                 "assembly_stats": self.project_root / "GCF_000002315.6_GRCg6a_assembly_stats.txt",
             },
             "GRCg7b": {
-                "genome": self.project_root / "GCF_016699485.2_GRCg7b_main_chr.fna",
-                "annotation": self.project_root / "GCF_016699485.2_GRCg7b_main_chr.gff.gz",
+                "genome": self.project_root / "GCF_016699485.2_GRCg7b_primary_42.fna",
+                "annotation": self.project_root / "GCF_016699485.2_GRCg7b_primary_42.gff.gz",
+                "aliases": self.project_root / "grcg7b_primary_42_aliases.txt",
+                "target_only_genome": self.project_root / "GCF_016699485.2_GRCg7b_extra_7.fna",
+                "target_only_annotation": self.project_root / "GCF_016699485.2_GRCg7b_extra_7.gff.gz",
                 "protein": self.project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_protein.faa",
                 "cds": self.project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_cds_from_genomic.fna",
+                "sequence_report": self.project_root / "GRCg7b_sequence_report.tsv",
                 "assembly_report": self.project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_assembly_report.txt",
                 "assembly_stats": self.project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_assembly_stats.txt",
             },
@@ -433,9 +454,21 @@ class GoldStandardComparativeStore:
                     "role": "primary_visualization",
                     "files": [
                         EvidenceFile.from_path("primary_paf", self.primary_paf).to_dict(),
+                        EvidenceFile.from_path(
+                            "all_primary_paf",
+                            self.dna_alignment_root / "GRCg6a_to_GRCg7b.primary.asm5.all.paf",
+                        ).to_dict(),
+                        EvidenceFile.from_path(
+                            "target_only_micro_paf",
+                            self.dna_alignment_root / "GRCg7b_extra_micro_to_GRCg6a_full.asm10.evidence.paf",
+                        ).to_dict(),
+                        EvidenceFile.from_path(
+                            "clean_primary_pif",
+                            self.dna_alignment_root / "GRCg6a_to_GRCg7b.primary.asm5.clean.pif.gz",
+                        ).to_dict(),
                         EvidenceFile.from_path("provenance", self.primary_provenance).to_dict(),
                     ],
-                    "best_practice": "Use for whole-genome ribbons, dotplot, and region navigation.",
+                    "best_practice": "Use clean primary minimap2 PAF/PIF for whole-genome ribbons, dotplot, and region navigation; keep all-primary and GRCg7b-only microchromosome PAF as review/evidence layers.",
                 },
                 "base_level_alignment": {
                     "status": base_status,

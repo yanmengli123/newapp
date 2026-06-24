@@ -9,11 +9,26 @@ from typing import Iterable, Literal, Optional
 
 AlignmentMode = Literal["natural"]
 
-PRIMARY_CHROMOSOMES = [
+GRCG6A_PRIMARY_CHROMOSOMES = [
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+    "21", "22", "23", "24", "25", "26", "27", "28", "30",
+    "31", "32", "33", "W", "Z", "MT",
+]
+
+GRCG7B_PRIMARY_CHROMOSOMES = [
     "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
     "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
     "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
-    "31", "32", "33", "W", "Z", "MT",
+    "31", "32", "33", "34", "35", "36", "37", "38", "39", "W", "Z", "MT",
+]
+
+PRIMARY_CHROMOSOMES = GRCG6A_PRIMARY_CHROMOSOMES
+CHICKEN_CHROMOSOME_ORDER = [
+    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+    "21", "22", "23", "24", "25", "26", "27", "28", "29", "30",
+    "31", "32", "33", "34", "35", "36", "37", "38", "39", "W", "Z", "MT",
 ]
 
 GRCG6A_REFSEQ_TO_CHR = {
@@ -87,10 +102,22 @@ GRCG7B_REFSEQ_TO_CHR = {
     "NC_052561.1": "30",
     "NC_052562.1": "31",
     "NC_052563.1": "32",
+    "NC_052564.1": "33",
+    "NC_052565.1": "34",
+    "NC_052566.1": "35",
+    "NC_052567.1": "36",
+    "NC_052568.1": "37",
+    "NC_052569.1": "38",
+    "NC_052570.1": "39",
     "NC_052571.1": "W",
     "NC_052572.1": "Z",
     "NC_024088.1": "MT",
     "NC_053523.1": "MT",
+}
+
+PRIMARY_CHROMOSOMES_BY_ASSEMBLY = {
+    "GRCg6a": set(GRCG6A_PRIMARY_CHROMOSOMES),
+    "GRCg7b": set(GRCG7B_PRIMARY_CHROMOSOMES),
 }
 
 
@@ -141,12 +168,20 @@ def normalize_chr(assembly: str, ref_name: str) -> str:
 
 def chromosome_sort_key(chr_name: str) -> tuple[int, int | str]:
     normalized = chr_name[3:] if chr_name.startswith("chr") else chr_name
-    if normalized in PRIMARY_CHROMOSOMES:
-        return (0, PRIMARY_CHROMOSOMES.index(normalized))
+    if normalized in CHICKEN_CHROMOSOME_ORDER:
+        return (0, CHICKEN_CHROMOSOME_ORDER.index(normalized))
     try:
         return (1, int(normalized))
     except ValueError:
         return (2, normalized)
+
+
+def is_primary_chromosome(assembly: str, chr_name: str) -> bool:
+    normalized = chr_name[3:] if chr_name.startswith("chr") else chr_name
+    allowed = PRIMARY_CHROMOSOMES_BY_ASSEMBLY.get(assembly)
+    if allowed is None:
+        return normalized in CHICKEN_CHROMOSOME_ORDER
+    return normalized in allowed
 
 
 def parse_paf_line(
@@ -208,7 +243,10 @@ def parse_paf_line(
         start_2=target_start,
         end_2=target_end,
         score=residue_matches,
-        is_primary_chromosome_pair=chr_1 in PRIMARY_CHROMOSOMES and chr_2 in PRIMARY_CHROMOSOMES,
+        is_primary_chromosome_pair=(
+            is_primary_chromosome(assembly_1, chr_1)
+            and is_primary_chromosome(assembly_2, chr_2)
+        ),
         is_same_chromosome=chr_1 == chr_2,
     )
 
