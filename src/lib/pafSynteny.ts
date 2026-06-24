@@ -2,7 +2,7 @@ import type { SyntenyFeature } from "../jbrowseSyntenyViewState";
 import { API_BASE } from "./apiClient";
 
 const PAF_URL = "/comparative/paf/file?mode=natural&min_quality=30&min_identity=85&min_alignment_length=50000";
-const GENE_COLLINEARITY_URL = "/comparative/gene-collinearity?limit=20000";
+const GENE_COLLINEARITY_URL = "/comparative/gene-collinearity?limit=1000&block_limit=1000";
 
 export interface LoadedPafSynteny {
   features: SyntenyFeature[];
@@ -12,6 +12,11 @@ export interface LoadedPafSynteny {
   source: string;
   warning: string;
   isFallback: boolean;
+}
+
+export interface LoadedGeneCollinearity {
+  geneFeatures: SyntenyFeature[];
+  geneStatus: string;
 }
 
 const CHR_TO_GRCG6A_REFSEQ: Record<string, string> = {
@@ -102,27 +107,79 @@ const GRCG7B_REFSEQ_TO_CHR: Record<string, string> = {
   "NC_053523.1": "chrMT",
 };
 
-export async function loadPafSyntenyFeatures(): Promise<LoadedPafSynteny> {
-  const [response, geneResponse] = await Promise.all([
-    fetch(`${API_BASE}${PAF_URL}`),
-    fetch(`${API_BASE}${GENE_COLLINEARITY_URL}`).catch(() => undefined),
-  ]);
-  if (!response.ok) {
-    throw new Error(`Failed to load natural-breakpoint PAF synteny file: ${response.status}`);
+function withDisplayAliases(accessionToChr: Record<string, string>) {
+  const aliases: Record<string, string> = {};
+  for (const [accession, chrName] of Object.entries(accessionToChr)) {
+    aliases[accession] = chrName;
+    aliases[chrName] = chrName;
+    aliases[chrName.replace(/^chr/, "")] = chrName;
+    if (chrName === "chrMT") {
+      aliases.M = chrName;
+    }
   }
-  const status = response.headers.get("X-Synteny-Layer-Status") || "primary";
-  const source = response.headers.get("X-Synteny-Source-Path") || PAF_URL;
-  const warning = response.headers.get("X-Synteny-Warning") || "";
-  const geneData = geneResponse?.ok ? await geneResponse.json().catch(() => null) : null;
-  return {
-    features: parsePaf(await response.text()),
-    geneFeatures: parseGeneCollinearity(geneData),
-    status,
-    geneStatus: geneData?.status || "missing",
-    source,
-    warning,
-    isFallback: false,
-  };
+  return aliases;
+}
+
+const GRCG6A_NAME_TO_CHR = withDisplayAliases({
+  ...GRCG6A_REFSEQ_TO_CHR,
+  ...Object.fromEntries(Object.keys(CHR_TO_GRCG6A_REFSEQ).map((chrName) => [chrName, chrName])),
+});
+const GRCG7B_NAME_TO_CHR = withDisplayAliases(GRCG7B_REFSEQ_TO_CHR);
+
+let pafSyntenyPromise: Promise<LoadedPafSynteny> | null = null;
+let geneCollinearityPromise: Promise<LoadedGeneCollinearity> | null = null;
+
+export function loadPafSyntenyFeatures(): Promise<LoadedPafSynteny> {
+  if (!pafSyntenyPromise) {
+    pafSyntenyPromise = fetch(`${API_BASE}${PAF_URL}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load natural-breakpoint PAF synteny file: ${response.status}`);
+        }
+        const status = response.headers.get("X-Synteny-Layer-Status") || "primary";
+        const source = response.headers.get("X-Synteny-Source-Path") || PAF_URL;
+        const warning = response.headers.get("X-Synteny-Warning") || "";
+        const features = parsePaf(await response.text());
+        if (!features.length) {
+          throw new Error("Natural PAF loaded, but no parseable GRCg6a/GRCg7b synteny features were found.");
+        }
+        return {
+          features,
+          geneFeatures: [],
+          status,
+          geneStatus: "loading",
+          source,
+          warning,
+          isFallback: false,
+        };
+      })
+      .catch((error) => {
+        pafSyntenyPromise = null;
+        throw error;
+      });
+  }
+  return pafSyntenyPromise;
+}
+
+export function loadGeneCollinearityFeatures(): Promise<LoadedGeneCollinearity> {
+  if (!geneCollinearityPromise) {
+    geneCollinearityPromise = fetch(`${API_BASE}${GENE_COLLINEARITY_URL}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          return { geneFeatures: [], geneStatus: "missing" };
+        }
+        const geneData = await response.json().catch(() => null);
+        return {
+          geneFeatures: parseGeneCollinearity(geneData),
+          geneStatus: geneData?.status || "available",
+        };
+      })
+      .catch(() => {
+        geneCollinearityPromise = null;
+        return { geneFeatures: [], geneStatus: "missing" };
+      });
+  }
+  return geneCollinearityPromise;
 }
 
 export function parsePaf(text: string): SyntenyFeature[] {
@@ -135,7 +192,7 @@ export function parsePaf(text: string): SyntenyFeature[] {
 export function findMateLocation(features: SyntenyFeature[], loc: string) {
   const parsed = parseLoc(loc);
   if (!parsed) return undefined;
-  const refName = GRCG6A_REFSEQ_TO_CHR[parsed.refName] ?? parsed.refName;
+  const refName = GRCG6A_NAME_TO_CHR[parsed.refName] ?? parsed.refName;
   const hit = features.find((feature) => (
     feature.refName === refName &&
     feature.start < parsed.end &&
@@ -229,8 +286,8 @@ function parsePafLine(line: string, index: number): SyntenyFeature | undefined {
 
   const strand = strandRaw === "-" ? -1 : 1;
   const uniqueId = `grcg6a-grcg7b-paf-${index}`;
-  const queryRefName = GRCG6A_REFSEQ_TO_CHR[queryName];
-  const targetRefName = GRCG7B_REFSEQ_TO_CHR[targetName];
+  const queryRefName = GRCG6A_NAME_TO_CHR[queryName];
+  const targetRefName = GRCG7B_NAME_TO_CHR[targetName];
   if (!queryRefName || !targetRefName) {
     return undefined;
   }

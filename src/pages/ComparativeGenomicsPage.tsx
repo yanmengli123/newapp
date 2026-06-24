@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ComponentType } from "react";
 import {
   Alert,
   Badge,
@@ -82,6 +82,7 @@ import {
 import FigureSettingsDrawer from "../components/comparative/FigureSettingsDrawer";
 
 const Plot = lazy(() => import("react-plotly.js"));
+const ResponsivePlot = Plot as unknown as ComponentType<ComponentProps<typeof Plot> & { useResizeHandler?: boolean }>;
 
 const PAGE_SIZE = 50;
 const NATURAL_FILTERS = {
@@ -1744,7 +1745,7 @@ function DotplotPanel({
         </Group>
       </Group>
       <Suspense fallback={<Paper withBorder p="xl" h={360}><Text size="sm" c="dimmed">Loading interactive dotplot...</Text></Paper>}>
-        <Plot
+        <ResponsivePlot
           data={[traceFor("+", "#2f9e44"), traceFor("-", "#c92a2a")]}
           layout={{
             autosize: true,

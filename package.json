@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
+    "test:paf-synteny": "node src/lib/pafSynteny.test.mjs",
     "test:api-contract": "node qa-api-contract.mjs",
     "preview": "vite preview"
   },
