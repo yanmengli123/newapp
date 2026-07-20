@@ -12,9 +12,15 @@ Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeS
 
 ```bash
 # Frontend
-npm run dev      # Start dev server (port 5173)
-npm run build    # TypeScript check + production build
-npm run lint     # ESLint
+npm run dev              # Start dev server (port 5173)
+npm run build            # TypeScript check + production build
+npm run lint             # ESLint
+npm run preview          # Serve built dist/ locally
+
+# Frontend tests (Node, no DB needed)
+npm run test:paf-synteny     # src/lib/pafSynteny.test.mjs
+npm run test:blast-config    # src/lib/blastConfig.test.mjs
+npm run test:api-contract    # qa-api-contract.mjs (endpoint smoke tests)
 
 # Backend — ONLY supported way to start (from C root):
 # ⚠️ Git Bash on Windows treats backslashes as escape chars.
@@ -22,13 +28,41 @@ npm run lint     # ESLint
 #    command collapses to "D:softpython310python.exe" and fails.
 "D:/soft/python310/python.exe" -m uvicorn backend.main:app --host 0.0.0.0 --port 8001
 
-# Backend tests (from C root):
+# Backend tests (pure math + SQL helper logic, no DB required):
 "D:/soft/python310/python.exe" -m backend.test_go_enrichment
+"D:/soft/python310/python.exe" -m backend.test_comparative_paf
+"D:/soft/python310/python.exe" -m backend.test_core_config
 
-# Legacy ways (DEPRECATED — do not use):
+# Legacy ways (DEPRECATED — root-level backends now exit with a message):
 # python backend/main.py               ← wrong: uses old import style
 # python grcg6a_fastapi_backend.py    ← wrong: different directory structure
 ```
+
+**External services**:
+- PostgreSQL (Docker, port 5433) — required for `/comparative`, `/go-enrichment`, `/expression`, `/overview`
+- BLAST (port 4567) — referenced by `VITE_BLAST_BASE` in `.env.development`
+
+## Environment
+
+`.env.development` (committed):
+```
+VITE_API_BASE=              # empty → Vite proxy handles routing in dev
+VITE_BLAST_BASE=http://localhost:4567
+```
+`API_BASE` is resolved in `src/lib/apiClient.ts` from `VITE_API_BASE` (default `''`). Backend paths are centralized in `backend/config.py` and resolve to `D:\jbrowsedata\projectdata\` unless overridden by env vars.
+
+## Verification Workflow
+
+Before reporting a code change as complete, run:
+```bash
+"D:/soft/python310/python.exe" -m backend.test_comparative_paf
+"D:/soft/python310/python.exe" -m backend.test_go_enrichment
+"D:/soft/python310/python.exe" -m backend.test_core_config
+npm run test:api-contract
+npm run lint
+npm run build
+```
+For browser-visible changes, also verify the route in a browser and check `http://127.0.0.1:8001/health`.
 
 ## Architecture
 
@@ -133,7 +167,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
 - **`DownloadsPage.tsx`** — CSV download cards for all 8 overview charts. Download via `fetch` + `Blob` + `createObjectURL` pattern hitting `/overview/<id>/csv` endpoints.
 - **API clients**: `src/lib/geneApi.ts` (gene/chromosome/GO/KEGG/tools), `src/lib/genomeApi.ts` (genome analysis — **all paths use `/genome-api/` prefix**), `src/lib/chatApi.ts` (chat), `src/lib/comparativeApi.ts` (comparative genomics — `/comparative` prefix)
   - **`src/lib/apiClient.ts`** — **Mandatory centralized API client**. All URL construction goes through `apiFetch<T>()` here. `API_BASE` is resolved from `import.meta.env.VITE_API_BASE` (defaults to `''` — dev proxy handles routing). Never hardcode URLs in components.
-- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/go-enrichment`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`, `/comparative`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.**
+- **Vite proxy** (`vite.config.ts`): All common backend paths (`/api`, `/go-enrichment`, `/health`, `/bwdata`, `/genes`, `/search`, `/chromosomes`, `/datasets`, `/overview`, `/annotations`, `/kegg-images`, `/tools`, `/genome`, `/comparative`) proxy to `http://localhost:8001`. **Always include new backend routes in the proxy if the frontend needs them.** The `spa-fallback` plugin rewrites `/go-enrichment` and `/comparative` (with or without trailing `/`) to `/` so Vite serves `index.html` and React Router takes over — required because these are top-level routes that would otherwise 404 the dev server.
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (section container), `KeggPathwayCard` (View/Interactive/Download/KEGG 4 buttons), `KeggInteractiveViewer` (PNG+SVG proportional overlay interactive viewer). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (single GO entry card with ID/name/evidence code/source/definition)
@@ -621,6 +655,15 @@ python backend/scripts/import_update_data.py --data-dir "D:/jbrowsedata/projectd
 - **QC**: All 14 checks passed (row counts, gene counts, 36-sample completeness, mapping completeness)
 
 ### Comparative Genomics (GRCg6a vs GRCg7b)
+
+**Evidence policy** (also documented in `README.md`):
+- Natural-breakpoint minimap2 `asm5` PAF is the primary synteny display.
+- Base-level `--cs` PAF is indexed and used for local block detail, not streamed wholesale.
+- Gene collinearity is a separate functional/gene-order layer.
+- Fixed-window PAF is not a fallback for the primary comparative display.
+- SV results are candidates unless independently validated.
+
+Check current gold-standard status at `GET /comparative/gold-standard` and citation at `GET /comparative/citation`. Extended documentation in `docs/COMPARATIVE_DUAL_DYNAMIC_STATIC_FIGURES.md`.
 
 **Overview**: Cross-assembly comparison between GRCg6a (White Leghorn) and GRCg7b (Broiler) chicken genomes. Uses **LinearSyntenyView** for dual-panel visualization with synteny ribbons.
 
