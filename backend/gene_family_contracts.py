@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -41,6 +42,7 @@ EXPECTED_DOC_FILES = (
     "rc2_exit_criteria.md",
 )
 RC1_SQLITE_SHA256 = "b590a0bfd9d81b41bbf044eb7daba08f241c9a959362d59f06de8142ac84ad97"
+RC1_RELEASE_ID = "gg-gf-2026-07-rc1"
 
 
 @dataclass
@@ -195,6 +197,15 @@ def _validate_identity(data: dict[str, Any], report: ContractValidationReport) -
             report.error(f"{scheme_id}: multi-valued scheme must not receive a universal slot axis")
     if cardinality:
         report.check("scheme_cardinality_valid")
+    publication = data.get("publication_cardinality", {}).get("single_per_role", {})
+    if publication.get("effective_primary_accepted_max") != 1:
+        report.error("single-valued schemes must publish at most one effective accepted primary assertion")
+    if publication.get("published_primary_candidate_max") != 1:
+        report.error("single-valued schemes must publish at most one primary candidate")
+    if publication.get("evaluated_alternatives_max", "missing") is not None:
+        report.error("independent alternative rule evaluations must remain unbounded")
+    if publication.get("alternatives_are_rule_evaluations_not_assertions") is not True:
+        report.error("alternative evaluations must not be materialized as fake assertions")
 
     vectors = data.get("test_vectors", [])
     if not vectors:
@@ -249,6 +260,13 @@ def _validate_states(data: dict[str, Any], report: ContractValidationReport) -> 
     }
     if set(data.get("decision_basis_type", [])) != required_basis:
         report.error("decision_basis_type contract is incomplete")
+    if set(data.get("rule_node_result", [])) != {"true", "false", "unknown"}:
+        report.error("rule_node_result contract is incomplete")
+    if set(data.get("rule_evaluation_outcome", [])) != {
+        "matched", "not_matched", "excluded", "conflicted",
+        "insufficient_evidence", "not_evaluable",
+    }:
+        report.error("rule_evaluation_outcome contract is incomplete")
     if not report.errors:
         report.check("state_enums_and_transitions_valid")
 
@@ -279,6 +297,22 @@ def _validate_rule_operators(data: dict[str, Any], report: ContractValidationRep
         report.error("rule evidence scopes are incomplete")
     if data.get("manual_review_is_rule_priority") is not False:
         report.error("manual review must remain outside automatic rule priority")
+    if data.get("logic", {}).get("system") != "strong_kleene":
+        report.error("rule logic must use Strong Kleene three-valued semantics")
+    if set(data.get("node_results", [])) != {"true", "false", "unknown"}:
+        report.error("rule node results must be true, false or unknown")
+    required_outcomes = {
+        "matched", "not_matched", "excluded", "conflicted",
+        "insufficient_evidence", "not_evaluable",
+    }
+    if set(data.get("evaluation_outcomes", [])) != required_outcomes:
+        report.error("rule evaluation outcomes are incomplete")
+    absence = data.get("domain_absent_semantics", {})
+    if absence.get("true_requires_all") != [
+        "scan_complete", "database_known", "model_known",
+        "threshold_known", "evidence_set_complete", "no_passing_hit",
+    ]:
+        report.error("domain_absent completeness requirements are incomplete")
     serialized = canonical_json(data).lower()
     for prohibited in data.get("prohibited_payloads", []):
         if prohibited not in {"sql", "python_expression", "javascript_expression", "shell_command"}:
@@ -414,6 +448,7 @@ def validate_contracts(
     contract_root: Path,
     docs_root: Path | None = None,
     rc1_db: Path | None = None,
+    require_rc1: bool = False,
 ) -> ContractValidationReport:
     report = ContractValidationReport()
     contracts = _load_contracts(contract_root, report)
@@ -440,32 +475,78 @@ def validate_contracts(
     _validate_qc(qc, states, report)
     if rc1_db is not None:
         validate_rc1_baseline(rc1_db, report)
+    elif require_rc1:
+        report.error("RC1 baseline audit is required but no release database was resolved")
+    else:
+        report.warnings.append("RC1 baseline audit skipped because no release database was resolved")
     return report
 
 
-def project_paths() -> tuple[Path, Path, Path]:
+def project_paths() -> tuple[Path, Path]:
     project_root = Path(__file__).resolve().parent.parent
     return (
         project_root / "contracts" / "gene-family" / "rc2",
         project_root / "docs" / "gene-family" / "rc2",
-        Path(r"D:\jbrowsedata\projectdata\gene family\releases\gg-gf-2026-07-rc1\gene_family.sqlite"),
     )
 
 
+def resolve_release_database(
+    explicit_db: Path | None = None,
+    release_root: Path | None = None,
+    release_registry: Path | None = None,
+    release_id: str = RC1_RELEASE_ID,
+) -> Path | None:
+    """Resolve a release database without embedding machine-local paths.
+
+    Resolution order is explicit database, release root, then JSON registry.
+    Environment variables provide only runtime configuration and are never
+    written into a contract or release artifact.
+    """
+
+    if explicit_db is not None:
+        return explicit_db
+    root = release_root or (
+        Path(value) if (value := os.environ.get("GRCG6A_GENE_FAMILY_RELEASE_ROOT")) else None
+    )
+    if root is not None:
+        return root / release_id / "gene_family.sqlite"
+    registry = release_registry or (
+        Path(value) if (value := os.environ.get("GRCG6A_GENE_FAMILY_RELEASE_REGISTRY")) else None
+    )
+    if registry is None:
+        return None
+    data = json.loads(registry.read_text(encoding="utf-8"))
+    record = data.get(release_id) if isinstance(data, dict) else None
+    value = record.get("database") if isinstance(record, dict) else record
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"release registry has no database for {release_id}")
+    path = Path(value)
+    return path if path.is_absolute() else registry.parent / path
+
+
 def main(argv: list[str] | None = None) -> int:
-    default_contracts, default_docs, default_rc1 = project_paths()
+    default_contracts, default_docs = project_paths()
     parser = argparse.ArgumentParser(description="Validate gene-family RC2-A scientific contracts")
     parser.add_argument("--contracts", type=Path, default=default_contracts)
     parser.add_argument("--docs", type=Path, default=default_docs)
-    parser.add_argument("--rc1-db", type=Path, default=default_rc1)
+    parser.add_argument("--rc1-db", type=Path)
+    parser.add_argument("--release-root", type=Path)
+    parser.add_argument("--release-registry", type=Path)
+    parser.add_argument("--require-rc1", action="store_true")
     parser.add_argument("--skip-rc1", action="store_true")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
 
+    rc1_db = None if args.skip_rc1 else resolve_release_database(
+        explicit_db=args.rc1_db,
+        release_root=args.release_root,
+        release_registry=args.release_registry,
+    )
     report = validate_contracts(
         args.contracts,
         docs_root=args.docs,
-        rc1_db=None if args.skip_rc1 else args.rc1_db,
+        rc1_db=rc1_db,
+        require_rc1=args.require_rc1 and not args.skip_rc1,
     )
     if args.as_json:
         print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))

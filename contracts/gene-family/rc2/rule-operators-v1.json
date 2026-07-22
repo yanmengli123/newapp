@@ -2,6 +2,22 @@
   "contract_version": "gg-gf-contract-1.0",
   "status": "frozen_for_implementation",
   "rule_language_version": "gf-rule-tree-1.0",
+  "node_results": ["true", "false", "unknown"],
+  "evaluation_outcomes": ["matched", "not_matched", "excluded", "conflicted", "insufficient_evidence", "not_evaluable"],
+  "logic": {
+    "system": "strong_kleene",
+    "not": {"true": "false", "false": "true", "unknown": "unknown"},
+    "and": {
+      "true": {"true": "true", "false": "false", "unknown": "unknown"},
+      "false": {"true": "false", "false": "false", "unknown": "false"},
+      "unknown": {"true": "unknown", "false": "false", "unknown": "unknown"}
+    },
+    "or": {
+      "true": {"true": "true", "false": "true", "unknown": "true"},
+      "false": {"true": "true", "false": "false", "unknown": "unknown"},
+      "unknown": {"true": "true", "false": "unknown", "unknown": "unknown"}
+    }
+  },
   "node_types": ["all", "any", "not", "predicate"],
   "evidence_scopes": ["same_hit", "same_protein", "same_gene", "any_isoform", "all_isoforms", "representative_isoform"],
   "operators": {
@@ -31,15 +47,27 @@
     "scope_required_for_predicate": true,
     "sibling_position_unique": true
   },
+  "domain_absent_semantics": {
+    "true_requires_all": ["scan_complete", "database_known", "model_known", "threshold_known", "evidence_set_complete", "no_passing_hit"],
+    "otherwise_when_no_passing_hit": "unknown",
+    "passing_hit_result": "false",
+    "missing_source_values_must_not_default_to": [0, false]
+  },
   "trace_required_fields": [
-    "assertion_version_id",
+    "evaluation_id",
     "rule_version_id",
+    "source_subject_namespace",
+    "source_subject_identifier",
+    "evaluation_outcome",
+    "evidence_snapshot_hash",
+    "evaluation_context_hash",
+    "emitted_assertion_version_id",
     "node_id",
-    "evaluation_result",
+    "node_result",
     "observed_value_json",
-    "matched_evidence_ids",
     "failure_reason_code"
   ],
+  "trace_evidence_link_fields": ["evaluation_id", "node_id", "evidence_id", "evidence_role"],
+  "evaluation_independent_of_assertion": true,
   "manual_review_is_rule_priority": false
 }
-

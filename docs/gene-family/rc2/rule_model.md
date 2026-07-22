@@ -30,9 +30,25 @@ gene/isoform scope.
 
 ## Rule trace
 
-Each local evaluation stores rule/node versions, evaluation result, canonical
-observed value, matched evidence IDs and failure reason. It must answer why an
-assertion was accepted, retained as candidate, or rejected.
+Rule evaluation is independent of assertion publication. `gf_rule_evaluation`
+is created for every attempted rule/subject pair, including failures and cases
+where no assertion is emitted. It records one of `matched`, `not_matched`,
+`excluded`, `conflicted`, `insufficient_evidence`, or `not_evaluable`, together
+with evidence-snapshot and complete evaluation-context hashes. Its nullable
+`emitted_assertion_version_id` links an evaluation to a published claim only
+when a claim was actually produced.
+
+`gf_rule_node_trace` records `true`, `false`, or `unknown` for every evaluated
+node. `gf_rule_trace_evidence` links trace nodes to immutable evidence rows.
+Rejected assertions are not fabricated merely to retain a negative trace.
+
+Boolean composition uses Strong Kleene logic: `false AND unknown = false`,
+`true AND unknown = unknown`, `true OR unknown = true`, `false OR unknown =
+unknown`, and `NOT unknown = unknown`.
+
+`domain_absent = true` requires a complete scan, known database/model/threshold,
+a complete evidence set and no passing hit. If no passing hit is visible but
+any completeness condition is unknown, the predicate is `unknown`, not `true`.
 
 External curated sources receive decision provenance, not a fabricated local
 expression tree.
@@ -57,4 +73,3 @@ CFTR is a fixed negative regression for accepted E3_RBR. Tests must verify its
 expected candidate/rejected state, exclusion reason, matching exclusion rule,
 absence from accepted metrics, and continued traceability of original Pfam
 evidence.
-

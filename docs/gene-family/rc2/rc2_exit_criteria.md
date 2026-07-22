@@ -14,6 +14,10 @@ it does not claim they currently pass.
 
 - Decision provenance coverage: 100% of accepted assertions.
 - Executable trace coverage: 100% of locally rule-derived assertions.
+- Independent evaluation coverage: every attempted local rule/subject pair has
+  an evaluation record, including non-matches and non-evaluable cases.
+- Rule-node results use only Strong Kleene `true/false/unknown`; missing
+  completeness is never collapsed to false or to proven absence.
 - Unknown rule references and rule regression failures: zero.
 - Ubiquitin accepted/candidate assertions have approved rule or source decision
   provenance; biological approval is signed by the curator.
@@ -61,4 +65,3 @@ blocking_issue_count = 0
 Limitations are structured with impact, affected schemes/metrics/assertions,
 workaround, owner and target release. A limitation is not automatically a
 blocker; the machine QC policy decides from scientific impact and usage.
-

@@ -35,7 +35,10 @@ Failed builds move to `.failed` and never appear as a formal release.
 
 ### New entities
 
-- Rule expression tree: `gf_rule_node`, `gf_rule_predicate`, `gf_rule_trace`.
+- Rule expression tree and independent execution provenance:
+  `gf_rule_node`, `gf_rule_predicate`, `gf_rule_evaluation`,
+  `gf_rule_node_trace`, and `gf_rule_trace_evidence`. Evaluations exist even
+  when no assertion is emitted.
 - Metrics: `gf_metric_definition`, `gf_metric_value`.
 - Curation: `gf_mapping_disposition`, append-only `gf_review_event` v2.
 - Release governance: `gf_release_signoff`, `gf_limitation`.

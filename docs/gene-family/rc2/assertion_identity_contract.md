@@ -71,3 +71,10 @@ The registry is a present-data contract. If future source data permits multiple
 TF/cofactor assignments per subject and role, the scheme cardinality must be
 versioned before ingest; records must never be silently collapsed.
 
+For a `single_per_role` slot, a release may publish at most one effective
+accepted primary assertion and at most one primary candidate. The rule engine
+may retain any number of alternative evaluations in `gf_rule_evaluation`; those
+alternatives are not assertions unless the publication step explicitly emits
+one. Supplementary assertions remain independent and unbounded. Partial unique
+indexes enforce the accepted/candidate publication limits in the RC2 draft
+schema.

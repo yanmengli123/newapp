@@ -318,15 +318,47 @@ CREATE TABLE gf_assertion_source_record (
     PRIMARY KEY (assertion_version_id, source_record_id)
 ) WITHOUT ROWID;
 
-CREATE TABLE gf_rule_trace (
-    assertion_version_id TEXT NOT NULL REFERENCES gf_assertion(assertion_version_id) ON DELETE CASCADE,
+CREATE TABLE gf_rule_evaluation (
+    evaluation_id TEXT PRIMARY KEY,
+    release_id TEXT NOT NULL REFERENCES gf_release(release_id),
     rule_version_id TEXT NOT NULL REFERENCES gf_rule(rule_version_id),
+    source_subject_namespace TEXT NOT NULL,
+    source_subject_identifier TEXT NOT NULL,
+    source_record_id TEXT REFERENCES gf_source_record(source_record_id),
+    evaluation_outcome TEXT NOT NULL CHECK (
+        evaluation_outcome IN (
+            'matched', 'not_matched', 'excluded', 'conflicted',
+            'insufficient_evidence', 'not_evaluable'
+        )
+    ),
+    reason_code TEXT REFERENCES gf_reason_code(reason_code),
+    emitted_assertion_version_id TEXT REFERENCES gf_assertion(assertion_version_id),
+    evidence_snapshot_hash TEXT NOT NULL CHECK (length(evidence_snapshot_hash) = 64),
+    evaluation_context_hash TEXT NOT NULL CHECK (length(evaluation_context_hash) = 64),
+    evaluated_at TEXT NOT NULL,
+    engine_version TEXT NOT NULL,
+    UNIQUE (release_id, rule_version_id, source_subject_namespace,
+            source_subject_identifier, evidence_snapshot_hash,
+            evaluation_context_hash)
+);
+
+CREATE TABLE gf_rule_node_trace (
+    trace_id TEXT PRIMARY KEY,
+    evaluation_id TEXT NOT NULL REFERENCES gf_rule_evaluation(evaluation_id) ON DELETE CASCADE,
     node_id TEXT NOT NULL REFERENCES gf_rule_node(node_id),
-    evaluation_result INTEGER NOT NULL CHECK (evaluation_result IN (0, 1)),
+    node_result TEXT NOT NULL CHECK (node_result IN ('true', 'false', 'unknown')),
     observed_value_json TEXT,
-    matched_evidence_ids_json TEXT NOT NULL DEFAULT '[]',
     failure_reason_code TEXT REFERENCES gf_reason_code(reason_code),
-    PRIMARY KEY (assertion_version_id, rule_version_id, node_id)
+    UNIQUE (evaluation_id, node_id)
+);
+
+CREATE TABLE gf_rule_trace_evidence (
+    trace_id TEXT NOT NULL REFERENCES gf_rule_node_trace(trace_id) ON DELETE CASCADE,
+    evidence_id TEXT NOT NULL REFERENCES gf_evidence(evidence_id) ON DELETE CASCADE,
+    evidence_role TEXT NOT NULL CHECK (
+        evidence_role IN ('matched', 'conflicting', 'completeness', 'context')
+    ),
+    PRIMARY KEY (trace_id, evidence_id, evidence_role)
 ) WITHOUT ROWID;
 
 CREATE TABLE gf_review_event (
@@ -538,11 +570,19 @@ CREATE INDEX idx_subject_protein ON gf_subject(release_id, protein_accession);
 CREATE INDEX idx_assertion_entry_state ON gf_assertion(release_id, entry_id, assertion_state, subject_pk);
 CREATE INDEX idx_assertion_subject ON gf_assertion(release_id, subject_pk, scheme_id);
 CREATE INDEX idx_assertion_slot ON gf_assertion(release_id, assignment_slot_key);
+CREATE UNIQUE INDEX uq_assertion_slot_accepted ON gf_assertion(release_id, assignment_slot_key)
+WHERE assignment_slot_key IS NOT NULL AND assertion_state = 'accepted';
+CREATE UNIQUE INDEX uq_assertion_slot_candidate ON gf_assertion(release_id, assignment_slot_key)
+WHERE assignment_slot_key IS NOT NULL AND assertion_state = 'candidate';
 CREATE INDEX idx_evidence_source ON gf_evidence(release_id, source_file_id, source_record_id);
 CREATE INDEX idx_source_record_subject ON gf_source_record(release_id, source_subject_namespace, source_subject_identifier);
 CREATE INDEX idx_domain_subject ON gf_domain_hit(subject_pk, pfam_accession, ali_from);
 CREATE INDEX idx_rule_node_parent ON gf_rule_node(rule_version_id, parent_node_id, position);
-CREATE INDEX idx_rule_trace_assertion ON gf_rule_trace(assertion_version_id, evaluation_result);
+CREATE INDEX idx_rule_evaluation_subject ON gf_rule_evaluation(
+    release_id, source_subject_namespace, source_subject_identifier, evaluation_outcome
+);
+CREATE INDEX idx_rule_evaluation_assertion ON gf_rule_evaluation(emitted_assertion_version_id);
+CREATE INDEX idx_rule_node_trace_evaluation ON gf_rule_node_trace(evaluation_id, node_result);
 CREATE INDEX idx_mapping_disposition_state ON gf_mapping_disposition(release_id, mapping_state);
 CREATE INDEX idx_metric_value_release ON gf_metric_value(release_id, metric_id, metric_version);
 CREATE INDEX idx_qc_release_status ON gf_qc_result(release_id, severity, status);

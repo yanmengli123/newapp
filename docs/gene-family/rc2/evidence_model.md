@@ -39,6 +39,10 @@ distinct fields. Alignment and envelope coordinates are not interchangeable.
 Missing values use `value_status`: `observed`, `derived`, `not_reported`,
 `not_applicable`, or `unknown_legacy`. Missing source values are never encoded as
 zero or false. Any derived value records its derivation implementation/version.
+Consequently, absence is not the inverse of presence unless evidence
+completeness is established. Domain absence becomes `true` only when the scan,
+database/model, threshold and evidence set are all known complete and no
+passing hit exists; otherwise a no-hit observation evaluates to `unknown`.
 
 ## Provenance completeness
 
@@ -62,4 +66,3 @@ never presented as exact coordinate-level equivalence. Numeric text is parsed as
 Decimal, canonicalized, and rejects NaN/Infinity. The original evidence files
 remain read-only; any filtered artifact records source checksum, rule version,
 before/after counts and content hash.
-

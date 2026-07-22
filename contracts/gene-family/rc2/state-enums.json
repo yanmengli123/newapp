@@ -22,10 +22,11 @@
   "scientific_impact": ["none", "minor", "major", "critical"],
   "entry_status": ["active", "deprecated", "merged", "retired"],
   "isoform_evaluation_state": ["not_evaluated", "evaluated_no_hit", "below_threshold", "passing_hit"],
+  "rule_node_result": ["true", "false", "unknown"],
+  "rule_evaluation_outcome": ["matched", "not_matched", "excluded", "conflicted", "insufficient_evidence", "not_evaluable"],
   "assertion_state_rules": {
     "unresolved_allowed": false,
     "mapping_uncertainty_representation": "candidate_with_reason_code",
     "historical_rows_mutable": false
   }
 }
-

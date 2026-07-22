@@ -53,6 +53,22 @@
     "ubiquitin_core": {"cardinality": "single_per_role", "classification_axis": "ubiquitin_core_class"},
     "ubiquitin_related_domain": {"cardinality": "multi_per_role", "classification_axis": null}
   },
+  "publication_cardinality": {
+    "single_per_role": {
+      "effective_primary_accepted_max": 1,
+      "published_primary_candidate_max": 1,
+      "evaluated_alternatives_max": null,
+      "supplementary_max": null,
+      "alternatives_are_rule_evaluations_not_assertions": true
+    },
+    "multi_per_role": {
+      "effective_primary_accepted_max": null,
+      "published_primary_candidate_max": null,
+      "evaluated_alternatives_max": null,
+      "supplementary_max": null,
+      "diff_semantics": "set"
+    }
+  },
   "test_vectors": [
     {
       "name": "kinomer_cmgg_primary_assertion",
@@ -80,4 +96,3 @@
     }
   ]
 }
-
