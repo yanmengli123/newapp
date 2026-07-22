@@ -188,7 +188,12 @@ def test_batch_builder_is_create_only_and_keeps_science_unapproved(tmp_path: Pat
     assert all(item["status"] == "missing" for item in manifest["expected_decision_artifacts"])
     inventory = (output / "targeted-rescan-input-inventory.tsv").read_text(encoding="utf-8")
     assert "declared_isoform_universe\t\tmissing" in inventory
-    assert "C:\\" not in (output / "inputs-lock.json").read_text(encoding="utf-8")
+    assert (output / "inputs" / "rc1-release-lock.json").is_file()
+    for path in output.rglob("*"):
+        if path.is_file():
+            text = path.read_text(encoding="utf-8")
+            assert "C:\\" not in text
+            assert "D:\\" not in text
     with pytest.raises(FileExistsError):
         build_curation_batch(
             output=output, packet_root=packet, rc1_manifest=rc1_manifest,

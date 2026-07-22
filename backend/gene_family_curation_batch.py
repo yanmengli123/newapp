@@ -12,6 +12,7 @@ import csv
 import gzip
 import json
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -27,6 +28,7 @@ ASSEMBLY_NAME = "GRCg6a"
 PROTEIN_FASTA_NAME = "GCF_000002315.6_GRCg6a_protein.faa.gz"
 ANNOTATION_GFF_NAME = "GCF_000002315.6_GRCg6a_genomic.gff.gz"
 ASSEMBLY_REPORT_NAME = "GCF_000002315.6_GRCg6a_assembly_report.txt"
+BATCH_ID_PATTERN = re.compile(r"^gg-gf-[a-z0-9-]+-curation-rc2-batch-[0-9]{3}$")
 EXPECTED_DECISION_ARTIFACTS = (
     ("evidence_admissibility", "curator-decisions/evidence-admissibility-policy.json"),
     ("domain_vocabulary", "curator-decisions/domain-vocabulary.json"),
@@ -116,7 +118,7 @@ def _artifact(relative_path: str, root: Path, artifact_type: str,
 
 
 def _inputs_lock(
-    *, packet_manifest: dict[str, Any], packet_manifest_sha256: str,
+    *, batch_id: str, packet_manifest: dict[str, Any], packet_manifest_sha256: str,
     packet_checksums_sha256: str, packet_file_count: int,
     rc1_manifest_sha256: str, rc1_database_sha256: str,
     handoff_manifest_sha256: str, evaluator_commit: str,
@@ -124,7 +126,7 @@ def _inputs_lock(
 ) -> dict[str, Any]:
     return {
         "lock_format": BATCH_FORMAT,
-        "batch_id": BATCH_ID,
+        "batch_id": batch_id,
         "assembly": {"name": ASSEMBLY_NAME, "accession": ASSEMBLY_ACCESSION,
                      "annotation_release": annotation_release},
         "rc1": {"release_id": packet_manifest["source_release_id"],
@@ -155,10 +157,18 @@ def build_curation_batch(
     *, output: Path, packet_root: Path, rc1_manifest: Path,
     rc1_database: Path, handoff_root: Path, rc2_contract_root: Path,
     projectdata_root: Path, evaluator_commit: str, generator_commit: str,
-    created_by: str, created_at: str,
+    created_by: str, created_at: str, batch_id: str = BATCH_ID,
+    supersedes_batch_id: str | None = None,
 ) -> Path:
     """Validate every observed input and atomically create a new batch."""
     output = output.resolve()
+    if not BATCH_ID_PATTERN.fullmatch(batch_id):
+        raise CurationBatchError(f"invalid curation batch ID: {batch_id}")
+    if supersedes_batch_id is not None:
+        if not BATCH_ID_PATTERN.fullmatch(supersedes_batch_id):
+            raise CurationBatchError(f"invalid superseded batch ID: {supersedes_batch_id}")
+        if supersedes_batch_id == batch_id:
+            raise CurationBatchError("a curation batch cannot supersede itself")
     if output.exists():
         raise FileExistsError(f"curation batch output already exists: {output}")
     if not output.parent.is_dir():
@@ -214,6 +224,7 @@ def build_curation_batch(
     packet_manifest_sha256 = sha256_file(packet_manifest_path)
     packet_checksums_sha256 = sha256_file(packet_checksums_path)
     lock = _inputs_lock(
+        batch_id=batch_id,
         packet_manifest=packet_manifest,
         packet_manifest_sha256=packet_manifest_sha256,
         packet_checksums_sha256=packet_checksums_sha256,
@@ -233,7 +244,13 @@ def build_curation_batch(
         shutil.copyfile(packet_manifest_path, stage / "inputs" / "packet-manifest.json")
         shutil.copyfile(packet_checksums_path, stage / "inputs" / "packet-checksums.sha256")
         shutil.copyfile(packet_subjects_path, stage / "inputs" / "subject-universe.tsv")
-        shutil.copyfile(rc1_manifest, stage / "inputs" / "rc1-release-manifest.json")
+        _write_json(stage / "inputs" / "rc1-release-lock.json", {
+            "source_release_id": packet_manifest["source_release_id"],
+            "source_manifest_sha256": rc1_manifest_sha256,
+            "source_database_sha256": rc1_database_sha256,
+            "raw_manifest_embedded": False,
+            "reason": "The immutable source manifest is referenced by hash because it contains a machine-local source_directory field.",
+        })
         _write_json(stage / "inputs-lock.json", lock)
         _write_tsv(stage / "targeted-rescan-input-inventory.tsv",
                    ["input_role", "logical_locator", "status", "sha256", "byte_size",
@@ -243,13 +260,14 @@ def build_curation_batch(
             _artifact("inputs/packet-manifest.json", stage, "curator_packet_manifest"),
             _artifact("inputs/packet-checksums.sha256", stage, "curator_packet_checksums"),
             _artifact("inputs/subject-universe.tsv", stage, "rc1_subject_universe"),
-            _artifact("inputs/rc1-release-manifest.json", stage, "rc1_release_manifest"),
+            _artifact("inputs/rc1-release-lock.json", stage, "rc1_release_lock",
+                      "generated_unapproved"),
             _artifact("inputs-lock.json", stage, "inputs_lock", "generated_unapproved"),
             _artifact("targeted-rescan-input-inventory.tsv", stage,
                       "targeted_rescan_input_inventory", "generated_unapproved"),
         ]
         batch_manifest = {
-            "schema_version": "1.0", "batch_id": BATCH_ID,
+            "schema_version": "1.0", "batch_id": batch_id,
             "scheme_id": "ubiquitin_core", "purpose": "RC1 reassessment rule curation",
             "contract_version": "gg-gf-contract-1.0",
             "contract_tag": "gene-family-rc2a-contract-v1.0",
@@ -263,7 +281,8 @@ def build_curation_batch(
                 for kind, path in EXPECTED_DECISION_ARTIFACTS
             ],
             "created_by": {"name": created_by, "role": "engineering_preparer"},
-            "created_at": created_at, "status": "draft", "supersedes_batch_id": None,
+            "created_at": created_at, "status": "draft",
+            "supersedes_batch_id": supersedes_batch_id,
             "scientific_approval_implied": False, "scientific_shadow_authorized": False,
             "rc2c_build_authorized": False,
             "limitations": [
@@ -312,6 +331,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--generator-commit", required=True)
     parser.add_argument("--created-by", required=True)
     parser.add_argument("--created-at", required=True)
+    parser.add_argument("--batch-id", default=BATCH_ID)
+    parser.add_argument("--supersedes-batch-id")
     parser.add_argument("--handoff-contracts", type=Path,
                         default=project_root / "contracts" / "gene-family" / "rc2b1")
     parser.add_argument("--rc2-contracts", type=Path,
@@ -323,7 +344,8 @@ def main(argv: list[str] | None = None) -> int:
         handoff_root=args.handoff_contracts, rc2_contract_root=args.rc2_contracts,
         projectdata_root=args.projectdata_root, evaluator_commit=args.evaluator_commit,
         generator_commit=args.generator_commit, created_by=args.created_by,
-        created_at=args.created_at,
+        created_at=args.created_at, batch_id=args.batch_id,
+        supersedes_batch_id=args.supersedes_batch_id,
     )
     print(built)
     return 0
