@@ -64,6 +64,37 @@ subject lists remain missing. Consequently:
   the unexecuted profile;
 - no scan or Shadow authorization is implied.
 
+## Create-only handoff batch
+
+The validated handoff skeleton is
+`analysis/rc2b1-curation-batch-002`, with batch identity
+`gg-gf-ubiquitin-curation-rc2-batch-002`. It was built by generator commit
+`4f61e7071814799b570d821a979c0a2d64627a8e` and explicitly supersedes
+batch-001.
+
+Batch-001 failed the portability QA because the copied immutable RC1 source
+manifest contained a historical machine-local `source_directory`. It remains a
+draft with no decisions or authority and must not be used. The generator was
+corrected to reference that immutable source manifest by SHA-256 through a
+portable `rc1-release-lock.json`; it no longer embeds the original path-bearing
+manifest.
+
+Batch-002 validation facts:
+
+- batch schema: pass;
+- detached batch checksums: 9/9 pass;
+- packet checksums reverified: 22/22 pass;
+- machine-local path scan: pass;
+- all 11 expected curator/aggregate/authorization artifacts: `missing`;
+- curation batch manifest SHA-256:
+  `d7754cd31d3231e5521acb878d17403bfc2b2f0a6b376a5b819d0113abce4a01`;
+- detached checksum manifest SHA-256:
+  `bfffdd3b5e1fa664114314bcb17d6930b6120bd042adb069f421bba6a3be0dcb`.
+
+The GRCg6a lock records 49,673 protein FASTA records. It does not claim that
+all are in the targeted subject universe, nor that GFF mapping completeness has
+been established.
+
 ## Database design
 
 The RC2 draft schema now models curation batches, immutable batch artifacts,
