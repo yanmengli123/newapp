@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeScript frontend with FastAPI backend. Frontend runs on port 5173, backend on port 8001.
+Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeScript frontend with FastAPI backend. **Frontend runs on port 5174 (pinned in `vite.config.ts` with `strictPort: true`), backend on port 8001.** Port 5173 is occupied by an unrelated nginx-hosted project on this host — do not use it.
 
 **Architecture model**: `C:\Users\32110\Desktop\newapp\backend\` is the development/main copy. `D:\jbrowsedata\projectdata\` is the production data/execution drive. The two directories have different structures — C has a `backend/` subdirectory that D does not. Python code lives in C; data, Docker, and genome files live in D. Only C is synced to Git; D is outside the repo.
 
@@ -12,7 +12,7 @@ Bioinformatics visualization platform for the GRCg6a chicken genome. React/TypeS
 
 ```bash
 # Frontend
-npm run dev              # Start dev server (port 5173)
+npm run dev              # Start dev server (port 5174, strictPort — fails fast if taken)
 npm run build            # TypeScript check + production build
 npm run lint             # ESLint
 npm run preview          # Serve built dist/ locally
@@ -348,7 +348,7 @@ All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowse
 | `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
 | `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
 | `GRCG6A_PG_DSN` | `postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a` | PostgreSQL connection string |
-| `ALLOWED_ORIGINS` | `http://localhost:5173,http://localhost:5174` | CORS allowed origins (comma-separated) |
+| `ALLOWED_ORIGINS` | `http://localhost:5174` | CORS allowed origins (comma-separated). Drop 5173 — that port belongs to an unrelated project. |
 
 **PostgreSQL Docker startup**:
 ```bash
@@ -843,7 +843,7 @@ git push origin <branch>
 ## Running Services
 
 ```bash
-# Frontend (from C root) — runs on port 5173
+# Frontend (from C root) — runs on port 5174 (strictPort — fails if taken)
 npm run dev
 
 # Backend (ONLY way — from C root) — runs on port 8001
@@ -860,17 +860,20 @@ cd /d/jbrowsedata/projectdata && docker-compose stop postgres && docker-compose 
 **Service status check**:
 ```bash
 # Check if ports are listening
-netstat -ano | grep -E "5173|8001"
+netstat -ano | grep -E "5174|8001|5433"
 
 # Quick health check
-curl -s http://localhost:5173 | head -3    # Frontend
+curl -s http://localhost:5174 | head -3    # Frontend (newapp) — Server: Vite
 curl -s http://localhost:8001/health       # Backend
+
+# DO NOT probe 5173 — that port is nginx serving an unrelated project
+# ("Rice Endosperm Development"). Seeing 200 there does NOT mean newapp is up.
 ```
 
 **Restart diagnostic sequence** (always check first before blindly restarting):
 ```bash
 # 1. What's running right now?
-netstat -ano | grep -E ":5173|:8001|:5433"
+netstat -ano | grep -E ":5174|:8001|:5433"
 #   - 5433 only           → PG up, backend/frontend down — start them
 #   - 5433 missing        → PG Docker is down; /comparative, /go-enrichment,
 #                           /expression, /overview will silently degrade to
@@ -885,7 +888,7 @@ npm run dev
 
 # 4. Verify:
 curl -s http://localhost:8001/health           # → {"ok":true,"gene_count":N}
-curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # → 200
+curl -s -o /dev/null -w "%{http_code}" http://localhost:5174   # → 200
 ```
 
 ## Backend Tests

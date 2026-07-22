@@ -22,6 +22,8 @@ export default defineConfig({
     } satisfies Plugin,
   ],
   server: {
+    port: 5174,
+    strictPort: true,
     proxy: {
       '/api':      'http://localhost:8001',
       '/health':   'http://localhost:8001',
