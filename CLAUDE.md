@@ -333,6 +333,54 @@ python backend/scripts/filter_fasta.py
 ### Chat (1, prefix `/api`)
 - `POST /api/chat` — `{ "message": "..." }` → `{ "reply": "...", "type": "...", "data": {...} }`. Intent detected from message; queries database directly. Supported intents: genome_stats, gene_search, chromosome, go, kegg, analysis_results.
 
+### Gene Family Catalog (12, prefix `/api/v1`) — ChickenData annotation layer
+Versioned, immutable SQLite release of gene/protein families and Pfam domain hits. Built offline by `CatalogBuilder`; served read-only. Active release is selected by env var (default `gg-gf-2026-07-rc1`).
+
+**Catalog router** (`/api/v1/gene-family-catalog`, 10 endpoints):
+- `GET /releases/current` — active release metadata (release_id, schema_version, taxon, assembly, qc_status)
+- `GET /summary` — aggregate counts (families, members, proteins, domain hits)
+- `GET /search?q=&namespace=&limit=` — search families by name/description
+- `GET /entries?namespace=&limit=&offset=` — paginated family entries
+- `GET /entries/{entry_id}` — single family detail
+- `GET /entries/{entry_id}/members` — gene members of a family
+- `GET /entries/{entry_id}/evidence` — source evidence for a family assignment
+- `GET /assertions/{assertion_id}` — single assertion detail
+- `GET /releases/{release_id}/downloads` — bulk download manifest
+- `GET /releases/{release_id}/downloads/{asset_name}` — single bulk asset (TSV/FASTA)
+
+**Gene annotation router** (`/api/v1`, 2 endpoints):
+- `GET /genes/{internal_gene_id}/family-annotations` — gene's family memberships + Pfam domain hits per protein
+- `GET /proteins/{protein_id}/domain-hits` — Pfam hits for a single protein
+
+**Build & test**:
+```bash
+# Build a new release (writes to $GRCG6A_GENE_FAMILY_RELEASE_ROOT/$RELEASE_ID/gene_family.sqlite)
+"D:/soft/python310/python.exe" backend/scripts/build_gene_family_catalog.py \
+    --source-dir "D:/jbrowsedata/projectdata/gene family" \
+    --core-db "D:/jbrowsedata/projectdata/grcg6a_nc.db" \
+    --release-root "D:/jbrowsedata/projectdata/gene family/releases" \
+    --release-id "gg-gf-YYYY-MM-rcN" \
+    --replace   # replace a previously generated RC
+
+# Test builder + service
+"D:/soft/python310/python.exe" -m backend.test_gene_family_catalog
+```
+
+**Frontend surfaces** (`src/`):
+- `/gene-families` — `GeneFamilyCatalogPage` (catalog browser with search + status badge)
+- `/gene-families/entry/:entryId` — `GeneFamilyEntryPage` (family detail with members + evidence)
+- `/gene-families/downloads` — `GeneFamilyDownloadsPage` (bulk asset downloads)
+- `GeneFamilySection` embedded in `GenePage` above the GO Annotations accordion
+
+**Env vars** (added to `backend/config.py`):
+| Var | Default |
+|---|---|
+| `GRCG6A_GENE_FAMILY_RELEASE_ROOT` | `D:\jbrowsedata\projectdata\gene family\releases` |
+| `GRCG6A_GENE_FAMILY_RELEASE_ID` | `gg-gf-2026-07-rc1` |
+| `GRCG6A_GENE_FAMILY_DB` | `<release_root>/<release_id>/gene_family.sqlite` |
+
+**QC status semantics**: the catalog release carries a `qc_status` field ("pass" / "blocked" / etc.). A `blocked` status means the release is **intentionally served** for review while known blockers are tracked in `/releases/current`'s `blocking_checks[]`. Do not block serving on QC — the UI surfaces the badge so users see the caveat.
+
 ## Data Files
 
 All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowsedata\projectdata\` unless overridden by environment variables:
@@ -347,6 +395,9 @@ All data paths are centralized in `backend/config.py` and resolve to `D:\jbrowse
 | `GRCG6A_GENOME_OUTPUT` | `.../outputs/jobs` | Analysis job outputs |
 | `GRCG6A_SAMPLE_RESULTS` | `.../outputs/sample_results` | Pre-generated results |
 | `GRCG6A_HMMER_DB` | `.../hmmer_db/Pfam-A.hmm` | HMMER/Pfam domain DB |
+| `GRCG6A_GENE_FAMILY_RELEASE_ROOT` | `.../gene family/releases` | Versioned gene-family catalog releases (one SQLite per release_id). See "Gene Family Catalog" section below. |
+| `GRCG6A_GENE_FAMILY_RELEASE_ID` | `gg-gf-2026-07-rc1` | Active immutable catalog release. Change to point API at a different release without rebuilding. |
+| `GRCG6A_GENE_FAMILY_DB` | `<release_root>/<release_id>/gene_family.sqlite` | Override for the active catalog SQLite (rarely needed). |
 | `GRCG6A_PG_DSN` | `postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a` | PostgreSQL connection string |
 | `ALLOWED_ORIGINS` | `http://localhost:5174` | CORS allowed origins (comma-separated). Drop 5173 — that port belongs to an unrelated project. |
 
@@ -471,7 +522,9 @@ All routers registered in `main.py`:
 | chat_router.py | `/api` | 1 |
 | overview_routes.py | `/overview` | 17 |
 | comparative_routes.py | `/comparative` | 18 |
-| **Total** | | **87** |
+| gene_family_routes.py (catalog_router) | `/api/v1/gene-family-catalog` | 10 |
+| gene_family_routes.py (gene_annotation_router) | `/api/v1` | 2 |
+| **Total** | | **99** |
 
 ### Database Schema (grcg6a_nc.db)
 Key tables: `features`, `chromosome`, `transcript_seq`, `cds_seq`, `protein_seq`, `gene_xref`, `gene_go`, `gene_kegg`, `gene_kegg_pathway`. DB is opened read-only at startup; indexes (`gene_index_by_id`, `gene_index_by_symbol`, `genes_by_seqid`, `chromosome_by_seqid`) are built in memory on app startup.
