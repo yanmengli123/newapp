@@ -157,9 +157,11 @@ CREATE TABLE gf_approval_attestation (
     release_id TEXT REFERENCES gf_release(release_id),
     artifact_type TEXT NOT NULL CHECK (
         artifact_type IN (
-            'domain_vocabulary', 'rule_bundle', 'regression_fixture_bundle',
-            'rollup_policy', 'publication_policy', 'shadow_run',
-            'rc2c_build', 'release'
+            'evidence_admissibility', 'domain_vocabulary', 'rule_bundle',
+            'mapping_decisions', 'rollup_policy', 'publication_policy',
+            'regression_fixture_bundle', 'shadow_scope_profile',
+            'shadow_input_manifest', 'scientific_approval_aggregate',
+            'shadow_run', 'rc2c_build', 'release'
         )
     ),
     artifact_hash_algorithm TEXT NOT NULL CHECK (
@@ -195,6 +197,130 @@ BEGIN SELECT RAISE(ABORT, 'approval attestations are append-only'); END;
 CREATE TRIGGER gf_approval_attestation_no_delete
 BEFORE DELETE ON gf_approval_attestation
 BEGIN SELECT RAISE(ABORT, 'approval attestations are append-only'); END;
+
+CREATE TABLE gf_curation_batch (
+    batch_id TEXT PRIMARY KEY,
+    scheme_id TEXT NOT NULL REFERENCES gf_scheme(scheme_id),
+    purpose TEXT NOT NULL,
+    contract_version TEXT NOT NULL,
+    contract_tag TEXT NOT NULL,
+    evaluator_tag TEXT NOT NULL,
+    evaluator_commit TEXT NOT NULL CHECK (length(evaluator_commit) = 40),
+    packet_manifest_sha256 TEXT NOT NULL CHECK (length(packet_manifest_sha256) = 64),
+    handoff_contract_manifest_sha256 TEXT NOT NULL CHECK (length(handoff_contract_manifest_sha256) = 64),
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    batch_status TEXT NOT NULL CHECK (
+        batch_status IN ('draft', 'open', 'under_review', 'closed', 'superseded', 'withdrawn')
+    ),
+    supersedes_batch_id TEXT REFERENCES gf_curation_batch(batch_id),
+    scientific_approval_implied INTEGER NOT NULL DEFAULT 0 CHECK (scientific_approval_implied = 0),
+    scientific_shadow_authorized INTEGER NOT NULL DEFAULT 0 CHECK (scientific_shadow_authorized = 0),
+    rc2c_build_authorized INTEGER NOT NULL DEFAULT 0 CHECK (rc2c_build_authorized = 0),
+    limitations_json TEXT NOT NULL DEFAULT '[]',
+    CHECK (supersedes_batch_id IS NULL OR supersedes_batch_id <> batch_id)
+);
+
+CREATE TRIGGER gf_curation_batch_identity_no_update
+BEFORE UPDATE OF batch_id ON gf_curation_batch
+BEGIN SELECT RAISE(ABORT, 'curation batch identity is immutable'); END;
+
+CREATE TRIGGER gf_curation_batch_closed_no_update
+BEFORE UPDATE ON gf_curation_batch
+WHEN OLD.batch_status IN ('closed', 'superseded', 'withdrawn')
+BEGIN SELECT RAISE(ABORT, 'closed curation batches are immutable'); END;
+
+CREATE TRIGGER gf_curation_batch_no_delete
+BEFORE DELETE ON gf_curation_batch
+BEGIN SELECT RAISE(ABORT, 'curation batches are append-only'); END;
+
+CREATE TABLE gf_curation_batch_artifact (
+    batch_artifact_id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL REFERENCES gf_curation_batch(batch_id),
+    artifact_role TEXT NOT NULL CHECK (artifact_role IN ('input', 'decision', 'attestation', 'aggregate', 'authorization')),
+    artifact_type TEXT NOT NULL,
+    relative_path TEXT NOT NULL,
+    artifact_hash_algorithm TEXT NOT NULL CHECK (artifact_hash_algorithm = 'gf-canonical-json-sha256-v1'),
+    artifact_sha256 TEXT NOT NULL CHECK (length(artifact_sha256) = 64),
+    artifact_status TEXT NOT NULL CHECK (
+        artifact_status IN ('observed', 'generated_unapproved', 'curator_supplied', 'approved', 'rejected', 'changes_requested')
+    ),
+    recorded_at TEXT NOT NULL,
+    UNIQUE (batch_id, artifact_role, artifact_type, artifact_sha256)
+);
+
+CREATE TRIGGER gf_curation_batch_artifact_no_update
+BEFORE UPDATE ON gf_curation_batch_artifact
+BEGIN SELECT RAISE(ABORT, 'curation batch artifacts are append-only'); END;
+
+CREATE TRIGGER gf_curation_batch_artifact_no_delete
+BEFORE DELETE ON gf_curation_batch_artifact
+BEGIN SELECT RAISE(ABORT, 'curation batch artifacts are append-only'); END;
+
+CREATE TABLE gf_shadow_scope_profile (
+    scope_profile_id TEXT PRIMARY KEY,
+    profile_version TEXT NOT NULL,
+    profile_kind TEXT NOT NULL CHECK (profile_kind IN ('targeted_rescanned', 'legacy_restricted')),
+    assembly_accession TEXT NOT NULL CHECK (assembly_accession = 'GCF_000002315.6'),
+    assembly_name TEXT NOT NULL CHECK (assembly_name = 'GRCg6a'),
+    profile_sha256 TEXT NOT NULL CHECK (length(profile_sha256) = 64),
+    profile_status TEXT NOT NULL CHECK (profile_status IN ('contract_only_unapproved', 'draft', 'approved', 'deprecated')),
+    approval_attestation_id TEXT REFERENCES gf_approval_attestation(attestation_id),
+    scientific_shadow_authorized INTEGER NOT NULL DEFAULT 0 CHECK (scientific_shadow_authorized = 0),
+    created_at TEXT NOT NULL,
+    CHECK (profile_status <> 'approved' OR approval_attestation_id IS NOT NULL)
+);
+
+CREATE TRIGGER gf_shadow_scope_profile_no_update
+BEFORE UPDATE ON gf_shadow_scope_profile
+BEGIN SELECT RAISE(ABORT, 'shadow scope profiles are versioned and append-only'); END;
+
+CREATE TRIGGER gf_shadow_scope_profile_no_delete
+BEFORE DELETE ON gf_shadow_scope_profile
+BEGIN SELECT RAISE(ABORT, 'shadow scope profiles are versioned and append-only'); END;
+
+CREATE TABLE gf_scientific_approval_aggregate (
+    aggregate_id TEXT PRIMARY KEY,
+    batch_id TEXT NOT NULL REFERENCES gf_curation_batch(batch_id),
+    aggregate_type TEXT NOT NULL CHECK (aggregate_type = 'shadow_input_approval'),
+    approval_scope TEXT NOT NULL CHECK (approval_scope = 'approved_for_shadow_run'),
+    artifact_hash_algorithm TEXT NOT NULL CHECK (artifact_hash_algorithm = 'gf-canonical-json-sha256-v1'),
+    aggregate_sha256 TEXT NOT NULL CHECK (length(aggregate_sha256) = 64),
+    aggregate_attestation_id TEXT NOT NULL REFERENCES gf_approval_attestation(attestation_id),
+    recorded_at TEXT NOT NULL,
+    UNIQUE (batch_id, aggregate_sha256)
+);
+
+CREATE TABLE gf_scientific_approval_component (
+    aggregate_id TEXT NOT NULL REFERENCES gf_scientific_approval_aggregate(aggregate_id),
+    artifact_type TEXT NOT NULL CHECK (
+        artifact_type IN (
+            'evidence_admissibility', 'domain_vocabulary', 'rule_bundle',
+            'mapping_decisions', 'rollup_policy', 'publication_policy',
+            'regression_fixture_bundle', 'shadow_scope_profile', 'shadow_input_manifest'
+        )
+    ),
+    artifact_sha256 TEXT NOT NULL CHECK (length(artifact_sha256) = 64),
+    attestation_id TEXT NOT NULL REFERENCES gf_approval_attestation(attestation_id),
+    attestation_sha256 TEXT NOT NULL CHECK (length(attestation_sha256) = 64),
+    PRIMARY KEY (aggregate_id, artifact_type)
+) WITHOUT ROWID;
+
+CREATE TRIGGER gf_scientific_approval_aggregate_no_update
+BEFORE UPDATE ON gf_scientific_approval_aggregate
+BEGIN SELECT RAISE(ABORT, 'scientific approval aggregates are append-only'); END;
+
+CREATE TRIGGER gf_scientific_approval_aggregate_no_delete
+BEFORE DELETE ON gf_scientific_approval_aggregate
+BEGIN SELECT RAISE(ABORT, 'scientific approval aggregates are append-only'); END;
+
+CREATE TRIGGER gf_scientific_approval_component_no_update
+BEFORE UPDATE ON gf_scientific_approval_component
+BEGIN SELECT RAISE(ABORT, 'scientific approval aggregate components are append-only'); END;
+
+CREATE TRIGGER gf_scientific_approval_component_no_delete
+BEFORE DELETE ON gf_scientific_approval_component
+BEGIN SELECT RAISE(ABORT, 'scientific approval aggregate components are append-only'); END;
 
 CREATE TABLE gf_rule (
     rule_version_id TEXT PRIMARY KEY,
@@ -565,6 +691,12 @@ CREATE TABLE gf_regression_fixture (
 CREATE TABLE gf_shadow_run (
     shadow_run_id TEXT PRIMARY KEY,
     release_id TEXT NOT NULL REFERENCES gf_release(release_id),
+    curation_batch_id TEXT REFERENCES gf_curation_batch(batch_id),
+    scope_profile_id TEXT REFERENCES gf_shadow_scope_profile(scope_profile_id),
+    shadow_input_manifest_sha256 TEXT CHECK (
+        shadow_input_manifest_sha256 IS NULL OR length(shadow_input_manifest_sha256) = 64
+    ),
+    scientific_approval_aggregate_id TEXT REFERENCES gf_scientific_approval_aggregate(aggregate_id),
     shadow_kind TEXT NOT NULL CHECK (
         shadow_kind IN ('engineering_dry_run', 'rc1_reassessment', 'proteome_wide_discovery')
     ),
@@ -579,7 +711,16 @@ CREATE TABLE gf_shadow_run (
     ),
     scientific_shadow_authorized INTEGER NOT NULL CHECK (scientific_shadow_authorized IN (0, 1)),
     manifest_hash TEXT CHECK (manifest_hash IS NULL OR length(manifest_hash) = 64),
-    CHECK (scientific_shadow_authorized = 0 OR approval_attestation_id IS NOT NULL)
+    CHECK (
+        scientific_shadow_authorized = 0
+        OR (
+            approval_attestation_id IS NOT NULL
+            AND curation_batch_id IS NOT NULL
+            AND scope_profile_id IS NOT NULL
+            AND shadow_input_manifest_sha256 IS NOT NULL
+            AND scientific_approval_aggregate_id IS NOT NULL
+        )
+    )
 );
 
 CREATE TABLE gf_rollup_policy (

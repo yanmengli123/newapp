@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/approval-attestation-v2.json",
+  "title": "Gene-family curator approval attestation v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["attestation_id", "artifact_type", "artifact_hash_algorithm", "artifact_sha256", "approval_scope", "decision", "curator", "approved_at", "limitations"],
+  "properties": {
+    "attestation_id": {"type": "string", "minLength": 1},
+    "artifact_type": {"enum": ["evidence_admissibility", "domain_vocabulary", "rule_bundle", "mapping_decisions", "rollup_policy", "publication_policy", "regression_fixture_bundle", "shadow_scope_profile", "shadow_input_manifest", "scientific_approval_aggregate", "shadow_run", "rc2c_build", "release"]},
+    "artifact_hash_algorithm": {"const": "gf-canonical-json-sha256-v1"},
+    "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "approval_scope": {"enum": ["approved_for_rule_testing", "approved_for_shadow_run", "approved_for_rc2c_build", "approved_for_release"]},
+    "decision": {"enum": ["approved", "rejected", "changes_requested"]},
+    "curator": {"type": "object", "additionalProperties": false, "required": ["name", "identifier", "identifier_scheme", "role"], "properties": {"name": {"type": "string", "minLength": 1}, "identifier": {"type": "string", "minLength": 1}, "identifier_scheme": {"enum": ["ORCID", "institutional", "local"]}, "role": {"enum": ["scientific_curator", "data_qc_reviewer", "release_approver"]}, "organization": {"type": ["string", "null"]}}},
+    "approved_at": {"type": "string", "format": "date-time"},
+    "limitations": {"type": "array", "items": {"type": "string"}},
+    "detached_signature": {"type": ["object", "null"], "additionalProperties": false, "required": ["algorithm", "signature_file", "signature_sha256"], "properties": {"algorithm": {"type": "string"}, "signature_file": {"type": "string"}, "signature_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}
+  }
+}

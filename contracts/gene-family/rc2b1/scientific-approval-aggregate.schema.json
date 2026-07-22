@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/scientific-approval-aggregate-v1.json",
+  "title": "Gene-family scientific approval aggregate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["aggregate_id", "aggregate_type", "artifact_hash_algorithm", "approval_scope", "components", "aggregate_attestation_id", "limitations"],
+  "properties": {
+    "aggregate_id": {"type": "string", "minLength": 1},
+    "aggregate_type": {"const": "shadow_input_approval"},
+    "artifact_hash_algorithm": {"const": "gf-canonical-json-sha256-v1"},
+    "approval_scope": {"const": "approved_for_shadow_run"},
+    "components": {"type": "array", "minItems": 9, "items": {"type": "object", "additionalProperties": false, "required": ["artifact_type", "artifact_sha256", "attestation_id", "attestation_sha256"], "properties": {"artifact_type": {"enum": ["evidence_admissibility", "domain_vocabulary", "rule_bundle", "mapping_decisions", "rollup_policy", "publication_policy", "regression_fixture_bundle", "shadow_scope_profile", "shadow_input_manifest"]}, "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "attestation_id": {"type": "string", "minLength": 1}, "attestation_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}},
+    "aggregate_attestation_id": {"type": "string", "minLength": 1},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

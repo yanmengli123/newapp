@@ -31,6 +31,14 @@ machine contract disagree, the conflict is a contract validation failure and
 must be resolved before building RC2; neither representation silently wins.
 
 The contracts follow FAIR's requirement that data-producing algorithms and
-workflows remain identifiable and reusable. Provenance terms follow PROV-O,
-canonical manifest JSON uses RFC 8785 JCS, and the release package targets
-RO-Crate 1.3 without making RO-Crate completion an RC2-A gate.
+workflows remain identifiable and reusable. Provenance terms follow PROV-O.
+The legacy `gf-canonical-json-sha256-v1` artifact-hash profile is deterministic
+but is not labeled RFC 8785 JCS; a future JCS implementation must receive a new
+algorithm identifier and conformance vectors. The release package targets the
+RO-Crate 1.3 long-term specification without making crate completion an RC2-A
+gate.
+
+Engineering execution records:
+
+- [RC2-B shadow preparation](RC2_B_SHADOW_PREPARATION.md)
+- [RC2-B.1 scientific handoff](RC2_B1_SCIENTIFIC_HANDOFF.md)

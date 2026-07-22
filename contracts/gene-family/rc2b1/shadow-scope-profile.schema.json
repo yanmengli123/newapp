@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/shadow-scope-profile-v1.json",
+  "title": "Gene-family shadow scope profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_id", "profile_version", "profile_kind", "status", "assembly", "subject_scope", "claims", "predicate_capabilities", "required_inputs", "profile_gate_overrides", "scientific_shadow_authorized", "formal_scientific_basis", "limitations"],
+  "properties": {
+    "profile_id": {"type": "string", "minLength": 1},
+    "profile_version": {"const": "1.0.0"},
+    "profile_kind": {"enum": ["targeted_rescanned", "legacy_restricted"]},
+    "status": {"enum": ["contract_only_unapproved", "draft", "approved", "deprecated"]},
+    "assembly": {"type": "object", "additionalProperties": false, "required": ["name", "accession"], "properties": {"name": {"const": "GRCg6a"}, "accession": {"const": "GCF_000002315.6"}}},
+    "subject_scope": {"type": "object", "additionalProperties": false, "required": ["scope_description", "rc1_associated_record_count", "declared_isoforms_required", "isoform_universe_status", "gene_level_absence_enabled"], "properties": {"scope_description": {"type": "string", "minLength": 1}, "rc1_associated_record_count": {"const": 1294}, "declared_isoforms_required": {"type": "boolean"}, "isoform_universe_status": {"enum": ["not_frozen", "partial", "complete"]}, "gene_level_absence_enabled": {"type": "boolean"}}},
+    "claims": {"type": "object", "additionalProperties": false, "required": ["discovery", "complete_catalog", "proteome_wide_recall"], "properties": {"discovery": {"type": "boolean"}, "complete_catalog": {"type": "boolean"}, "proteome_wide_recall": {"type": "boolean"}}},
+    "predicate_capabilities": {"type": "object", "additionalProperties": false, "required": ["legacy_hit_observed", "domain_presence", "domain_absence", "domain_order", "threshold_dependent_predicates", "legacy_only_accepted_emission"], "properties": {"legacy_hit_observed": {"type": "boolean"}, "domain_presence": {"type": "boolean"}, "domain_absence": {"type": "boolean"}, "domain_order": {"type": "boolean"}, "threshold_dependent_predicates": {"type": "boolean"}, "legacy_only_accepted_emission": {"type": "boolean"}}},
+    "required_inputs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "profile_gate_overrides": {"type": "array", "items": {"$ref": "#/$defs/gateOverride"}},
+    "scientific_shadow_authorized": {"const": false},
+    "formal_scientific_basis": {"type": "boolean"},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"profile_kind": {"const": "legacy_restricted"}}, "required": ["profile_kind"]},
+      "then": {
+        "properties": {
+          "claims": {"properties": {"discovery": {"const": false}, "complete_catalog": {"const": false}, "proteome_wide_recall": {"const": false}}},
+          "predicate_capabilities": {"properties": {"domain_presence": {"const": false}, "domain_absence": {"const": false}, "domain_order": {"const": false}, "threshold_dependent_predicates": {"const": false}, "legacy_only_accepted_emission": {"const": false}}},
+          "formal_scientific_basis": {"const": false}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"subject_scope": {"properties": {"isoform_universe_status": {"enum": ["not_frozen", "partial"]}}, "required": ["isoform_universe_status"]}}, "required": ["subject_scope"]},
+      "then": {"properties": {"subject_scope": {"properties": {"gene_level_absence_enabled": {"const": false}}}}}
+    }
+  ],
+  "$defs": {"gateOverride": {"type": "object", "additionalProperties": false, "required": ["gate_id", "gate_status", "observed_value", "not_applicable_reason"], "properties": {"gate_id": {"type": "string", "minLength": 1}, "gate_status": {"const": "not_applicable"}, "observed_value": {"type": "null"}, "not_applicable_reason": {"type": "string", "minLength": 1}}}}
+}

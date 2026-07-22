@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/curation-batch-manifest-v1.json",
+  "title": "Gene-family curation batch manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "batch_id", "scheme_id", "purpose", "contract_version", "contract_tag", "evaluator_tag", "packet_manifest_sha256", "handoff_contract_manifest_sha256", "input_artifacts", "expected_decision_artifacts", "created_by", "created_at", "status", "supersedes_batch_id", "scientific_approval_implied", "scientific_shadow_authorized", "rc2c_build_authorized", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "batch_id": {"type": "string", "pattern": "^gg-gf-[a-z0-9-]+-curation-rc2-batch-[0-9]{3}$"},
+    "scheme_id": {"const": "ubiquitin_core"},
+    "purpose": {"type": "string", "minLength": 1},
+    "contract_version": {"const": "gg-gf-contract-1.0"},
+    "contract_tag": {"const": "gene-family-rc2a-contract-v1.0"},
+    "evaluator_tag": {"const": "gene-family-rc2b-evaluator-core-v1.0"},
+    "packet_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "handoff_contract_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "input_artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/artifactReference"}},
+    "expected_decision_artifacts": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/expectedArtifact"}},
+    "created_by": {"type": "object", "additionalProperties": false, "required": ["name", "role"], "properties": {"name": {"type": "string", "minLength": 1}, "role": {"const": "engineering_preparer"}}},
+    "created_at": {"type": "string", "format": "date-time"},
+    "status": {"enum": ["draft", "open", "under_review", "closed", "superseded", "withdrawn"]},
+    "supersedes_batch_id": {"type": ["string", "null"]},
+    "scientific_approval_implied": {"const": false},
+    "scientific_shadow_authorized": {"const": false},
+    "rc2c_build_authorized": {"const": false},
+    "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "relativePath": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"},
+    "artifactReference": {"type": "object", "additionalProperties": false, "required": ["artifact_type", "relative_path", "sha256", "required", "status"], "properties": {"artifact_type": {"type": "string", "minLength": 1}, "relative_path": {"$ref": "#/$defs/relativePath"}, "sha256": {"$ref": "#/$defs/sha256"}, "required": {"type": "boolean"}, "status": {"enum": ["observed", "generated_unapproved", "curator_supplied", "missing"]}}},
+    "expectedArtifact": {"type": "object", "additionalProperties": false, "required": ["artifact_type", "relative_path", "required", "status"], "properties": {"artifact_type": {"type": "string", "minLength": 1}, "relative_path": {"$ref": "#/$defs/relativePath"}, "required": {"type": "boolean"}, "status": {"enum": ["missing", "draft", "approved", "rejected", "changes_requested"]}}}
+  }
+}

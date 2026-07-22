@@ -1,0 +1,15 @@
+{
+  "profile_id": "shadow-scope-targeted-rescanned-v1",
+  "profile_version": "1.0.0",
+  "profile_kind": "targeted_rescanned",
+  "status": "contract_only_unapproved",
+  "assembly": {"name": "GRCg6a", "accession": "GCF_000002315.6"},
+  "subject_scope": {"scope_description": "RC1 ubiquitin-core associated records plus every declared protein isoform of those genes", "rc1_associated_record_count": 1294, "declared_isoforms_required": true, "isoform_universe_status": "not_frozen", "gene_level_absence_enabled": false},
+  "claims": {"discovery": false, "complete_catalog": false, "proteome_wide_recall": false},
+  "predicate_capabilities": {"legacy_hit_observed": true, "domain_presence": false, "domain_absence": false, "domain_order": false, "threshold_dependent_predicates": false, "legacy_only_accepted_emission": false},
+  "required_inputs": ["protein_fasta", "gene_transcript_protein_map", "declared_isoform_universe", "annotation_release", "pfam_release", "pfam_hmm_library", "hmmer_version", "complete_command", "threshold_policy", "scanned_subject_list", "no_hit_subject_list", "failed_subject_list"],
+  "profile_gate_overrides": [],
+  "scientific_shadow_authorized": false,
+  "formal_scientific_basis": false,
+  "limitations": ["No rescan has been executed.", "The complete declared isoform universe is not frozen; gene-level absence remains disabled.", "Presence, absence, order and threshold-dependent predicates remain disabled until scan and threshold provenance gates pass."]
+}

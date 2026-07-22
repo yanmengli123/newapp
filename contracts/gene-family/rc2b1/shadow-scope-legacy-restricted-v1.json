@@ -1,0 +1,18 @@
+{
+  "profile_id": "shadow-scope-legacy-restricted-v1",
+  "profile_version": "1.0.0",
+  "profile_kind": "legacy_restricted",
+  "status": "contract_only_unapproved",
+  "assembly": {"name": "GRCg6a", "accession": "GCF_000002315.6"},
+  "subject_scope": {"scope_description": "RC1 ubiquitin-core historical records only", "rc1_associated_record_count": 1294, "declared_isoforms_required": false, "isoform_universe_status": "not_frozen", "gene_level_absence_enabled": false},
+  "claims": {"discovery": false, "complete_catalog": false, "proteome_wide_recall": false},
+  "predicate_capabilities": {"legacy_hit_observed": true, "domain_presence": false, "domain_absence": false, "domain_order": false, "threshold_dependent_predicates": false, "legacy_only_accepted_emission": false},
+  "required_inputs": ["rc1_subject_universe", "legacy_evidence_inventory", "rc1_baseline", "evidence_admissibility_policy"],
+  "profile_gate_overrides": [
+    {"gate_id": "threshold_policy_coverage", "gate_status": "not_applicable", "observed_value": null, "not_applicable_reason": "Legacy restricted reassessment prohibits threshold-dependent predicates."},
+    {"gate_id": "scan_completeness_coverage", "gate_status": "not_applicable", "observed_value": null, "not_applicable_reason": "Legacy restricted reassessment cannot infer absence or order from unconfirmed historical scan coverage."}
+  ],
+  "scientific_shadow_authorized": false,
+  "formal_scientific_basis": false,
+  "limitations": ["Diagnostic historical reassessment only.", "Cannot establish domain absence, domain order, complete catalog, proteome completeness or proteome-wide recall.", "Cannot emit accepted assertions solely from legacy evidence."]
+}

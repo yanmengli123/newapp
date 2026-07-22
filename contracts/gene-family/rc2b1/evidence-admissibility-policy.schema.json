@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/evidence-admissibility-policy-v1.json",
+  "title": "Gene-family evidence admissibility policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "policy_version", "scheme_id", "status", "artifact_hash_algorithm", "legacy_hit_semantics", "rules", "approval_attestation_id", "limitations"],
+  "properties": {
+    "policy_id": {"type": "string", "minLength": 1},
+    "policy_version": {"type": "string", "minLength": 1},
+    "scheme_id": {"const": "ubiquitin_core"},
+    "status": {"enum": ["draft", "approved", "deprecated"]},
+    "artifact_hash_algorithm": {"const": "gf-canonical-json-sha256-v1"},
+    "legacy_hit_semantics": {
+      "type": "object", "additionalProperties": false,
+      "required": ["claim_name", "fact_field", "query_operators", "new_rule_operator_required", "implies_domain_present", "implies_domain_absent"],
+      "properties": {
+        "claim_name": {"const": "legacy_hit_observed"},
+        "fact_field": {"const": "legacy.pfam_observed_terms"},
+        "query_operators": {"type": "array", "uniqueItems": true, "items": {"enum": ["contains", "exists", "eq"]}},
+        "new_rule_operator_required": {"const": false},
+        "implies_domain_present": {"const": false},
+        "implies_domain_absent": {"const": false}
+      }
+    },
+    "rules": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/admissibilityRule"}},
+    "approval_attestation_id": {"type": ["string", "null"]},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "admissibilityRule": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rule_id", "evidence_source_type", "provenance_status", "threshold_status", "scan_completeness", "allowed_predicates", "allowed_assertion_states", "can_support_presence", "can_support_absence", "can_support_order", "can_independently_support_accepted", "limitations"],
+      "properties": {
+        "rule_id": {"type": "string", "minLength": 1},
+        "evidence_source_type": {"enum": ["legacy_emitted_pfam_hit", "rc1_primary_classification", "product_only", "frozen_environment_rescan", "versioned_external_curation", "manual_curator_decision"]},
+        "provenance_status": {"enum": ["complete", "partial", "unknown_legacy", "not_applicable"]},
+        "threshold_status": {"enum": ["passed_versioned_policy", "failed_versioned_policy", "unknown_legacy", "not_applicable"]},
+        "scan_completeness": {"enum": ["complete", "partial", "unknown_legacy", "not_applicable"]},
+        "allowed_predicates": {"type": "array", "uniqueItems": true, "items": {"enum": ["legacy_hit_observed", "domain_present", "domain_absent", "domain_order", "external_curated_assertion", "manual_review_decision", "product_annotation_observed", "historical_classification_observed"]}},
+        "allowed_assertion_states": {"type": "array", "uniqueItems": true, "items": {"enum": ["accepted", "candidate", "rejected", "retired"]}},
+        "can_support_presence": {"type": "boolean"},
+        "can_support_absence": {"type": "boolean"},
+        "can_support_order": {"type": "boolean"},
+        "can_independently_support_accepted": {"type": "boolean"},
+        "limitations": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

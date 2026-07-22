@@ -1,0 +1,18 @@
+{
+  "contract_id": "gf-shadow-runner-io-v1",
+  "version": "1.0.0",
+  "status": "interface_frozen_implementation_absent",
+  "orchestration_only": true,
+  "adds_rule_operators": false,
+  "formal_assertion_write_allowed": false,
+  "release_database_write_allowed": false,
+  "required_inputs": ["shadow-input-manifest.json", "inputs-lock.json", "subject-universe.tsv", "scan-run-manifest.json", "evidence-admissibility-policy.json", "domain-vocabulary.json", "rule-bundle.json", "mapping-decisions.tsv", "rollup-policy.json", "publication-policy.json", "fixture-bundle.json", "scientific-approval-aggregate.json", "shadow-run-authorization.json"],
+  "ordered_process": ["input_validation", "subject_universe_validation", "evidence_adaptation", "rule_evaluation", "node_trace", "protein_outcomes", "gene_rollup", "publication_proposals", "metrics", "rc1_diff", "gates", "provenance"],
+  "required_outputs": ["shadow-manifest.json", "inputs-lock.json", "subject-universe.tsv", "rule-evaluations.tsv", "rule-node-traces.tsv", "trace-evidence-links.tsv", "protein-outcomes.tsv", "gene-rollup-proposals.tsv", "publication-proposals.tsv", "metrics.json", "diff-vs-rc1.json", "gate-results.json", "rejected-records.tsv", "limitations.json", "provenance.jsonld", "checksums.sha256"],
+  "rejected_record_policy": {"silent_drop_allowed": false, "every_skipped_source_record_reported": true},
+  "clean_build_requirement": {"independent_processes": 2, "fresh_output_directories": 2, "shared_previous_run_outputs_allowed": false},
+  "semantic_hashes": ["evaluation", "node_trace", "evidence_link", "protein_outcome", "rollup_proposal", "publication_proposal", "metric", "diff", "gate_result"],
+  "semantic_hash_excluded_fields": ["timestamp", "build_id", "absolute_path", "elapsed_time"],
+  "diff_contract": {"observed_change_type": ["assertion_added", "assertion_removed", "classification_changed", "state_changed", "mapping_changed", "evidence_link_changed"], "cause_set": ["source", "normalization", "domain_vocabulary", "rule", "mapping", "review", "isoform_rollup", "publication_policy"], "multiple_causes_allowed": true},
+  "provenance_profiles": {"prov_o": "https://www.w3.org/TR/prov-o/", "ro_crate": "https://w3id.org/ro/crate/1.3", "ro_crate_1_3_status_wording": "current long-term specification release; not described as a W3C Recommendation"}
+}

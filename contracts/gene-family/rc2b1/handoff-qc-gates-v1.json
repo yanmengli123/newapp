@@ -1,0 +1,19 @@
+{
+  "gate_registry_id": "gf-rc2b1-handoff-qc-gates-v1",
+  "version": "1.0.0",
+  "status": "frozen_for_engineering",
+  "scientific_shadow_authorized": false,
+  "gates": [
+    {"gate_id": "batch_manifest_schema_coverage", "severity": "blocker", "expected": "1.0"},
+    {"gate_id": "admissibility_policy_canonicalized", "severity": "blocker", "expected": true},
+    {"gate_id": "required_attestation_artifact_types_complete", "severity": "blocker", "expected": true},
+    {"gate_id": "shadow_scope_profile_schema_coverage", "severity": "blocker", "expected": "1.0"},
+    {"gate_id": "aggregate_manifest_components_resolved", "severity": "blocker", "expected": "1.0"},
+    {"gate_id": "shadow_run_authorization_supported", "severity": "blocker", "expected": true},
+    {"gate_id": "mapping_cross_table_mismatch_count", "severity": "blocker", "expected": 0},
+    {"gate_id": "unreviewed_accepted_mapping_exception_count", "severity": "blocker", "expected": 0},
+    {"gate_id": "independent_clean_build_count", "severity": "blocker", "expected": 2},
+    {"gate_id": "canonical_semantic_hash_equality", "severity": "blocker", "expected": "1.0"},
+    {"gate_id": "raw_source_modification_count", "severity": "blocker", "expected": 0}
+  ]
+}

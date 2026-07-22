@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/shadow-input-manifest-v1.json",
+  "title": "Gene-family formal shadow input manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_id", "batch_id", "scope_profile_id", "artifact_hash_algorithm", "inputs", "scientific_approval_aggregate_sha256", "shadow_run_authorization_sha256", "formal_shadow_authorized"],
+  "properties": {
+    "manifest_id": {"type": "string", "minLength": 1},
+    "batch_id": {"type": "string", "minLength": 1},
+    "scope_profile_id": {"type": "string", "minLength": 1},
+    "artifact_hash_algorithm": {"const": "gf-canonical-json-sha256-v1"},
+    "inputs": {"type": "array", "minItems": 11, "items": {"type": "object", "additionalProperties": false, "required": ["artifact_type", "relative_path", "sha256"], "properties": {"artifact_type": {"type": "string", "minLength": 1}, "relative_path": {"type": "string", "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}},
+    "scientific_approval_aggregate_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "shadow_run_authorization_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "formal_shadow_authorized": {"type": "boolean"}
+  }
+}

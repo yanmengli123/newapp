@@ -1,0 +1,18 @@
+{
+  "registry_id": "gf-artifact-hash-algorithms-v1",
+  "version": "1.0.0",
+  "algorithms": [
+    {
+      "algorithm_id": "gf-canonical-json-sha256-v1",
+      "canonicalization": "UTF-8 JSON; object keys sorted lexicographically; ensure_ascii=false; separators comma and colon; NaN and Infinity rejected",
+      "rfc8785_jcs": false,
+      "digest": "SHA-256",
+      "test_vectors": [
+        {"input": {"b": "鸡", "a": [true, null, "x"]}, "canonical": "{\"a\":[true,null,\"x\"],\"b\":\"鸡\"}", "sha256": "b5c666ef9a5aaf531837f401566d2aad4e65307b425f979368e8cc2084732f73"},
+        {"input": {"z": "line\\nquote\\\"", "a": "é"}, "canonical": "{\"a\":\"é\",\"z\":\"line\\\\nquote\\\\\\\"\"}", "sha256": "4c6b3894e29c3d7cf79398251d6108c067410e2af46d99515c2bad60b322b296"}
+      ]
+    }
+  ],
+  "rfc8785_algorithm_registered": false,
+  "reason": "The existing profile is preserved without relabeling it as JCS; RFC 8785 requires a separately versioned implementation and conformance suite."
+}

@@ -1,0 +1,24 @@
+{
+  "manifest_id": "gg-gf-rc2b1-scientific-handoff-1.0",
+  "version": "1.0.0",
+  "status": "frozen_for_engineering",
+  "base_contract": "gg-gf-contract-1.0",
+  "rc2a_contract_tag": "gene-family-rc2a-contract-v1.0",
+  "rc2b_evaluator_tag": "gene-family-rc2b-evaluator-core-v1.0",
+  "files": [
+    {"path": "curation-batch-manifest.schema.json", "sha256": "7210672b6780d1d9e0b7656f1f0e210f15cc3e322b46a53769f2fa392fb269de"},
+    {"path": "evidence-admissibility-policy.schema.json", "sha256": "f83410e913784d796c12e02c82bc775de94fb66f760fd60860b8ce84251e9267"},
+    {"path": "approval-attestation-v2.schema.json", "sha256": "5ea7ecac28577e28b6741a17745d548ae3cd9333202a7a1674473f56b524bee7"},
+    {"path": "scientific-approval-aggregate.schema.json", "sha256": "baaa0d8d7f3127e0edd5a9c375b212b3763765d87d905cd387bf588b99bf2b56"},
+    {"path": "shadow-scope-profile.schema.json", "sha256": "9586c0acf23c3b2ff3de2cd619eac0d7ba8ad95a73770c9d5343c5304af29ade"},
+    {"path": "shadow-input-manifest.schema.json", "sha256": "96e2295e7eb3707359e380f7fed2cf81d576ffa766db1f607262eceb07f8c87b"},
+    {"path": "artifact-hash-algorithms-v1.json", "sha256": "e4005c7b2e86ecedf5eef4987df93b10232ae15eecd91b10e2e1496e61bdae7d"},
+    {"path": "shadow-scope-targeted-rescanned-v1.json", "sha256": "ce599ab06236ba367c1cd48f982fb8b7408f3be8f6238a98a8c364c250d71df0"},
+    {"path": "shadow-scope-legacy-restricted-v1.json", "sha256": "84381d92e00088b60d46d1065d83c74311cefbe3b60edb27d011cb6393cefdc5"},
+    {"path": "shadow-runner-io-contract-v1.json", "sha256": "5d313bb638cac990f77a98799bbcde74230a5ecc09331b65a19fab2b7105b552"},
+    {"path": "handoff-qc-gates-v1.json", "sha256": "b1555715fa2a01071f73d574366a99864130ad5beeb2386aad2eedaf623ed3c9"}
+  ],
+  "scientific_shadow_authorized": false,
+  "rescan_authorized": false,
+  "rc2c_build_authorized": false
+}
