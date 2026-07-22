@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/contracts/gene-family/rc2b2/target-universe-manifest.schema.json",
+  "title": "RC2-B.2 targeted GRCg6a universe manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "universe_id",
+    "status",
+    "assembly",
+    "annotation_release",
+    "source_artifacts",
+    "identity_policy",
+    "counts",
+    "quality",
+    "output_artifacts",
+    "created_at",
+    "generator_commit",
+    "source_modification_count",
+    "scan_executed",
+    "scientific_decisions_emitted"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "universe_id": {"const": "gg-gf-ubiquitin-grcg6a-target-universe-v1"},
+    "status": {"const": "engineering_generated_unapproved"},
+    "assembly": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "accession"],
+      "properties": {
+        "name": {"const": "GRCg6a"},
+        "accession": {"const": "GCF_000002315.6"}
+      }
+    },
+    "annotation_release": {"const": "NCBI Gallus gallus Annotation Release 104"},
+    "source_artifacts": {
+      "type": "array",
+      "minItems": 4,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "identity_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gene_key",
+        "scientific_subject_key",
+        "scan_execution_key",
+        "equal_sequence_accessions_merged",
+        "scan_results_reexpanded_before_rule_evaluation",
+        "placement_is_biological_gene"
+      ],
+      "properties": {
+        "gene_key": {"const": "NCBIGene identifier"},
+        "scientific_subject_key": {"const": "versioned_protein_accession"},
+        "scan_execution_key": {"const": "sequence_sha256"},
+        "equal_sequence_accessions_merged": {"const": false},
+        "scan_results_reexpanded_before_rule_evaluation": {"const": true},
+        "placement_is_biological_gene": {"const": false}
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_genes",
+        "target_transcripts",
+        "target_protein_subjects",
+        "noncoding_transcript_exclusions",
+        "scan_execution_sequences",
+        "shared_sequence_groups",
+        "subjects_in_shared_sequence_groups",
+        "scan_execution_reuse_savings",
+        "multi_placement_genes",
+        "annotation_exception_proteins"
+      ],
+      "properties": {
+        "target_genes": {"const": 1294},
+        "target_transcripts": {"const": 4777},
+        "target_protein_subjects": {"const": 4571},
+        "noncoding_transcript_exclusions": {"const": 206},
+        "scan_execution_sequences": {"const": 3525},
+        "shared_sequence_groups": {"const": 460},
+        "subjects_in_shared_sequence_groups": {"const": 1506},
+        "scan_execution_reuse_savings": {"const": 1046},
+        "multi_placement_genes": {"const": 4},
+        "annotation_exception_proteins": {"const": 209}
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_proteins_missing_fasta",
+        "protein_mapped_to_multiple_genes",
+        "unexplained_transcript_exclusions",
+        "transcript_status_coverage_percent",
+        "protein_sequence_hash_coverage_percent"
+      ],
+      "properties": {
+        "target_proteins_missing_fasta": {"const": 0},
+        "protein_mapped_to_multiple_genes": {"const": 0},
+        "unexplained_transcript_exclusions": {"const": 0},
+        "transcript_status_coverage_percent": {"const": 100.0},
+        "protein_sequence_hash_coverage_percent": {"const": 100.0}
+      }
+    },
+    "output_artifacts": {
+      "type": "array",
+      "minItems": 10,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "generator_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_modification_count": {"const": 0},
+    "scan_executed": {"const": false},
+    "scientific_decisions_emitted": {"const": false}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "logical_locator", "sha256", "byte_size"],
+      "properties": {
+        "artifact_type": {"type": "string", "minLength": 1},
+        "logical_locator": {"type": "string", "minLength": 1, "pattern": "^(?![A-Za-z]:)(?!/).+$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "byte_size": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}
+

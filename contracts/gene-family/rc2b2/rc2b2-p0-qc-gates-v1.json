@@ -1,0 +1,47 @@
+{
+  "gate_set_id": "gg-gf-rc2b2-p0-qc-gates-v1",
+  "phase": "RC2-B.2-P0 Readiness Freeze",
+  "target_universe": {
+    "target_genes": {"operator": "eq", "required_value": 1294},
+    "target_transcripts": {"operator": "eq", "required_value": 4777},
+    "target_protein_subjects": {"operator": "eq", "required_value": 4571},
+    "noncoding_transcript_exclusions": {"operator": "eq", "required_value": 206},
+    "target_proteins_missing_fasta": {"operator": "eq", "required_value": 0},
+    "protein_mapped_to_multiple_genes": {"operator": "eq", "required_value": 0},
+    "unexplained_transcript_exclusions": {"operator": "eq", "required_value": 0},
+    "source_modification_count": {"operator": "eq", "required_value": 0}
+  },
+  "environment_freeze": {
+    "pfam_models_with_ga": {"operator": "eq", "required_value": 19632},
+    "pfam_models_total": {"operator": "eq", "required_value": 19632},
+    "pfam_artifact_hash_coverage_percent": {"operator": "eq", "required_value": 100.0},
+    "pressed_index_hash_coverage_percent": {"operator": "eq", "required_value": 100.0},
+    "hmmer_observed_version": {"operator": "eq", "required_value": "3.4"},
+    "container_digest_observed": {"operator": "eq", "required_value": true},
+    "authoritative_diagnostic_separation": {"operator": "eq", "required_value": true}
+  },
+  "pilot_acceptance": {
+    "input_subject_coverage_percent": {"operator": "eq", "required_value": 100.0},
+    "authoritative_scan_completion_percent": {"operator": "eq", "required_value": 100.0},
+    "diagnostic_scan_completion_percent": {"operator": "eq", "required_value": 100.0},
+    "no_hit_explicit_representation_percent": {"operator": "eq", "required_value": 100.0},
+    "failed_record_reporting_percent": {"operator": "eq", "required_value": 100.0},
+    "accession_reexpansion_correct_percent": {"operator": "eq", "required_value": 100.0},
+    "ga_parsing_coverage_percent": {"operator": "eq", "required_value": 100.0},
+    "repeat_run_semantic_hash_match_percent": {"operator": "eq", "required_value": 100.0},
+    "raw_source_modifications": {"operator": "eq", "required_value": 0}
+  },
+  "failure_policy": {
+    "force_failed_count_to_zero": false,
+    "record_every_failure": true,
+    "formal_shadow_requires_observed_failed_count_zero": true,
+    "formal_disposition_required_before_shadow": true
+  },
+  "authorizations": {
+    "pilot_scan": "separate_authorization_required_after_environment_freeze",
+    "full_targeted_scan": "pilot_acceptance_required",
+    "formal_shadow": "aggregate_approval_and_run_authorization_required",
+    "rc2c_build": "not_authorized",
+    "api_frontend_switch": "not_authorized"
+  }
+}

@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/contracts/gene-family/rc2b2/scan-environment-manifest.schema.json",
+  "title": "RC2-B.2 Pfam/HMMER scan environment manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment_id",
+    "status",
+    "pfam_release_target",
+    "pfam_artifacts",
+    "pfam_model_count_with_ga",
+    "pfam_model_count_total",
+    "hmmer_target_version",
+    "hmmer_observed_version",
+    "container",
+    "runtime",
+    "host_architecture",
+    "locale",
+    "authoritative_scan",
+    "diagnostic_scan",
+    "protein_fasta_sha256",
+    "subject_universe_sha256",
+    "command_manifest_sha256",
+    "environment_manifest_sha256",
+    "pilot_scan_authorized",
+    "full_targeted_scan_authorized",
+    "formal_shadow_authorized",
+    "blocking_reasons"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "environment_id": {"const": "gg-gf-pfam35-hmmer34-environment-v1"},
+    "status": {"enum": ["draft_missing_inputs", "frozen_for_pilot"]},
+    "pfam_release_target": {"const": "35.0"},
+    "pfam_artifacts": {
+      "type": "array",
+      "minItems": 10,
+      "items": {"$ref": "#/$defs/inputArtifact"}
+    },
+    "pfam_model_count_with_ga": {"oneOf": [{"const": 19632}, {"type": "null"}]},
+    "pfam_model_count_total": {"oneOf": [{"const": 19632}, {"type": "null"}]},
+    "hmmer_target_version": {"const": "3.4"},
+    "hmmer_observed_version": {"oneOf": [{"const": "3.4"}, {"type": "null"}]},
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_reference", "image_digest", "value_status"],
+      "properties": {
+        "image_reference": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "image_digest": {"oneOf": [{"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}, {"type": "null"}]},
+        "value_status": {"$ref": "#/$defs/valueStatus"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "value_status"],
+      "properties": {
+        "name": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "version": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "value_status": {"$ref": "#/$defs/valueStatus"}
+      }
+    },
+    "host_architecture": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+    "locale": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+    "authoritative_scan": {"$ref": "#/$defs/scan"},
+    "diagnostic_scan": {"$ref": "#/$defs/scan"},
+    "protein_fasta_sha256": {"$ref": "#/$defs/nullableSha256"},
+    "subject_universe_sha256": {"$ref": "#/$defs/nullableSha256"},
+    "command_manifest_sha256": {"$ref": "#/$defs/nullableSha256"},
+    "environment_manifest_sha256": {"$ref": "#/$defs/nullableSha256"},
+    "pilot_scan_authorized": {"const": false},
+    "full_targeted_scan_authorized": {"const": false},
+    "formal_shadow_authorized": {"const": false},
+    "blocking_reasons": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "valueStatus": {
+      "enum": ["observed", "derived", "not_reported", "not_applicable", "unknown_legacy"]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        {"type": "null"}
+      ]
+    },
+    "inputArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_role", "logical_locator", "sha256", "byte_size", "value_status"],
+      "properties": {
+        "artifact_role": {
+          "enum": [
+            "pfam_hmm_compressed",
+            "pfam_hmm_uncompressed",
+            "pfam_hmm_dat",
+            "pfam_hmm_h3f",
+            "pfam_hmm_h3i",
+            "pfam_hmm_h3m",
+            "pfam_hmm_h3p",
+            "pfam_clans",
+            "pfam_dead_families",
+            "pfam_version_record"
+          ]
+        },
+        "logical_locator": {"oneOf": [{"type": "string", "minLength": 1}, {"type": "null"}]},
+        "sha256": {"$ref": "#/$defs/nullableSha256"},
+        "byte_size": {"oneOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "value_status": {"$ref": "#/$defs/valueStatus"}
+      }
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_role",
+        "command_argv",
+        "command_sha256",
+        "can_support_accepted",
+        "can_support_candidate"
+      ],
+      "properties": {
+        "evidence_role": {"enum": ["authoritative", "diagnostic_only"]},
+        "command_argv": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "command_sha256": {"$ref": "#/$defs/sha256"},
+        "can_support_accepted": {"type": "boolean"},
+        "can_support_candidate": {
+          "oneOf": [{"type": "boolean"}, {"const": "policy_dependent"}]
+        }
+      }
+    },
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
+

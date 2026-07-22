@@ -1,0 +1,46 @@
+{
+  "manifest_id": "gg-gf-rc2b2-readiness-1.0",
+  "status": "frozen_for_engineering",
+  "parent_handoff": {
+    "manifest_id": "gg-gf-rc2b1-scientific-handoff-1.0",
+    "relative_path": "../rc2b1/handoff-contract-manifest-v1.json",
+    "sha256": "27bdf773c28373fbe43eb7bab3c39a4e22f4961f0a29ffe26b13246ee2dba204"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "a1bfafffb75377af20ce726fd3a210c329bec33151d842728ec04408030c9274"
+    },
+    {
+      "path": "decision-submission-manifest.schema.json",
+      "sha256": "9e6965d1b8336aea1d41904e472cd90109d220e454c752f61a9482a4efa50f64"
+    },
+    {
+      "path": "dual-scan-policy-v1.json",
+      "sha256": "26e39ebd82ebbc390cd1d7b18d0d9f343216de8a38957217364f0e9deeb5356b"
+    },
+    {
+      "path": "rc2b2-p0-qc-gates-v1.json",
+      "sha256": "41077e1d8754cd9de576ed6a2bd07c9596a0c45a8564e6f07f324cc051620747"
+    },
+    {
+      "path": "scan-environment-manifest.schema.json",
+      "sha256": "26c585e0bd96b7eced63fa468c7c961cf320fa3675160cce7a334b1622d6b4a9"
+    },
+    {
+      "path": "target-universe-manifest.schema.json",
+      "sha256": "bb2d75caa04cc0c130a433b39a5497827f2699ad2bf22cdffff5b67022b9a5ef"
+    }
+  ],
+  "identity_policy": {
+    "scientific_subject_key": "versioned_protein_accession",
+    "scan_execution_key": "sequence_sha256",
+    "placement_is_biological_gene": false
+  },
+  "scientific_approval_implied": false,
+  "pilot_scan_authorized": false,
+  "full_targeted_scan_authorized": false,
+  "formal_shadow_authorized": false,
+  "rc2c_build_authorized": false,
+  "api_frontend_switch_authorized": false
+}

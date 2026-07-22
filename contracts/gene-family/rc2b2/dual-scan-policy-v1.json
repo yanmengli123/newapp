@@ -1,0 +1,72 @@
+{
+  "policy_id": "gg-gf-pfam-dual-scan-policy-v1",
+  "pfam_release": "35.0",
+  "hmmer_version": "3.4",
+  "authoritative": {
+    "evidence_role": "authoritative",
+    "command_argv": [
+      "hmmscan",
+      "--cut_ga",
+      "--acc",
+      "--noali",
+      "--cpu",
+      "${CPU}",
+      "--tblout",
+      "authoritative.tblout",
+      "--domtblout",
+      "authoritative.domtblout",
+      "Pfam-A.hmm",
+      "target-scan-executions.fasta"
+    ],
+    "can_support_accepted": true,
+    "can_support_candidate": true
+  },
+  "diagnostic": {
+    "evidence_role": "diagnostic_only",
+    "command_argv": [
+      "hmmscan",
+      "--acc",
+      "--noali",
+      "--cpu",
+      "${CPU}",
+      "-E",
+      "1000",
+      "--domE",
+      "1000",
+      "--tblout",
+      "diagnostic.tblout",
+      "--domtblout",
+      "diagnostic.domtblout",
+      "Pfam-A.hmm",
+      "target-scan-executions.fasta"
+    ],
+    "can_support_accepted": false,
+    "can_support_candidate": "policy_dependent"
+  },
+  "stable_hit_key_fields": [
+    "scan_subject_key",
+    "pfam_accession",
+    "hmm_from",
+    "hmm_to",
+    "ali_from",
+    "ali_to",
+    "env_from",
+    "env_to"
+  ],
+  "required_threshold_fields": [
+    "sequence_ga",
+    "domain_ga",
+    "sequence_threshold_pass",
+    "domain_threshold_pass"
+  ],
+  "separation": {
+    "mixed_evidence_views_allowed": false,
+    "legacy_unknown_treated_as_ga_pass": false,
+    "scan_evidence_is_assertion": false,
+    "rule_evaluation_is_publication": false
+  },
+  "pilot_scan_authorized": false,
+  "full_targeted_scan_authorized": false,
+  "formal_shadow_authorized": false
+}
+
