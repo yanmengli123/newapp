@@ -73,7 +73,7 @@ C:\Users\32110\Desktop\newapp\   # Source root (Git-managed)
 ├── src/                          # React/TypeScript frontend
 │   ├── pages/                    # Route targets (App.tsx)
 │   ├── components/                # UI components
-│   │   ├── expression/            # 14 Plotly expression chart components
+│   │   ├── expression/            # 19 expression chart / structural components (Mix of Plotly + ECharts + Mantine)
 │   │   ├── kegg/                # KEGG pathway viewer
 │   │   ├── go/                   # GO term cards
 │   │   ├── go_enrichment/       # GO Enrichment SEA components
@@ -171,7 +171,7 @@ D:\jbrowsedata\projectdata\      # Production data/execution root (NOT in Git)
   - `resolveGeneId()` — Auto-resolves non-canonical gene IDs (symbol → gene-XXX). All gene API functions use this internally; components should NOT call search before gene API functions.
 - **KEGG components** — `src/components/kegg/`: `KeggPathwaysSection` (section container), `KeggPathwayCard` (View/Interactive/Download/KEGG 4 buttons), `KeggInteractiveViewer` (PNG+SVG proportional overlay interactive viewer). All image URLs use `API_BASE` from `apiClient`, not hardcoded localhost.
 - **GO components** — `src/components/go/`: `GOTermCard` (single GO entry card with ID/name/evidence code/source/definition)
-- **Expression components** — `src/components/expression/`: 15 chart components + 2 structural components
+- **Expression components** — `src/components/expression/`: chart + structural components for the GenePage Expression module and the home-page ESC Atlas
   - `utils.ts` — Shared utilities (`isValidNumber`/`normalizeSex`/`STAGE_ORDER`/`resolveStageMeans`/`groupSamplesByStageSex`/`groupSamplesByStageSexReplicate`/`PLOT_CONFIG`)
   - `chartCustomizer.types.ts` — `ChartType`, `ResolvedChartStyle`, `ChartStyleConfig` types
   - `chartCustomizer.defaults.ts` — `CHART_TYPE_LABELS`, default style per chart type
@@ -890,17 +890,36 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:5173   # → 200
 
 ## Backend Tests
 
-Backend tests run from the project root (C:). The test file is `backend/test_go_enrichment.py` and tests pure math and SQL helper logic without requiring a running database.
+Backend tests run from the project root (C:) and exercise pure math + SQL helper logic + asset-builder code without requiring a running database. Test files live alongside the code in `backend/`:
 
+| Module | What it covers |
+|---|---|
+| `backend/test_go_enrichment.py` | Hypergeometric math, FDR correction (BH/None), `_compute_enrichment_for_namespace()`, `_go_alt_sql_parts()` SQL helper, per-ontology isolation |
+| `backend/test_core_config.py` | `backend/config.py` path resolution + env-var override behavior |
+| `backend/test_comparative_paf.py` | Natural PAF parsing, synteny block construction |
+| `backend/test_comparative_registry.py` | Comparative registry assembly logic |
+| `backend/test_comparative_asset_builder.py` | Static-figures asset build paths |
+| `backend/test_import_comparative_data.py` | Comparative import pipeline |
+
+Run all (from C root):
 ```bash
-# Run all backend tests (from C root)
-D:\soft\python310\python.exe -m backend.test_go_enrichment
+"D:/soft/python310/python.exe" -m backend.test_comparative_paf
+"D:/soft/python310/python.exe" -m backend.test_go_enrichment
+"D:/soft/python310/python.exe" -m backend.test_core_config
+```
 
-# Run via pytest (if installed)
+Run any one with the same pattern, e.g.:
+```bash
+"D:/soft/python310/python.exe" -m backend.test_comparative_registry
+"D:/soft/python310/python.exe" -m backend.test_comparative_asset_builder
+```
+
+Or via pytest if installed:
+```bash
 python -m pytest backend/test_go_enrichment.py
 ```
 
-Key test functions:
+Key test functions in `test_go_enrichment.py`:
 - `test_compute_enrichment_pure` — calls production `_compute_enrichment_for_namespace()` directly with edge cases (K=0, missing go_names, min_overlap filter)
 - `test_compute_enrichment_correction_none` — verifies correction=none returns raw p-values
 - `test_go_alt_sql_parts` — verifies mock cursor receives correct args for `_table_exists("go_alt_id")`
