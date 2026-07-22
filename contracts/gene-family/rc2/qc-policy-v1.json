@@ -1,0 +1,58 @@
+{
+  "contract_version": "gg-gf-contract-1.0",
+  "status": "frozen_for_implementation",
+  "qc_policy_version": "1.0",
+  "derivation": {
+    "blocked": "one_or_more_open_blockers",
+    "warning": "zero_open_blockers_and_one_or_more_open_warnings",
+    "passed": "zero_open_blockers_and_warnings_and_all_required_checks_complete",
+    "pending": "one_or_more_required_checks_missing"
+  },
+  "gates": [
+    {"gate_id": "assertion_key_coverage", "category": "identity", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "assertion_key_uniqueness", "category": "identity", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "assignment_slot_applicable_coverage", "category": "identity", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "multi_value_universal_slot_count", "category": "identity", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "stable_key_vectors_passed", "category": "identity", "severity": "blocker", "operator": "eq", "expected": true},
+    {"gate_id": "accepted_decision_provenance_coverage", "category": "rules", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "applicable_executable_rule_trace_coverage", "category": "rules", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "unknown_rule_reference_count", "category": "rules", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "rule_regression_failure_count", "category": "rules", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "unreviewed_accepted_ambiguous_count", "category": "mapping", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "unreviewed_accepted_unmapped_count", "category": "mapping", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "silent_mapping_drop_count", "category": "mapping", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "candidate_in_accepted_metric_count", "category": "metrics", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "supplementary_in_core_metric_count", "category": "metrics", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "public_metric_registry_coverage", "category": "metrics", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "api_materialized_metric_diff_count", "category": "metrics", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "unexpected_assertion_change_count", "category": "diff", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "unexplained_accepted_removal_count", "category": "diff", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "unexplained_accepted_downgrade_count", "category": "diff", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "source_checksum_coverage", "category": "reproducibility", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "normalized_hash_reproducibility", "category": "reproducibility", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "semantic_table_hash_reproducibility", "category": "reproducibility", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "raw_source_modification_count", "category": "reproducibility", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "rejected_source_record_reporting_coverage", "category": "reproducibility", "severity": "blocker", "operator": "eq", "expected": 1.0},
+    {"gate_id": "biological_regression_failure_count", "category": "integrity", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "sqlite_integrity_error_count", "category": "integrity", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "foreign_key_error_count", "category": "integrity", "severity": "blocker", "operator": "eq", "expected": 0},
+    {"gate_id": "openapi_contract_failure_count", "category": "integrity", "severity": "blocker", "operator": "eq", "expected": 0}
+  ],
+  "always_blocking_conditions": [
+    "accepted_assertion_without_decision_provenance",
+    "unreviewed_accepted_mapping_exception",
+    "candidate_in_accepted_metric",
+    "supplementary_in_ubiquitin_core_metric",
+    "unexplained_accepted_removal_or_downgrade",
+    "unconfirmed_evidence_scope_used_for_accepted_classification",
+    "unknown_critical_model_version_directly_determines_accepted_classification"
+  ],
+  "rc2_target": {
+    "release_status": "release_candidate",
+    "qc_status": ["passed", "warning"],
+    "blocking_issue_count": 0
+  },
+  "required_signoff_roles": ["builder", "data_qc_reviewer", "scientific_curator"],
+  "ga_additional_signoff_roles": ["release_approver"]
+}
+

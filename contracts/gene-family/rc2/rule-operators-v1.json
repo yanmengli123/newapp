@@ -1,0 +1,45 @@
+{
+  "contract_version": "gg-gf-contract-1.0",
+  "status": "frozen_for_implementation",
+  "rule_language_version": "gf-rule-tree-1.0",
+  "node_types": ["all", "any", "not", "predicate"],
+  "evidence_scopes": ["same_hit", "same_protein", "same_gene", "any_isoform", "all_isoforms", "representative_isoform"],
+  "operators": {
+    "exists": {"value_types": ["null"], "arity": 1},
+    "not_exists": {"value_types": ["null"], "arity": 1},
+    "eq": {"value_types": ["string", "integer", "decimal", "boolean"], "arity": 1},
+    "neq": {"value_types": ["string", "integer", "decimal", "boolean"], "arity": 1},
+    "in": {"value_types": ["array"], "arity": 1},
+    "not_in": {"value_types": ["array"], "arity": 1},
+    "contains": {"value_types": ["string"], "arity": 1},
+    "regex": {"value_types": ["string"], "arity": 1, "safety": "precompiled_allowlisted_pattern"},
+    "gt": {"value_types": ["integer", "decimal"], "arity": 1},
+    "gte": {"value_types": ["integer", "decimal"], "arity": 1},
+    "lt": {"value_types": ["integer", "decimal"], "arity": 1},
+    "lte": {"value_types": ["integer", "decimal"], "arity": 1},
+    "count_gte": {"value_types": ["integer"], "arity": 1},
+    "domain_present": {"value_types": ["pfam_accession", "pfam_accession_array"], "arity": 1},
+    "domain_absent": {"value_types": ["pfam_accession", "pfam_accession_array"], "arity": 1},
+    "domain_order": {"value_types": ["pfam_accession_array"], "arity": 1}
+  },
+  "prohibited_payloads": ["sql", "python_expression", "javascript_expression", "shell_command"],
+  "tree_constraints": {
+    "one_root": true,
+    "acyclic": true,
+    "not_child_count": 1,
+    "predicate_has_no_children": true,
+    "scope_required_for_predicate": true,
+    "sibling_position_unique": true
+  },
+  "trace_required_fields": [
+    "assertion_version_id",
+    "rule_version_id",
+    "node_id",
+    "evaluation_result",
+    "observed_value_json",
+    "matched_evidence_ids",
+    "failure_reason_code"
+  ],
+  "manual_review_is_rule_priority": false
+}
+

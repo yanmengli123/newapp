@@ -1,0 +1,83 @@
+{
+  "contract_version": "gg-gf-contract-1.0",
+  "status": "frozen_for_implementation",
+  "algorithm_id": "gf-assertion-key-v1",
+  "serialization": "RFC8785-JCS",
+  "digest": "SHA-256",
+  "payload_value_type": "string",
+  "assertion_key": {
+    "prefix": "gfak1:",
+    "fields": [
+      "taxon_id",
+      "scheme_stable_id",
+      "source_subject_namespace",
+      "source_subject_identifier",
+      "entry_stable_id",
+      "assignment_role"
+    ],
+    "excluded_fields": [
+      "release_id",
+      "assertion_state",
+      "mapped_internal_gene_id",
+      "mapped_internal_protein_id",
+      "evidence_bundle_hash",
+      "review_state",
+      "gene_symbol"
+    ]
+  },
+  "assignment_slot_key": {
+    "algorithm_id": "gf-assignment-slot-key-v1",
+    "prefix": "gfas1:",
+    "applicable_cardinality": ["single_per_role"],
+    "fields": [
+      "taxon_id",
+      "scheme_stable_id",
+      "source_subject_namespace",
+      "source_subject_identifier",
+      "assignment_role",
+      "classification_axis"
+    ]
+  },
+  "assertion_version_id": {
+    "algorithm_id": "gf-assertion-version-v1",
+    "digest": "SHA-256",
+    "separator": "U+001F",
+    "fields": ["release_id", "assertion_key"],
+    "random_uuid_allowed": false
+  },
+  "scheme_cardinality": {
+    "animaltfdb_tf": {"cardinality": "single_per_role", "classification_axis": "tf_family"},
+    "animaltfdb_cofactor": {"cardinality": "single_per_role", "classification_axis": "cofactor_class"},
+    "kinomer": {"cardinality": "single_per_role", "classification_axis": "kinomer_group"},
+    "pfam": {"cardinality": "multi_per_role", "classification_axis": null},
+    "ubiquitin_core": {"cardinality": "single_per_role", "classification_axis": "ubiquitin_core_class"},
+    "ubiquitin_related_domain": {"cardinality": "multi_per_role", "classification_axis": null}
+  },
+  "test_vectors": [
+    {
+      "name": "kinomer_cmgg_primary_assertion",
+      "payload": {
+        "taxon_id": "9031",
+        "scheme_stable_id": "kinomer",
+        "source_subject_namespace": "refseq_protein",
+        "source_subject_identifier": "XP_015140123.2",
+        "entry_stable_id": "kinomer-group:CMGC",
+        "assignment_role": "primary"
+      },
+      "expected": "gfak1:49d6ba9d5c1c0744f79e6794c2cf561d64050a25a2b47b64870860eabfd461c4"
+    },
+    {
+      "name": "kinomer_group_primary_slot",
+      "slot_payload": {
+        "taxon_id": "9031",
+        "scheme_stable_id": "kinomer",
+        "source_subject_namespace": "refseq_protein",
+        "source_subject_identifier": "XP_015140123.2",
+        "assignment_role": "primary",
+        "classification_axis": "kinomer_group"
+      },
+      "expected": "gfas1:83565ca0db9144595eac2188949605ce6c7ece8e45a5dd8cdcc06536c28c294c"
+    }
+  ]
+}
+

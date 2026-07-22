@@ -1,0 +1,66 @@
+{
+  "contract_version": "gg-gf-contract-1.0",
+  "status": "frozen_for_implementation",
+  "algorithm_id": "gf-subject-normalization-v1",
+  "unicode_normalization": "NFC",
+  "reject_control_characters": true,
+  "preserve_original_value": true,
+  "namespaces": {
+    "ncbi_gene": {
+      "aliases": ["gene_id", "ncbi_gene_id", "GeneID"],
+      "pattern": "^[0-9]+$",
+      "case": "unchanged",
+      "version_policy": "not_applicable",
+      "stable_key_eligible": true
+    },
+    "ensembl_gene": {
+      "aliases": ["ensembl_gene_id"],
+      "pattern": "^ENSGALG[0-9]+(?:\\.[0-9]+)?$",
+      "case": "upper",
+      "version_policy": "split_optional_suffix",
+      "stable_key_eligible": true
+    },
+    "refseq_protein": {
+      "aliases": ["protein_id", "protein_accession"],
+      "pattern": "^(?:NP|XP|YP|WP)_[0-9]+\\.[0-9]+$",
+      "case": "upper",
+      "version_policy": "required_identity_bearing",
+      "lineage_policy": "store_accession_without_version",
+      "stable_key_eligible": true
+    },
+    "refseq_transcript": {
+      "aliases": ["transcript_id", "transcript_accession"],
+      "pattern": "^(?:NM|XM|NR|XR)_[0-9]+\\.[0-9]+$",
+      "case": "upper",
+      "version_policy": "required_identity_bearing",
+      "lineage_policy": "store_accession_without_version",
+      "stable_key_eligible": true
+    },
+    "pfam": {
+      "aliases": ["pfam_acc", "pfam_accession"],
+      "pattern": "^PF[0-9]{5}(?:\\.[0-9]+)?$",
+      "case": "upper",
+      "version_policy": "split_optional_suffix",
+      "stable_key_eligible": false
+    },
+    "chickendata_gene": {
+      "aliases": ["internal_gene_id"],
+      "pattern": "^GRCg6a_G[0-9]+$",
+      "case": "unchanged",
+      "version_policy": "not_applicable",
+      "stable_key_eligible": false,
+      "usage": "mapping_target_only"
+    },
+    "gene_symbol": {
+      "aliases": ["symbol", "gene_symbol"],
+      "pattern": "^\\S+$",
+      "case": "preserve",
+      "version_policy": "not_applicable",
+      "stable_key_eligible": false,
+      "usage": "display_and_search_only"
+    }
+  },
+  "on_invalid": "reject_record_with_reason",
+  "namespace_inference_from_symbol_allowed": false
+}
+

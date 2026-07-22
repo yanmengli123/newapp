@@ -1,0 +1,28 @@
+{
+  "contract_version": "gg-gf-contract-1.0",
+  "status": "frozen_for_implementation",
+  "reason_code_version": "1.0",
+  "codes": [
+    {"code": "accepted_multi_domain_support", "outcomes": ["accepted"], "category": "evidence"},
+    {"code": "accepted_curated_reference", "outcomes": ["accepted"], "category": "curation"},
+    {"code": "external_curated_classification", "outcomes": ["accepted", "candidate"], "category": "source"},
+    {"code": "candidate_domain_only", "outcomes": ["candidate"], "category": "evidence"},
+    {"code": "candidate_product_only", "outcomes": ["candidate"], "category": "evidence"},
+    {"code": "candidate_below_cutoff", "outcomes": ["candidate"], "category": "threshold"},
+    {"code": "candidate_conflicting_architecture", "outcomes": ["candidate"], "category": "conflict"},
+    {"code": "candidate_missing_required_combination", "outcomes": ["candidate"], "category": "evidence"},
+    {"code": "excluded_negative_domain", "outcomes": ["rejected", "candidate"], "category": "exclusion"},
+    {"code": "excluded_incompatible_architecture", "outcomes": ["rejected", "candidate"], "category": "exclusion"},
+    {"code": "excluded_abc_transporter_architecture", "outcomes": ["rejected", "candidate"], "category": "exclusion"},
+    {"code": "mapping_ambiguous", "outcomes": ["candidate", "accepted"], "category": "mapping"},
+    {"code": "mapping_unresolved", "outcomes": ["candidate", "accepted"], "category": "mapping"},
+    {"code": "manual_review_required", "outcomes": ["candidate"], "category": "review"},
+    {"code": "manual_rejected", "outcomes": ["rejected"], "category": "review"},
+    {"code": "source_record_rejected", "outcomes": [], "category": "ingest"},
+    {"code": "legacy_provenance_incomplete", "outcomes": ["accepted", "candidate"], "category": "provenance"},
+    {"code": "classification_changed", "outcomes": [], "category": "diff"},
+    {"code": "source_only_change", "outcomes": [], "category": "diff"}
+  ],
+  "unknown_codes_allowed": false
+}
+

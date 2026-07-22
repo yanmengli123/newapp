@@ -1,0 +1,31 @@
+{
+  "contract_version": "gg-gf-contract-1.0",
+  "status": "frozen_for_implementation",
+  "release_status": ["internal_review", "release_candidate", "published", "deprecated", "withdrawn"],
+  "release_transitions": {
+    "internal_review": ["release_candidate", "withdrawn"],
+    "release_candidate": ["published", "withdrawn"],
+    "published": ["deprecated", "withdrawn"],
+    "deprecated": ["withdrawn"],
+    "withdrawn": []
+  },
+  "qc_status": ["pending", "passed", "warning", "blocked"],
+  "assertion_state": ["accepted", "candidate", "rejected", "deprecated", "withdrawn"],
+  "review_state": ["unreviewed", "confirmed", "needs_review", "resolved"],
+  "review_decision": ["approve", "reject", "retain_candidate", "remap", "insufficient_evidence"],
+  "decision_basis_type": ["executable_local_rule", "external_curated_source", "manual_review", "legacy_source_assertion"],
+  "assignment_role": ["primary", "secondary", "supplementary"],
+  "assignment_cardinality": ["single_per_role", "multi_per_role", "ordered_multi"],
+  "mapping_state": ["exact", "ambiguous", "unmapped", "not_applicable"],
+  "value_status": ["observed", "derived", "not_reported", "not_applicable", "unknown_legacy"],
+  "provenance_status": ["complete", "inferred", "partial", "unknown_legacy"],
+  "scientific_impact": ["none", "minor", "major", "critical"],
+  "entry_status": ["active", "deprecated", "merged", "retired"],
+  "isoform_evaluation_state": ["not_evaluated", "evaluated_no_hit", "below_threshold", "passing_hit"],
+  "assertion_state_rules": {
+    "unresolved_allowed": false,
+    "mapping_uncertainty_representation": "candidate_with_reason_code",
+    "historical_rows_mutable": false
+  }
+}
+
