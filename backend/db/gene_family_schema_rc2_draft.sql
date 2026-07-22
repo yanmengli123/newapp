@@ -144,6 +144,58 @@ CREATE TABLE gf_reason_code (
     description TEXT
 );
 
+CREATE TABLE gf_trace_diagnostic_code (
+    diagnostic_code TEXT PRIMARY KEY,
+    diagnostic_code_version TEXT NOT NULL,
+    category TEXT NOT NULL,
+    description TEXT NOT NULL,
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+);
+
+CREATE TABLE gf_approval_attestation (
+    attestation_id TEXT PRIMARY KEY,
+    release_id TEXT REFERENCES gf_release(release_id),
+    artifact_type TEXT NOT NULL CHECK (
+        artifact_type IN (
+            'domain_vocabulary', 'rule_bundle', 'regression_fixture_bundle',
+            'rollup_policy', 'publication_policy', 'shadow_run',
+            'rc2c_build', 'release'
+        )
+    ),
+    artifact_hash_algorithm TEXT NOT NULL CHECK (
+        artifact_hash_algorithm = 'gf-canonical-json-sha256-v1'
+    ),
+    artifact_sha256 TEXT NOT NULL CHECK (length(artifact_sha256) = 64),
+    approval_scope TEXT NOT NULL CHECK (
+        approval_scope IN (
+            'approved_for_rule_testing', 'approved_for_shadow_run',
+            'approved_for_rc2c_build', 'approved_for_release'
+        )
+    ),
+    decision TEXT NOT NULL CHECK (decision IN ('approved', 'rejected', 'changes_requested')),
+    curator_name TEXT NOT NULL,
+    curator_identifier TEXT NOT NULL,
+    curator_identifier_scheme TEXT NOT NULL CHECK (
+        curator_identifier_scheme IN ('ORCID', 'institutional', 'local')
+    ),
+    curator_role TEXT NOT NULL CHECK (
+        curator_role IN ('scientific_curator', 'data_qc_reviewer', 'release_approver')
+    ),
+    organization TEXT,
+    approved_at TEXT NOT NULL,
+    limitations_json TEXT NOT NULL DEFAULT '[]',
+    detached_signature_json TEXT,
+    UNIQUE (artifact_type, artifact_sha256, approval_scope, curator_identifier, approved_at)
+);
+
+CREATE TRIGGER gf_approval_attestation_no_update
+BEFORE UPDATE ON gf_approval_attestation
+BEGIN SELECT RAISE(ABORT, 'approval attestations are append-only'); END;
+
+CREATE TRIGGER gf_approval_attestation_no_delete
+BEFORE DELETE ON gf_approval_attestation
+BEGIN SELECT RAISE(ABORT, 'approval attestations are append-only'); END;
+
 CREATE TABLE gf_rule (
     rule_version_id TEXT PRIMARY KEY,
     rule_stable_id TEXT NOT NULL,
@@ -303,6 +355,120 @@ CREATE TABLE gf_domain_hit (
     CHECK (env_from IS NULL OR env_to IS NULL OR env_from <= env_to)
 );
 
+CREATE TABLE gf_scan_run (
+    scan_run_id TEXT PRIMARY KEY,
+    release_id TEXT NOT NULL REFERENCES gf_release(release_id),
+    evidence_source_id TEXT NOT NULL,
+    proteome_source TEXT,
+    proteome_version TEXT,
+    proteome_sha256 TEXT CHECK (proteome_sha256 IS NULL OR length(proteome_sha256) = 64),
+    expected_subject_count INTEGER CHECK (expected_subject_count IS NULL OR expected_subject_count > 0),
+    subject_universe_value_status TEXT NOT NULL CHECK (
+        subject_universe_value_status IN (
+            'observed', 'derived', 'not_reported', 'not_applicable', 'unknown_legacy'
+        )
+    ),
+    pfam_release TEXT,
+    pfam_hmm_sha256 TEXT CHECK (pfam_hmm_sha256 IS NULL OR length(pfam_hmm_sha256) = 64),
+    hmmer_version TEXT,
+    command_json TEXT,
+    threshold_policy TEXT CHECK (
+        threshold_policy IS NULL OR threshold_policy IN (
+            'pfam_ga', 'explicit_model_thresholds', 'other_versioned_policy'
+        )
+    ),
+    provenance_status TEXT NOT NULL CHECK (
+        provenance_status IN ('complete', 'partial', 'unknown_legacy')
+    ),
+    started_at TEXT,
+    completed_at TEXT,
+    scan_status TEXT NOT NULL CHECK (scan_status IN ('completed', 'partial', 'failed')),
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    CHECK (
+        provenance_status <> 'complete'
+        OR (
+            proteome_source IS NOT NULL AND proteome_version IS NOT NULL
+            AND proteome_sha256 IS NOT NULL AND expected_subject_count IS NOT NULL
+            AND subject_universe_value_status IN ('observed', 'derived')
+            AND pfam_release IS NOT NULL AND pfam_hmm_sha256 IS NOT NULL
+            AND hmmer_version IS NOT NULL AND command_json IS NOT NULL
+            AND threshold_policy IS NOT NULL
+        )
+    )
+);
+
+CREATE TABLE gf_scan_subject (
+    scan_run_id TEXT NOT NULL REFERENCES gf_scan_run(scan_run_id) ON DELETE CASCADE,
+    source_protein_id TEXT NOT NULL,
+    subject_pk INTEGER REFERENCES gf_subject(subject_pk),
+    scan_attempted INTEGER NOT NULL CHECK (scan_attempted IN (0, 1)),
+    scan_completed INTEGER NOT NULL CHECK (scan_completed IN (0, 1)),
+    hit_count INTEGER NOT NULL CHECK (hit_count >= 0),
+    no_hit_confirmed INTEGER NOT NULL CHECK (no_hit_confirmed IN (0, 1)),
+    failure_diagnostic_code TEXT REFERENCES gf_trace_diagnostic_code(diagnostic_code),
+    evidence_completeness TEXT NOT NULL CHECK (
+        evidence_completeness IN ('complete', 'partial', 'unknown_legacy')
+    ),
+    PRIMARY KEY (scan_run_id, source_protein_id),
+    CHECK (no_hit_confirmed = 0 OR (scan_completed = 1 AND hit_count = 0))
+) WITHOUT ROWID;
+
+CREATE TABLE gf_threshold_provenance (
+    scan_run_id TEXT NOT NULL REFERENCES gf_scan_run(scan_run_id) ON DELETE CASCADE,
+    pfam_accession TEXT NOT NULL,
+    threshold_type TEXT CHECK (
+        threshold_type IS NULL OR threshold_type IN ('GA', 'explicit_score', 'other_versioned')
+    ),
+    sequence_threshold TEXT,
+    sequence_threshold_value_status TEXT NOT NULL CHECK (
+        sequence_threshold_value_status IN (
+            'observed', 'derived', 'not_reported', 'not_applicable', 'unknown_legacy'
+        )
+    ),
+    domain_threshold TEXT,
+    domain_threshold_value_status TEXT NOT NULL CHECK (
+        domain_threshold_value_status IN (
+            'observed', 'derived', 'not_reported', 'not_applicable', 'unknown_legacy'
+        )
+    ),
+    threshold_source TEXT,
+    threshold_version TEXT,
+    provenance_status TEXT NOT NULL CHECK (
+        provenance_status IN ('complete', 'inferred', 'partial', 'unknown_legacy')
+    ),
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    PRIMARY KEY (scan_run_id, pfam_accession),
+    CHECK (
+        provenance_status <> 'complete'
+        OR (
+            threshold_type IS NOT NULL AND sequence_threshold IS NOT NULL
+            AND sequence_threshold_value_status IN ('observed', 'derived')
+            AND domain_threshold IS NOT NULL
+            AND domain_threshold_value_status IN ('observed', 'derived')
+            AND threshold_source IS NOT NULL AND threshold_version IS NOT NULL
+        )
+    )
+) WITHOUT ROWID;
+
+CREATE TABLE gf_evidence_admissibility (
+    admissibility_id TEXT PRIMARY KEY,
+    release_id TEXT NOT NULL REFERENCES gf_release(release_id),
+    evidence_source_id TEXT NOT NULL,
+    evidence_source_hash TEXT NOT NULL CHECK (length(evidence_source_hash) = 64),
+    supports_presence INTEGER NOT NULL CHECK (supports_presence IN (0, 1)),
+    supports_absence INTEGER NOT NULL CHECK (supports_absence IN (0, 1)),
+    supports_domain_order INTEGER NOT NULL CHECK (supports_domain_order IN (0, 1)),
+    supports_accepted_classification INTEGER NOT NULL CHECK (supports_accepted_classification IN (0, 1)),
+    supports_candidate_classification INTEGER NOT NULL CHECK (supports_candidate_classification IN (0, 1)),
+    diagnostic_code TEXT NOT NULL REFERENCES gf_trace_diagnostic_code(diagnostic_code),
+    assessment_status TEXT NOT NULL CHECK (
+        assessment_status IN ('engineering_assessment', 'curator_approved', 'deprecated')
+    ),
+    approval_attestation_id TEXT REFERENCES gf_approval_attestation(attestation_id),
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    UNIQUE (release_id, evidence_source_id, evidence_source_hash)
+);
+
 CREATE TABLE gf_assertion_evidence (
     assertion_version_id TEXT NOT NULL REFERENCES gf_assertion(assertion_version_id) ON DELETE CASCADE,
     evidence_id TEXT NOT NULL REFERENCES gf_evidence(evidence_id) ON DELETE CASCADE,
@@ -348,7 +514,7 @@ CREATE TABLE gf_rule_node_trace (
     node_id TEXT NOT NULL REFERENCES gf_rule_node(node_id),
     node_result TEXT NOT NULL CHECK (node_result IN ('true', 'false', 'unknown')),
     observed_value_json TEXT,
-    failure_reason_code TEXT REFERENCES gf_reason_code(reason_code),
+    failure_reason_code TEXT REFERENCES gf_trace_diagnostic_code(diagnostic_code),
     UNIQUE (evaluation_id, node_id)
 );
 
@@ -360,6 +526,167 @@ CREATE TABLE gf_rule_trace_evidence (
     ),
     PRIMARY KEY (trace_id, evidence_id, evidence_role)
 ) WITHOUT ROWID;
+
+CREATE TABLE gf_regression_fixture (
+    fixture_version_id TEXT PRIMARY KEY,
+    fixture_id TEXT NOT NULL,
+    fixture_version TEXT NOT NULL,
+    fixture_class TEXT NOT NULL CHECK (
+        fixture_class IN ('synthetic_engine', 'biological_regression', 'release_regression')
+    ),
+    fixture_type TEXT NOT NULL CHECK (
+        fixture_type IN (
+            'positive', 'negative', 'boundary', 'missing_evidence',
+            'conflicting_evidence', 'exclusion', 'mapping'
+        )
+    ),
+    fixture_status TEXT NOT NULL CHECK (fixture_status IN ('draft', 'approved', 'deprecated')),
+    source_subject_namespace TEXT NOT NULL,
+    source_subject_identifier TEXT NOT NULL,
+    evidence_snapshot_hash TEXT NOT NULL CHECK (length(evidence_snapshot_hash) = 64),
+    evaluation_context_hash TEXT NOT NULL CHECK (length(evaluation_context_hash) = 64),
+    expected_node_results_json TEXT NOT NULL,
+    expected_rule_outcome TEXT NOT NULL CHECK (
+        expected_rule_outcome IN (
+            'matched', 'not_matched', 'excluded', 'conflicted',
+            'insufficient_evidence', 'not_evaluable'
+        )
+    ),
+    expected_emitted_entry_id TEXT REFERENCES gf_entry(entry_id),
+    expected_assertion_state TEXT CHECK (
+        expected_assertion_state IN ('accepted', 'candidate', 'rejected')
+    ),
+    expected_reason_codes_json TEXT NOT NULL DEFAULT '[]',
+    must_not_emit_json TEXT NOT NULL DEFAULT '{}',
+    approval_attestation_id TEXT REFERENCES gf_approval_attestation(attestation_id),
+    UNIQUE (fixture_id, fixture_version)
+);
+
+CREATE TABLE gf_shadow_run (
+    shadow_run_id TEXT PRIMARY KEY,
+    release_id TEXT NOT NULL REFERENCES gf_release(release_id),
+    shadow_kind TEXT NOT NULL CHECK (
+        shadow_kind IN ('engineering_dry_run', 'rc1_reassessment', 'proteome_wide_discovery')
+    ),
+    subject_universe_hash TEXT NOT NULL CHECK (length(subject_universe_hash) = 64),
+    evaluation_context_hash TEXT NOT NULL CHECK (length(evaluation_context_hash) = 64),
+    rule_bundle_hash TEXT NOT NULL CHECK (length(rule_bundle_hash) = 64),
+    domain_vocabulary_hash TEXT NOT NULL CHECK (length(domain_vocabulary_hash) = 64),
+    scan_run_id TEXT REFERENCES gf_scan_run(scan_run_id),
+    approval_attestation_id TEXT REFERENCES gf_approval_attestation(attestation_id),
+    shadow_status TEXT NOT NULL CHECK (
+        shadow_status IN ('engineering_only', 'authorized', 'completed', 'failed')
+    ),
+    scientific_shadow_authorized INTEGER NOT NULL CHECK (scientific_shadow_authorized IN (0, 1)),
+    manifest_hash TEXT CHECK (manifest_hash IS NULL OR length(manifest_hash) = 64),
+    CHECK (scientific_shadow_authorized = 0 OR approval_attestation_id IS NOT NULL)
+);
+
+CREATE TABLE gf_rollup_policy (
+    rollup_policy_version_id TEXT PRIMARY KEY,
+    rollup_policy_id TEXT NOT NULL,
+    policy_version TEXT NOT NULL,
+    policy_status TEXT NOT NULL CHECK (policy_status IN ('draft', 'approved', 'deprecated')),
+    positive_isoform_policy TEXT NOT NULL CHECK (
+        positive_isoform_policy IN ('any_admissible_isoform', 'all_evaluated_isoforms', 'representative_isoform_only')
+    ),
+    conflict_policy TEXT NOT NULL CHECK (
+        conflict_policy IN ('needs_curator_review', 'candidate_with_conflict', 'no_publication')
+    ),
+    representative_protein_policy TEXT NOT NULL CHECK (
+        representative_protein_policy IN ('highest_evidence_rank', 'longest_admissible_isoform', 'curator_selected')
+    ),
+    unresolved_mapping_policy TEXT NOT NULL CHECK (
+        unresolved_mapping_policy IN ('needs_curator_review', 'source_level_candidate', 'no_publication')
+    ),
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    approval_attestation_id TEXT REFERENCES gf_approval_attestation(attestation_id),
+    UNIQUE (rollup_policy_id, policy_version)
+);
+
+CREATE TABLE gf_gene_rollup_proposal (
+    rollup_proposal_id TEXT PRIMARY KEY,
+    shadow_run_id TEXT NOT NULL REFERENCES gf_shadow_run(shadow_run_id) ON DELETE CASCADE,
+    source_gene_namespace TEXT NOT NULL,
+    source_gene_identifier TEXT NOT NULL,
+    entry_id TEXT REFERENCES gf_entry(entry_id),
+    rollup_outcome TEXT NOT NULL CHECK (
+        rollup_outcome IN ('supported', 'not_supported', 'conflicted', 'insufficient_evidence', 'mapping_unresolved')
+    ),
+    representative_protein_id TEXT,
+    rollup_policy_version_id TEXT NOT NULL REFERENCES gf_rollup_policy(rollup_policy_version_id),
+    policy_disposition TEXT CHECK (
+        policy_disposition IN (
+            'needs_curator_review', 'candidate_with_conflict', 'no_publication',
+            'source_level_candidate'
+        )
+    ),
+    diagnostic_code TEXT REFERENCES gf_trace_diagnostic_code(diagnostic_code),
+    input_evaluation_set_hash TEXT NOT NULL CHECK (length(input_evaluation_set_hash) = 64),
+    accepted_classification_admissible INTEGER NOT NULL CHECK (
+        accepted_classification_admissible IN (0, 1)
+    ),
+    candidate_classification_admissible INTEGER NOT NULL CHECK (
+        candidate_classification_admissible IN (0, 1)
+    ),
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    UNIQUE (shadow_run_id, source_gene_namespace, source_gene_identifier, entry_id)
+);
+
+CREATE TABLE gf_gene_rollup_protein (
+    rollup_proposal_id TEXT NOT NULL REFERENCES gf_gene_rollup_proposal(rollup_proposal_id) ON DELETE CASCADE,
+    source_protein_id TEXT NOT NULL,
+    evaluation_id TEXT REFERENCES gf_rule_evaluation(evaluation_id),
+    protein_role TEXT NOT NULL CHECK (
+        protein_role IN ('supporting', 'conflicting', 'insufficient', 'not_evaluable', 'representative')
+    ),
+    PRIMARY KEY (rollup_proposal_id, source_protein_id, protein_role)
+) WITHOUT ROWID;
+
+CREATE TABLE gf_publication_policy (
+    publication_policy_version_id TEXT PRIMARY KEY,
+    publication_policy_id TEXT NOT NULL,
+    policy_version TEXT NOT NULL,
+    policy_status TEXT NOT NULL CHECK (policy_status IN ('draft', 'approved', 'deprecated')),
+    shadow_only INTEGER NOT NULL CHECK (shadow_only = 1),
+    policy_json TEXT NOT NULL,
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    approval_attestation_id TEXT REFERENCES gf_approval_attestation(attestation_id),
+    UNIQUE (publication_policy_id, policy_version)
+);
+
+CREATE TABLE gf_shadow_publication_proposal (
+    publication_proposal_id TEXT PRIMARY KEY,
+    shadow_run_id TEXT NOT NULL REFERENCES gf_shadow_run(shadow_run_id) ON DELETE CASCADE,
+    rollup_proposal_id TEXT NOT NULL REFERENCES gf_gene_rollup_proposal(rollup_proposal_id),
+    publication_policy_version_id TEXT NOT NULL REFERENCES gf_publication_policy(publication_policy_version_id),
+    publication_decision TEXT NOT NULL CHECK (
+        publication_decision IN ('proposed_accepted', 'proposed_candidate', 'no_publication', 'needs_curator_review')
+    ),
+    proposed_assertion_state TEXT CHECK (
+        proposed_assertion_state IN ('accepted', 'candidate')
+    ),
+    proposed_entry_id TEXT REFERENCES gf_entry(entry_id),
+    decision_reason_code TEXT REFERENCES gf_reason_code(reason_code),
+    diagnostic_code TEXT REFERENCES gf_trace_diagnostic_code(diagnostic_code),
+    selected_evaluation_id TEXT REFERENCES gf_rule_evaluation(evaluation_id),
+    alternative_evaluation_ids_json TEXT NOT NULL DEFAULT '[]',
+    decision_input_hash TEXT NOT NULL CHECK (length(decision_input_hash) = 64),
+    content_hash TEXT NOT NULL CHECK (length(content_hash) = 64),
+    CHECK (
+        (publication_decision = 'proposed_accepted' AND proposed_assertion_state = 'accepted')
+        OR (publication_decision = 'proposed_candidate' AND proposed_assertion_state = 'candidate')
+        OR (publication_decision IN ('no_publication', 'needs_curator_review') AND proposed_assertion_state IS NULL)
+    )
+);
+
+CREATE TRIGGER gf_shadow_publication_proposal_no_update
+BEFORE UPDATE ON gf_shadow_publication_proposal
+BEGIN SELECT RAISE(ABORT, 'shadow publication proposals are immutable'); END;
+
+CREATE TRIGGER gf_shadow_publication_proposal_no_delete
+BEFORE DELETE ON gf_shadow_publication_proposal
+BEGIN SELECT RAISE(ABORT, 'shadow publication proposals are immutable'); END;
 
 CREATE TABLE gf_review_event (
     review_event_id TEXT PRIMARY KEY,
@@ -577,12 +904,16 @@ WHERE assignment_slot_key IS NOT NULL AND assertion_state = 'candidate';
 CREATE INDEX idx_evidence_source ON gf_evidence(release_id, source_file_id, source_record_id);
 CREATE INDEX idx_source_record_subject ON gf_source_record(release_id, source_subject_namespace, source_subject_identifier);
 CREATE INDEX idx_domain_subject ON gf_domain_hit(subject_pk, pfam_accession, ali_from);
+CREATE INDEX idx_scan_subject_status ON gf_scan_subject(scan_run_id, scan_completed, evidence_completeness);
+CREATE INDEX idx_threshold_scan_accession ON gf_threshold_provenance(scan_run_id, pfam_accession);
 CREATE INDEX idx_rule_node_parent ON gf_rule_node(rule_version_id, parent_node_id, position);
 CREATE INDEX idx_rule_evaluation_subject ON gf_rule_evaluation(
     release_id, source_subject_namespace, source_subject_identifier, evaluation_outcome
 );
 CREATE INDEX idx_rule_evaluation_assertion ON gf_rule_evaluation(emitted_assertion_version_id);
 CREATE INDEX idx_rule_node_trace_evaluation ON gf_rule_node_trace(evaluation_id, node_result);
+CREATE INDEX idx_rollup_shadow_outcome ON gf_gene_rollup_proposal(shadow_run_id, rollup_outcome);
+CREATE INDEX idx_publication_shadow_decision ON gf_shadow_publication_proposal(shadow_run_id, publication_decision);
 CREATE INDEX idx_mapping_disposition_state ON gf_mapping_disposition(release_id, mapping_state);
 CREATE INDEX idx_metric_value_release ON gf_metric_value(release_id, metric_id, metric_version);
 CREATE INDEX idx_qc_release_status ON gf_qc_result(release_id, severity, status);

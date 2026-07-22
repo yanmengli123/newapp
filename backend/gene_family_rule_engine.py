@@ -32,6 +32,14 @@ CONTEXT_HASH_FIELDS = {
     "vocabulary_hash", "reason_registry_hash", "engine_commit",
     "dependency_lock_hash", "engine_config_hash",
 }
+EMITTED_TRACE_DIAGNOSTIC_CODES = frozenset({
+    "alignment_coordinate_not_reported",
+    "child_result_unknown",
+    "evidence_completeness_unknown",
+    "fact_not_reported",
+    "fact_value_unknown",
+    "required_domain_for_order_missing",
+})
 
 
 class ContractError(ValueError):
@@ -430,15 +438,29 @@ def evaluation_context_hash(context: Mapping[str, Any]) -> str:
     return content_hash(context)
 
 
-def _complete(evidence: Mapping[str, Any]) -> bool:
+def _complete(evidence: Mapping[str, Any], capability: str | None = None) -> bool:
     completeness = evidence.get("completeness", {})
-    return all(completeness.get(field) is True for field in COMPLETENESS_FIELDS)
+    base_complete = all(
+        completeness.get(field) is True for field in COMPLETENESS_FIELDS
+    )
+    return base_complete and (
+        capability is None or completeness.get(capability) is True
+    )
 
 
 def _passing(value: Any) -> NodeResult:
     if value is True or value == "true":
         return NodeResult.TRUE
     if value is False or value == "false":
+        return NodeResult.FALSE
+    return NodeResult.UNKNOWN
+
+
+def _capability_passing(hit: Mapping[str, Any], capability: str) -> NodeResult:
+    admissible = hit.get(capability)
+    if admissible is True:
+        return _passing(hit.get("threshold_pass"))
+    if admissible is False:
         return NodeResult.FALSE
     return NodeResult.UNKNOWN
 
@@ -481,25 +503,36 @@ def _eval_predicate(
             "matching_hit_count": len(hits),
             "completeness": evidence.get("completeness", {}),
         }
-        passing = [_passing(hit.get("threshold_pass")) for hit in hits]
+        passing = [
+            _capability_passing(hit, "admissible_for_presence") for hit in hits
+        ]
         if operator == "domain_present":
             if NodeResult.TRUE in passing:
                 return NodeResult.TRUE, observed, evidence_ids, None
-            if NodeResult.UNKNOWN in passing or not _complete(evidence):
+            if NodeResult.UNKNOWN in passing or not _complete(
+                evidence, "presence_admissibility_known"
+            ):
                 return NodeResult.UNKNOWN, observed, evidence_ids, "evidence_completeness_unknown"
             return NodeResult.FALSE, observed, evidence_ids, None
         if operator == "domain_absent":
             if NodeResult.TRUE in passing:
                 return NodeResult.FALSE, observed, evidence_ids, None
-            if NodeResult.UNKNOWN in passing or not _complete(evidence):
+            if NodeResult.UNKNOWN in passing or not _complete(
+                evidence, "absence_admissibility_known"
+            ):
                 return NodeResult.UNKNOWN, observed, evidence_ids, "evidence_completeness_unknown"
             return NodeResult.TRUE, observed, evidence_ids, None
         ordered_hits: list[tuple[str, int, str]] = []
         for term_id in term_values:
             term_hits = _domain_hits({term_id}, evidence, accession_index)
-            candidates = [hit for hit in term_hits if _passing(hit.get("threshold_pass")) is NodeResult.TRUE]
+            candidates = [
+                hit for hit in term_hits
+                if _capability_passing(hit, "admissible_for_domain_order") is NodeResult.TRUE
+            ]
             if not candidates:
-                result = NodeResult.FALSE if _complete(evidence) else NodeResult.UNKNOWN
+                result = NodeResult.FALSE if _complete(
+                    evidence, "domain_order_admissibility_known"
+                ) else NodeResult.UNKNOWN
                 return result, observed, evidence_ids, "required_domain_for_order_missing"
             if any(hit.get("ali_from") is None for hit in candidates):
                 return NodeResult.UNKNOWN, observed, evidence_ids, "alignment_coordinate_not_reported"

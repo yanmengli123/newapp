@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/scan-evidence-v1.json",
+  "title": "Gene-family scan and threshold provenance v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scan_run", "subjects", "thresholds", "admissibility"],
+  "properties": {
+    "scan_run": {"$ref": "#/$defs/scanRun"},
+    "subjects": {"type": "array", "items": {"$ref": "#/$defs/scanSubject"}},
+    "thresholds": {"type": "array", "items": {"$ref": "#/$defs/threshold"}},
+    "admissibility": {"type": "array", "items": {"$ref": "#/$defs/admissibility"}}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "scanRun": {
+      "type": "object", "additionalProperties": false,
+      "required": ["scan_run_id", "evidence_source_id", "proteome_source", "proteome_version", "proteome_sha256", "expected_subject_count", "subject_universe_value_status", "pfam_release", "pfam_hmm_sha256", "hmmer_version", "command", "threshold_policy", "provenance_status", "scan_status"],
+      "properties": {
+        "scan_run_id": {"type": "string", "minLength": 1},
+        "evidence_source_id": {"type": "string", "minLength": 1},
+        "proteome_source": {"type": ["string", "null"], "minLength": 1},
+        "proteome_version": {"type": ["string", "null"], "minLength": 1},
+        "proteome_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "expected_subject_count": {"type": ["integer", "null"], "minimum": 1},
+        "subject_universe_value_status": {"$ref": "#/$defs/valueStatus"},
+        "pfam_release": {"type": ["string", "null"], "minLength": 1},
+        "pfam_hmm_sha256": {"anyOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "hmmer_version": {"type": ["string", "null"], "minLength": 1},
+        "command": {"type": ["array", "null"], "items": {"type": "string"}, "minItems": 1},
+        "threshold_policy": {"enum": ["pfam_ga", "explicit_model_thresholds", "other_versioned_policy", null]},
+        "provenance_status": {"enum": ["complete", "partial", "unknown_legacy"]},
+        "started_at": {"type": ["string", "null"], "format": "date-time"},
+        "completed_at": {"type": ["string", "null"], "format": "date-time"},
+        "scan_status": {"enum": ["completed", "partial", "failed"]}
+      },
+      "allOf": [{
+        "if": {"properties": {"provenance_status": {"const": "complete"}}, "required": ["provenance_status"]},
+        "then": {
+          "properties": {
+            "proteome_source": {"type": "string"},
+            "proteome_version": {"type": "string"},
+            "proteome_sha256": {"$ref": "#/$defs/sha256"},
+            "expected_subject_count": {"type": "integer"},
+            "subject_universe_value_status": {"enum": ["observed", "derived"]},
+            "pfam_release": {"type": "string"},
+            "pfam_hmm_sha256": {"$ref": "#/$defs/sha256"},
+            "hmmer_version": {"type": "string"},
+            "command": {"type": "array", "minItems": 1},
+            "threshold_policy": {"enum": ["pfam_ga", "explicit_model_thresholds", "other_versioned_policy"]}
+          }
+        }
+      }]
+    },
+    "scanSubject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_protein_id", "scan_attempted", "scan_completed", "hit_count", "no_hit_confirmed", "evidence_completeness"],
+      "properties": {
+        "source_protein_id": {"type": "string", "minLength": 1},
+        "scan_attempted": {"type": "boolean"},
+        "scan_completed": {"type": "boolean"},
+        "hit_count": {"type": "integer", "minimum": 0},
+        "no_hit_confirmed": {"type": "boolean"},
+        "failure_code": {"type": ["string", "null"]},
+        "evidence_completeness": {"enum": ["complete", "partial", "unknown_legacy"]}
+      }
+    },
+    "threshold": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pfam_accession", "threshold_type", "sequence_threshold", "sequence_threshold_value_status", "domain_threshold", "domain_threshold_value_status", "threshold_source", "threshold_version", "provenance_status"],
+      "properties": {
+        "pfam_accession": {"type": "string", "pattern": "^PF[0-9]{5}$"},
+        "threshold_type": {"enum": ["GA", "explicit_score", "other_versioned", null]},
+        "sequence_threshold": {"type": ["string", "null"], "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"},
+        "sequence_threshold_value_status": {"$ref": "#/$defs/valueStatus"},
+        "domain_threshold": {"type": ["string", "null"], "pattern": "^-?[0-9]+(?:\\.[0-9]+)?$"},
+        "domain_threshold_value_status": {"$ref": "#/$defs/valueStatus"},
+        "threshold_source": {"type": ["string", "null"], "minLength": 1},
+        "threshold_version": {"type": ["string", "null"], "minLength": 1},
+        "provenance_status": {"enum": ["complete", "inferred", "partial", "unknown_legacy"]}
+      },
+      "allOf": [{
+        "if": {"properties": {"provenance_status": {"const": "complete"}}, "required": ["provenance_status"]},
+        "then": {
+          "properties": {
+            "threshold_type": {"enum": ["GA", "explicit_score", "other_versioned"]},
+            "sequence_threshold": {"type": "string"},
+            "sequence_threshold_value_status": {"enum": ["observed", "derived"]},
+            "domain_threshold": {"type": "string"},
+            "domain_threshold_value_status": {"enum": ["observed", "derived"]},
+            "threshold_source": {"type": "string"},
+            "threshold_version": {"type": "string"}
+          }
+        }
+      }]
+    },
+    "admissibility": {
+      "type": "object", "additionalProperties": false,
+      "required": ["evidence_source_id", "evidence_source_hash", "supports_presence", "supports_absence", "supports_domain_order", "supports_accepted_classification", "supports_candidate_classification", "diagnostic_code", "assessment_status", "approval_attestation_id"],
+      "properties": {
+        "evidence_source_id": {"type": "string", "minLength": 1},
+        "evidence_source_hash": {"$ref": "#/$defs/sha256"},
+        "supports_presence": {"type": "boolean"},
+        "supports_absence": {"type": "boolean"},
+        "supports_domain_order": {"type": "boolean"},
+        "supports_accepted_classification": {"type": "boolean"},
+        "supports_candidate_classification": {"type": "boolean"},
+        "diagnostic_code": {"type": "string", "minLength": 1},
+        "assessment_status": {"enum": ["engineering_assessment", "curator_approved", "deprecated"]},
+        "approval_attestation_id": {"type": ["string", "null"]}
+      }
+    },
+    "valueStatus": {
+      "enum": ["observed", "derived", "not_reported", "not_applicable", "unknown_legacy"]
+    }
+  }
+}

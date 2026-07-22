@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/regression-fixture-v1.json",
+  "title": "Gene-family rule regression fixture v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fixture_id", "fixture_version", "fixture_class", "fixture_type", "status", "subject", "evidence_snapshot_hash", "evaluation_context_hash", "expected_node_results", "expected_rule_outcome", "expected_reason_codes", "must_not_emit"],
+  "properties": {
+    "fixture_id": {"type": "string", "minLength": 1},
+    "fixture_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "fixture_class": {"enum": ["synthetic_engine", "biological_regression", "release_regression"]},
+    "fixture_type": {"enum": ["positive", "negative", "boundary", "missing_evidence", "conflicting_evidence", "exclusion", "mapping"]},
+    "status": {"enum": ["draft", "approved", "deprecated"]},
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["namespace", "identifier"],
+      "properties": {"namespace": {"type": "string"}, "identifier": {"type": "string"}}
+    },
+    "evidence_snapshot_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "evaluation_context_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "expected_node_results": {
+      "type": "object", "minProperties": 1,
+      "additionalProperties": {"enum": ["true", "false", "unknown"]}
+    },
+    "expected_rule_outcome": {"enum": ["matched", "not_matched", "excluded", "conflicted", "insufficient_evidence", "not_evaluable"]},
+    "expected_emitted_entry": {"type": ["string", "null"]},
+    "expected_assertion_state": {"enum": ["accepted", "candidate", "rejected", null]},
+    "expected_reason_codes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "must_not_emit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entries", "assertion_states"],
+      "properties": {
+        "entries": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "assertion_states": {"type": "array", "items": {"enum": ["accepted", "candidate", "rejected"]}, "uniqueItems": true}
+      }
+    },
+    "approval_attestation_id": {"type": ["string", "null"]}
+  }
+}

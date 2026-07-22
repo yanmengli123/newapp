@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/publication-policy-v1.json",
+  "title": "Shadow assertion publication policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "version", "status", "shadow_only", "matched_complete_action", "matched_incomplete_action", "conflict_action", "not_evaluable_action", "mapping_exception_action", "approval_attestation_id"],
+  "properties": {
+    "policy_id": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["draft", "approved", "deprecated"]},
+    "shadow_only": {"const": true},
+    "matched_complete_action": {"enum": ["proposed_accepted", "proposed_candidate", "needs_curator_review", "no_publication"]},
+    "matched_incomplete_action": {"enum": ["proposed_candidate", "needs_curator_review", "no_publication"]},
+    "conflict_action": {"enum": ["proposed_candidate", "needs_curator_review", "no_publication"]},
+    "not_evaluable_action": {"enum": ["proposed_candidate", "needs_curator_review", "no_publication"]},
+    "mapping_exception_action": {"enum": ["proposed_candidate", "needs_curator_review", "no_publication"]},
+    "approval_attestation_id": {"type": ["string", "null"]}
+  }
+}

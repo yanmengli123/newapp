@@ -1,0 +1,21 @@
+{
+  "registry_id": "gf-shadow-qc-gates-v1",
+  "version": "1.0.0",
+  "status": "frozen_for_engineering",
+  "base_contract": "gg-gf-contract-1.0",
+  "gates": [
+    {"gate_id": "mapping_cross_table_mismatch_count", "operator": "eq", "expected": 0, "severity": "blocker"},
+    {"gate_id": "threshold_policy_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "scan_completeness_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "evidence_admissibility_approval_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "diagnostic_code_registry_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "fixture_expected_outcome_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "attempted_evaluation_trace_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "protein_gene_rollup_provenance_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "publication_decision_provenance_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "shadow_subject_universe_coverage", "operator": "eq", "expected": 1.0, "severity": "blocker"},
+    {"gate_id": "independent_clean_build_semantic_hash_match", "operator": "eq", "expected": true, "severity": "blocker"}
+  ],
+  "coverage_denominator": "all subjects, isoforms, Pfam models and scan runs entering the declared shadow universe",
+  "scientific_shadow_authorized": false
+}

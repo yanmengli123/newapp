@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/mapping-consistency-v1.json",
+  "title": "Gene-family mapping consistency report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_id", "release_id", "mapping_registry_hash", "rows"],
+  "properties": {
+    "report_id": {"type": "string", "minLength": 1},
+    "release_id": {"type": "string", "minLength": 1},
+    "mapping_registry_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["source_namespace", "source_identifier", "gf_subject_status", "gf_subject_internal_gene_id", "registry_mapping_status", "registry_internal_gene_id", "registry_candidate_gene_ids", "consistency_status", "engineering_reason", "scientific_review_required", "proposed_action"],
+        "properties": {
+          "source_namespace": {"type": "string"},
+          "source_identifier": {"type": "string"},
+          "gf_subject_status": {"enum": ["exact", "ambiguous", "unmapped", "not_applicable"]},
+          "gf_subject_internal_gene_id": {"type": ["string", "null"]},
+          "registry_mapping_status": {"enum": ["exact", "ambiguous", "unmapped", null]},
+          "registry_internal_gene_id": {"type": ["string", "null"]},
+          "registry_candidate_gene_ids": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "consistency_status": {"enum": ["consistent", "cross_table_mismatch", "registry_row_missing"]},
+          "engineering_reason": {"type": "string"},
+          "scientific_review_required": {"type": "boolean"},
+          "proposed_action": {"enum": ["none", "engineering_investigation", "engineering_reconcile_in_future_derived_build", "curator_review", "review_before_promotion"]}
+        }
+      }
+    }
+  }
+}

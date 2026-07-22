@@ -1,0 +1,29 @@
+{
+  "registry_id": "gf-trace-diagnostic-codes-v1",
+  "version": "1.0.0",
+  "status": "frozen_for_engineering",
+  "namespace": "trace_diagnostic",
+  "codes": [
+    {"code": "alignment_coordinate_not_reported", "category": "evidence", "description": "Required alignment coordinate is not reported."},
+    {"code": "child_result_unknown", "category": "logic", "description": "A composite node is unknown because one or more child results are unknown."},
+    {"code": "domain_order_not_evaluable", "category": "evidence", "description": "Domain order cannot be evaluated from admissible hits and coordinates."},
+    {"code": "evidence_completeness_unknown", "category": "evidence", "description": "One or more required evidence-completeness dimensions are unknown."},
+    {"code": "evidence_source_admissible", "category": "evidence", "description": "The versioned evidence source is approved for every declared use."},
+    {"code": "evidence_source_candidate_only", "category": "evidence", "description": "The evidence source may support candidate classification but not accepted classification."},
+    {"code": "evidence_source_not_admissible", "category": "evidence", "description": "The evidence source is not admissible for classification."},
+    {"code": "evidence_source_admissibility_unknown", "category": "evidence", "description": "The admissible uses of the evidence source have not been established."},
+    {"code": "excluded_domain_present", "category": "exclusion", "description": "An admissible exclusion-domain hit is present."},
+    {"code": "fact_not_reported", "category": "evidence", "description": "A required ordinary fact is not reported."},
+    {"code": "fact_value_unknown", "category": "evidence", "description": "A fact exists but its value status is not observed or derived."},
+    {"code": "isoform_classification_conflict", "category": "rollup", "description": "Protein isoforms support incompatible gene-level classifications."},
+    {"code": "multiple_candidate_rules", "category": "conflict", "description": "Multiple equal-priority rule outputs remain eligible."},
+    {"code": "protein_mapping_unresolved", "category": "mapping", "description": "A protein cannot be mapped unambiguously to the rollup gene."},
+    {"code": "required_domain_for_order_missing", "category": "evidence", "description": "A domain required for an order predicate has no admissible passing hit."},
+    {"code": "required_domain_unknown", "category": "evidence", "description": "Presence of a required domain is unknown."},
+    {"code": "scan_not_confirmed", "category": "scan", "description": "A complete scan for the subject has not been confirmed."},
+    {"code": "subject_not_in_scan_universe", "category": "scan", "description": "The evaluated subject is absent from the frozen scan universe."},
+    {"code": "threshold_policy_unknown", "category": "threshold", "description": "The model-specific sequence/domain threshold policy is unknown."}
+  ],
+  "unknown_codes_allowed": false,
+  "scientific_approval_implied": false
+}

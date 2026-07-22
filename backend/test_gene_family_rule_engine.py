@@ -11,6 +11,7 @@ import pytest
 from backend.gene_family_rule_engine import (
     ContractError,
     EvaluationOutcome,
+    EMITTED_TRACE_DIAGNOSTIC_CODES,
     NodeResult,
     compile_rule_bundle,
     content_hash,
@@ -49,6 +50,9 @@ def evidence(*domains, complete=True):
                 "database": "SYNDB",
                 "accession": accession,
                 "threshold_pass": threshold,
+                "admissible_for_presence": True,
+                "admissible_for_absence": True,
+                "admissible_for_domain_order": True,
                 "ali_from": index * 100 + 1,
             }
             for index, (accession, threshold) in enumerate(domains)
@@ -60,6 +64,9 @@ def evidence(*domains, complete=True):
             "model_known": complete,
             "threshold_known": complete,
             "evidence_set_complete": complete,
+            "presence_admissibility_known": complete,
+            "absence_admissibility_known": complete,
+            "domain_order_admissibility_known": complete,
         },
     }
 
@@ -78,12 +85,48 @@ def context(bundle, rule):
 
 
 def test_schema_files_are_strict_json_schema_documents():
-    for name in ("domain-vocabulary.schema.json", "rule-catalog.schema.json"):
+    for name in (
+        "domain-vocabulary.schema.json",
+        "rule-catalog.schema.json",
+        "scan-evidence.schema.json",
+        "regression-fixture.schema.json",
+        "approval-attestation.schema.json",
+        "rollup-policy.schema.json",
+        "publication-policy.schema.json",
+        "mapping-consistency.schema.json",
+    ):
         schema = json.loads(
             (ROOT / "rules" / "gene-family" / "ubiquitin" / "v1" / name).read_text(encoding="utf-8")
         )
         assert schema["$schema"].endswith("2020-12/schema")
         assert schema["additionalProperties"] is False
+
+
+def test_every_emitted_trace_diagnostic_is_registered_separately_from_assertion_reasons():
+    root = ROOT / "rules" / "gene-family" / "ubiquitin" / "v1"
+    registry = json.loads((root / "trace-diagnostic-codes-v1.json").read_text(encoding="utf-8"))
+    diagnostic_codes = {row["code"] for row in registry["codes"]}
+    assertion_reasons = json.loads(
+        (ROOT / "contracts" / "gene-family" / "rc2" / "reason-codes-v1.json").read_text(encoding="utf-8")
+    )
+    assertion_codes = {row["code"] for row in assertion_reasons["codes"]}
+    assert EMITTED_TRACE_DIAGNOSTIC_CODES <= diagnostic_codes
+    assert diagnostic_codes.isdisjoint(assertion_codes)
+    assert registry["scientific_approval_implied"] is False
+
+
+def test_domain_presence_is_unknown_when_evidence_admissibility_is_unknown():
+    compiled = compile_fixture()
+    rule = compiled["catalog"]["rules"][0]
+    snapshot = evidence(("SYN_A", True))
+    snapshot["domains"][0].pop("admissible_for_presence")
+    snapshot["completeness"]["presence_admissibility_known"] = False
+    record = evaluate_rule(rule, compiled, snapshot, context(compiled, rule))
+    assert record.evaluation_outcome == "insufficient_evidence"
+    assert any(
+        trace.failure_reason_code == "evidence_completeness_unknown"
+        for trace in record.traces
+    )
 
 
 def test_compiler_is_deterministic_and_executes_no_authoring_payload():

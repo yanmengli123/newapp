@@ -1,0 +1,19 @@
+{
+  "manifest_id": "gf-shadow-contract-manifest-v1",
+  "version": "1.0.0",
+  "status": "frozen_for_engineering",
+  "base_contract": "gg-gf-contract-1.0",
+  "files": [
+    {"path": "domain-vocabulary.schema.json", "sha256": "27400e74a99629b64666df442459287010bf0cf1a1bd40e48b520b7f02a3fd24"},
+    {"path": "rule-catalog.schema.json", "sha256": "5f77dc9134ff27d96a0e5682d0d2002e85797aaf6d0fb0f3267ca07b95e4a6c3"},
+    {"path": "scan-evidence.schema.json", "sha256": "1b8edbad5f2d06030ee60e431aed44a1396a7490df6ff592dd5187bbff8c2009"},
+    {"path": "regression-fixture.schema.json", "sha256": "6ae5f9ab7eb9ed31dbb2c3c01da15f0a0e3ed801451ef7752262328b1952700a"},
+    {"path": "approval-attestation.schema.json", "sha256": "9c0846ef012bad65bdb652299ee668fc389af2ce6feab0ea1534ede88c64a218"},
+    {"path": "rollup-policy.schema.json", "sha256": "1ae35cc74633c22092da4be534ec2dcf1f16bdb288f825c90bb231d3256fc21e"},
+    {"path": "publication-policy.schema.json", "sha256": "ffb0e8b5aedf05ff0cfcd354e982514c372e962bfa5065e2f7196d4e649df5d3"},
+    {"path": "mapping-consistency.schema.json", "sha256": "95e97ea98c9d0b707e6b4045586cd9f811b9853eee92b6ca21913154887e034f"},
+    {"path": "trace-diagnostic-codes-v1.json", "sha256": "f00b2fb8d29948dc3bd70e9da6d29625e9195f24c986093e1b7bd66cee31fb39"},
+    {"path": "shadow-qc-gates-v1.json", "sha256": "68f66064ef4bd6d31263a5355e7ecf0c9ac772753c4308d78177c76de667edc5"}
+  ],
+  "scientific_shadow_authorized": false
+}

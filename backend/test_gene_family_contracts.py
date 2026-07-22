@@ -232,6 +232,43 @@ def test_rc2_schema_draft_is_valid_and_enforces_cardinality_and_append_only_revi
                   'unknown', '{"value_status":"not_reported"}')
         """
     )
+    with pytest.raises(sqlite3.IntegrityError, match="FOREIGN KEY constraint"):
+        connection.execute(
+            "UPDATE gf_rule_node_trace SET failure_reason_code='unknown-diagnostic' WHERE trace_id='trace-unknown'"
+        )
+    connection.execute(
+        """
+        INSERT INTO gf_trace_diagnostic_code (
+            diagnostic_code, diagnostic_code_version, category, description
+        ) VALUES ('evidence_completeness_unknown', '1.0.0', 'evidence', 'test')
+        """
+    )
+    connection.execute(
+        """
+        UPDATE gf_rule_node_trace
+        SET failure_reason_code='evidence_completeness_unknown'
+        WHERE trace_id='trace-unknown'
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO gf_approval_attestation (
+            attestation_id, release_id, artifact_type, artifact_hash_algorithm,
+            artifact_sha256,
+            approval_scope, decision, curator_name, curator_identifier,
+            curator_identifier_scheme, curator_role, approved_at
+        ) VALUES ('attestation-test', 'test-rc2', 'rollup_policy',
+                  'gf-canonical-json-sha256-v1', ?,
+                  'approved_for_rule_testing', 'approved', 'Synthetic Curator',
+                  'test-curator', 'local', 'scientific_curator',
+                  '2026-07-22T00:00:00Z')
+        """,
+        (digest,),
+    )
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        connection.execute(
+            "UPDATE gf_approval_attestation SET decision='rejected' WHERE attestation_id='attestation-test'"
+        )
     before_review = connection.execute(
         "SELECT evaluation_outcome, emitted_assertion_version_id FROM gf_rule_evaluation"
     ).fetchone()

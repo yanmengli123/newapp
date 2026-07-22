@@ -23,3 +23,22 @@ curator before a shadow run can be considered for release.
 Synthetic fixtures live under `backend/testdata/gene_family_rules` so that test
 rules cannot be mistaken for production biological policy.
 
+## Shadow-preparation contracts
+
+The engineering-only schemas and registries in this directory additionally
+define scan/threshold provenance, evidence admissibility, regression fixtures,
+trace diagnostics, mapping consistency, protein-to-gene rollup, shadow
+publication policy and approval attestations. `shadow-qc-gates-v1.json` extends
+the frozen RC2-A gates without silently changing the seven-file RC2-A contract
+bundle.
+
+`shadow-contract-manifest-v1.json` freezes the engineering contract file set
+and SHA-256 digests. Validate it with
+`python -m backend.scripts.validate_gene_family_shadow_contracts` before any
+shadow-related engineering change is accepted.
+
+Trace diagnostic codes are intentionally separate from assertion reason codes:
+node diagnostics explain evaluation mechanics, while assertion reason codes
+explain a published scientific claim or state. Approval scope is likewise kept
+in a separate attestation artifact rather than overloaded into vocabulary or
+rule lifecycle status.

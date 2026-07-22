@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/rollup-policy-v1.json",
+  "title": "Protein-to-gene rollup policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_id", "version", "status", "positive_isoform_policy", "conflict_policy", "representative_protein_policy", "unresolved_mapping_policy", "approval_attestation_id"],
+  "properties": {
+    "policy_id": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["draft", "approved", "deprecated"]},
+    "positive_isoform_policy": {"enum": ["any_admissible_isoform", "all_evaluated_isoforms", "representative_isoform_only"]},
+    "conflict_policy": {"enum": ["needs_curator_review", "candidate_with_conflict", "no_publication"]},
+    "representative_protein_policy": {"enum": ["highest_evidence_rank", "longest_admissible_isoform", "curator_selected"]},
+    "unresolved_mapping_policy": {"enum": ["needs_curator_review", "source_level_candidate", "no_publication"]},
+    "approval_attestation_id": {"type": ["string", "null"]}
+  }
+}
