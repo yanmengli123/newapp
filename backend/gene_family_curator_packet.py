@@ -17,13 +17,17 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 
-PACKET_FORMAT = "gf-rc2b-curator-packet-1.0"
-PACKET_ID = "rc2b-curator-packet-v1"
+PACKET_FORMAT = "gf-rc2b-curator-packet-1.1"
+PACKET_ID = "rc2b-curator-packet-v1.1"
 TRACE_DIAGNOSTIC_PROPOSALS = (
     "alignment_coordinate_not_reported",
     "child_result_unknown",
     "domain_order_not_evaluable",
     "evidence_completeness_unknown",
+    "evidence_source_admissible",
+    "evidence_source_candidate_only",
+    "evidence_source_not_admissible",
+    "evidence_source_admissibility_unknown",
     "excluded_domain_present",
     "fact_not_reported",
     "fact_value_unknown",
@@ -509,7 +513,7 @@ def _write_json(path: Path, value: Any) -> None:
 
 
 def _packet_readme(summary: Mapping[str, Any]) -> str:
-    return f"""# RC2-B curator review packet v1
+    return f"""# RC2-B curator review packet v1.1
 
 Status: machine-generated review material; not a scientific approval.
 
@@ -630,9 +634,8 @@ def generate_curator_packet(
     emit("evidence-examples/cftr-legacy-evidence.tsv", cftr_primary)
 
     _write_text(decisions_dir / "domain-vocabulary.template.yaml", """
-template_status: requires_curator_completion
 vocabulary_id: gallus-ubiquitin-domain-vocabulary
-version: 0.0.0-draft
+version: 0.0.0
 status: draft
 curator: null
 approved_by: null
@@ -640,9 +643,8 @@ approval_date: null
 terms: []
 """)
     _write_text(decisions_dir / "rule-catalog.template.yaml", """
-template_status: requires_curator_completion
 catalog_id: gallus-ubiquitin-rule-catalog
-version: 0.0.0-draft
+version: 0.0.0
 status: draft
 domain_vocabulary: null
 rules: []
@@ -656,19 +658,43 @@ rules: []
         ],
     )
     _write_text(decisions_dir / "rollup-policy.template.yaml", """
-template_status: requires_curator_completion
 policy_id: gallus-ubiquitin-rollup-policy
-version: 0.0.0-draft
+version: 0.0.0
 status: draft
 positive_isoform_policy: null
 conflict_policy: null
 representative_protein_policy: null
-curator: null
+unresolved_mapping_policy: null
+approval_attestation_id: null
 """)
+    _write_text(decisions_dir / "publication-policy.template.yaml", """
+policy_id: gallus-ubiquitin-publication-policy
+version: 0.0.0
+status: draft
+shadow_only: true
+matched_complete_action: null
+matched_incomplete_action: null
+conflict_action: null
+not_evaluable_action: null
+mapping_exception_action: null
+approval_attestation_id: null
+""")
+    _write_json(decisions_dir / "evidence-admissibility.template.json", {
+        "evidence_source_id": None,
+        "evidence_source_hash": None,
+        "supports_presence": None,
+        "supports_absence": None,
+        "supports_domain_order": None,
+        "supports_accepted_classification": None,
+        "supports_candidate_classification": None,
+        "diagnostic_code": None,
+        "assessment_status": None,
+        "approval_attestation_id": None,
+    })
     _write_json(decisions_dir / "approval-attestation.template.json", {
-        "template_status": "requires_curator_completion",
         "attestation_id": None,
         "artifact_type": None,
+        "artifact_hash_algorithm": "gf-canonical-json-sha256-v1",
         "artifact_sha256": None,
         "approval_scope": None,
         "decision": None,
@@ -733,4 +759,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

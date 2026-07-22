@@ -223,6 +223,45 @@ class MappingResult:
     candidates: tuple[str, ...]
 
 
+def resolve_gene_mapping_precedence(
+    *, ncbi_supplied: bool, ensembl_supplied: bool, symbol_supplied: bool,
+    ncbi_candidates: set[str], ensembl_candidates: set[str],
+    symbol_candidates: set[str],
+) -> MappingResult:
+    """Resolve stable identifiers before considering a non-unique symbol.
+
+    NCBI Gene and Ensembl gene identifiers are stable mapping assertions.  A
+    symbol is only a fallback when neither stable identifier was supplied; it
+    must never turn an exact stable-ID match into an ambiguous mapping.  If two
+    supplied stable identifiers resolve to different genes, the result remains
+    ambiguous and is not silently prioritized.
+    """
+
+    stable_sources = []
+    if ncbi_supplied:
+        stable_sources.append(("ncbigene", set(ncbi_candidates)))
+    if ensembl_supplied:
+        stable_sources.append(("ensembl", set(ensembl_candidates)))
+    if stable_sources:
+        nonempty = [(name, values) for name, values in stable_sources if values]
+        union = set().union(*(values for _, values in nonempty)) if nonempty else set()
+        if len(union) == 1:
+            internal = next(iter(union))
+            methods = "+".join(name for name, values in nonempty if internal in values)
+            return MappingResult("exact", internal, methods, (internal,))
+        if union:
+            return MappingResult("ambiguous", None, None, tuple(sorted(union)))
+        return MappingResult("unmapped", None, None, ())
+
+    if symbol_supplied:
+        ordered = tuple(sorted(symbol_candidates))
+        if len(ordered) == 1:
+            return MappingResult("exact", ordered[0], "gene_symbol", ordered)
+        if ordered:
+            return MappingResult("ambiguous", None, None, ordered)
+    return MappingResult("unmapped", None, None, ())
+
+
 class CatalogBuilder:
     def __init__(
         self,
@@ -495,30 +534,24 @@ class CatalogBuilder:
         if cached is not None:
             return cached
 
-        by_source: list[tuple[str, set[str]]] = []
         if ncbi:
             matches = set(self.ncbi_index.get(ncbi, set()))
-            by_source.append(("ncbigene", matches))
             self._record_identifier_mapping("ncbigene", ncbi, matches)
         if ensembl:
             matches = set(self.ensembl_index.get(ensembl, set()))
-            by_source.append(("ensembl", matches))
             self._record_identifier_mapping("ensembl", ensembl, matches)
         if symbol:
             matches = set(self.symbol_index.get(symbol, set()))
-            by_source.append(("gene_symbol", matches))
             self._record_identifier_mapping("gene_symbol", symbol, matches)
 
-        nonempty = [(name, values) for name, values in by_source if values]
-        union = set().union(*(values for _, values in nonempty)) if nonempty else set()
-        if len(union) == 1 and all(len(values) == 1 for _, values in nonempty):
-            internal = next(iter(union))
-            methods = "+".join(name for name, values in nonempty if internal in values)
-            result = MappingResult("exact", internal, methods, (internal,))
-        elif union:
-            result = MappingResult("ambiguous", None, None, tuple(sorted(union)))
-        else:
-            result = MappingResult("unmapped", None, None, ())
+        result = resolve_gene_mapping_precedence(
+            ncbi_supplied=bool(ncbi),
+            ensembl_supplied=bool(ensembl),
+            symbol_supplied=bool(symbol),
+            ncbi_candidates=set(self.ncbi_index.get(ncbi, set())) if ncbi else set(),
+            ensembl_candidates=set(self.ensembl_index.get(ensembl, set())) if ensembl else set(),
+            symbol_candidates=set(self.symbol_index.get(symbol, set())) if symbol else set(),
+        )
         self.mapping_cache[key] = result
         return result
 
@@ -1597,6 +1630,29 @@ class CatalogBuilder:
             observed=f"{mapping_rate:.4%}",
             expected=">= 95%",
             details="Unmapped and ambiguous identifiers remain in the catalog and are exported as QC reports.",
+        )
+        mapping_cross_table_mismatches = self._count(
+            """
+            SELECT COUNT(*)
+            FROM gf_subject s
+            JOIN gf_identifier_mapping m
+              ON m.release_id = s.release_id
+             AND m.source_namespace = s.source_namespace
+             AND m.source_accession = s.source_accession
+            WHERE s.mapping_state <> m.mapping_state
+               OR COALESCE(s.internal_gene_id, '') <> COALESCE(m.internal_gene_id, '')
+            """
+        )
+        self.add_qc(
+            "mapping_cross_table_mismatch_count",
+            severity="error",
+            status="passed" if mapping_cross_table_mismatches == 0 else "failed",
+            observed=mapping_cross_table_mismatches,
+            expected=0,
+            details=(
+                "A subject and its effective identifier-registry row must have "
+                "the same mapping state and internal gene identifier."
+            ),
         )
 
         self.add_qc(
