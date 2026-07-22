@@ -1,0 +1,56 @@
+{
+  "catalog_id": "synthetic-rule-catalog",
+  "version": "1.0.0",
+  "status": "draft",
+  "domain_vocabulary": {
+    "vocabulary_id": "synthetic-domain-vocabulary",
+    "version": "1.0.0",
+    "sha256": "8d9b9cddace6f6dea2d5e67882f47a344c47db5badbbe5449347ba207136010f"
+  },
+  "rules": [
+    {
+      "rule_id": "synthetic.include-a-without-x",
+      "version": "1.0.0",
+      "status": "draft",
+      "rule_kind": "inclusion",
+      "scheme_id": "synthetic",
+      "output_entry_id": "synthetic:class-a",
+      "output_assertion_state": "candidate",
+      "priority": 10,
+      "scope": "same_protein",
+      "unknown_outcome": "insufficient_evidence",
+      "biological_definition": "Synthetic test only; no biological meaning.",
+      "references": [],
+      "root": {
+        "node_id": "root",
+        "type": "all",
+        "children": [
+          {
+            "node_id": "domain-a-present",
+            "type": "predicate",
+            "scope": "same_protein",
+            "field": "domains",
+            "operator": "domain_present",
+            "value": "SYN:DOMAIN_A"
+          },
+          {
+            "node_id": "exclusion-absent",
+            "type": "predicate",
+            "scope": "same_protein",
+            "field": "domains",
+            "operator": "domain_absent",
+            "value": "SYN:EXCLUSION"
+          }
+        ]
+      },
+      "fixtures": {
+        "positive": ["complete-a"],
+        "negative": ["complete-x"],
+        "boundary": ["threshold-unknown"],
+        "missing_evidence": ["incomplete-scan"],
+        "conflicting_evidence": ["a-and-x"]
+      }
+    }
+  ]
+}
+

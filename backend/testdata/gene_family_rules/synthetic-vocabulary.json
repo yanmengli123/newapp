@@ -1,0 +1,28 @@
+{
+  "vocabulary_id": "synthetic-domain-vocabulary",
+  "version": "1.0.0",
+  "status": "draft",
+  "terms": [
+    {
+      "term_id": "SYN:DOMAIN_A",
+      "label": "Synthetic domain A",
+      "definition": "Non-biological term used only for evaluator tests.",
+      "status": "active",
+      "mappings": [{"database": "SYNDB", "accession": "SYN_A"}]
+    },
+    {
+      "term_id": "SYN:DOMAIN_B",
+      "label": "Synthetic domain B",
+      "definition": "Non-biological term used only for evaluator tests.",
+      "status": "active",
+      "mappings": [{"database": "SYNDB", "accession": "SYN_B"}]
+    },
+    {
+      "term_id": "SYN:EXCLUSION",
+      "label": "Synthetic exclusion domain",
+      "definition": "Non-biological exclusion term used only for evaluator tests.",
+      "status": "active",
+      "mappings": [{"database": "SYNDB", "accession": "SYN_X"}]
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.local/schemas/gene-family/rule-catalog-v1.json",
+  "title": "Gene-family local rule catalog v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["catalog_id", "version", "status", "domain_vocabulary", "rules"],
+  "properties": {
+    "catalog_id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]+$"},
+    "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "status": {"enum": ["draft", "approved", "deprecated"]},
+    "domain_vocabulary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vocabulary_id", "version", "sha256"],
+      "properties": {
+        "vocabulary_id": {"type": "string"},
+        "version": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/rule"}
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule_id", "version", "status", "rule_kind", "scheme_id", "priority", "scope", "root", "biological_definition", "references", "fixtures"],
+      "properties": {
+        "rule_id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]+$"},
+        "version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+        "status": {"enum": ["draft", "approved", "deprecated", "retired"]},
+        "rule_kind": {"enum": ["inclusion", "exclusion"]},
+        "scheme_id": {"type": "string", "minLength": 1},
+        "output_entry_id": {"type": ["string", "null"]},
+        "output_assertion_state": {"enum": ["accepted", "candidate", "rejected", null]},
+        "priority": {"type": "integer"},
+        "scope": {"enum": ["same_protein"]},
+        "unknown_outcome": {"enum": ["insufficient_evidence", "not_evaluable"]},
+        "biological_definition": {"type": "string"},
+        "references": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "curator": {"type": ["string", "null"]},
+        "approved_by": {"type": ["string", "null"]},
+        "approval_date": {"type": ["string", "null"], "format": "date"},
+        "reason_code": {"type": ["string", "null"]},
+        "root": {"$ref": "#/$defs/node"},
+        "fixtures": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["positive", "negative", "boundary", "missing_evidence", "conflicting_evidence"],
+          "properties": {
+            "positive": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "negative": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "boundary": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "missing_evidence": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "conflicting_evidence": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          }
+        }
+      }
+    },
+    "node": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node_id", "type", "children"],
+          "properties": {
+            "node_id": {"type": "string", "minLength": 1},
+            "type": {"enum": ["all", "any"]},
+            "children": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/node"}}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node_id", "type", "child"],
+          "properties": {
+            "node_id": {"type": "string", "minLength": 1},
+            "type": {"const": "not"},
+            "child": {"$ref": "#/$defs/node"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["node_id", "type", "scope", "field", "operator", "value"],
+          "properties": {
+            "node_id": {"type": "string", "minLength": 1},
+            "type": {"const": "predicate"},
+            "scope": {"const": "same_protein"},
+            "field": {"type": "string", "minLength": 1},
+            "operator": {"enum": ["exists", "not_exists", "eq", "neq", "in", "not_in", "contains", "regex", "gt", "gte", "lt", "lte", "count_gte", "domain_present", "domain_absent", "domain_order"]},
+            "value": {}
+          }
+        }
+      ]
+    }
+  }
+}
+
