@@ -9,6 +9,7 @@
     "target_proteins_missing_fasta": {"operator": "eq", "required_value": 0},
     "protein_mapped_to_multiple_genes": {"operator": "eq", "required_value": 0},
     "unexplained_transcript_exclusions": {"operator": "eq", "required_value": 0},
+    "unexplained_source_format_anomalies": {"operator": "eq", "required_value": 0},
     "source_modification_count": {"operator": "eq", "required_value": 0}
   },
   "environment_freeze": {

@@ -274,6 +274,7 @@ def _validate_gate_contract(root: Path, report: RC2B2ContractReport) -> None:
         "target_proteins_missing_fasta": 0,
         "protein_mapped_to_multiple_genes": 0,
         "unexplained_transcript_exclusions": 0,
+        "unexplained_source_format_anomalies": 0,
         "source_modification_count": 0,
     }.items():
         if target.get(key) != {"operator": "eq", "required_value": required}:
@@ -339,4 +340,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

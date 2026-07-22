@@ -95,6 +95,8 @@
         "target_proteins_missing_fasta",
         "protein_mapped_to_multiple_genes",
         "unexplained_transcript_exclusions",
+        "source_format_anomalies",
+        "unexplained_source_format_anomalies",
         "transcript_status_coverage_percent",
         "protein_sequence_hash_coverage_percent"
       ],
@@ -102,6 +104,8 @@
         "target_proteins_missing_fasta": {"const": 0},
         "protein_mapped_to_multiple_genes": {"const": 0},
         "unexplained_transcript_exclusions": {"const": 0},
+        "source_format_anomalies": {"type": "integer", "minimum": 0},
+        "unexplained_source_format_anomalies": {"const": 0},
         "transcript_status_coverage_percent": {"const": 100.0},
         "protein_sequence_hash_coverage_percent": {"const": 100.0}
       }
@@ -131,4 +135,3 @@
     }
   }
 }
-

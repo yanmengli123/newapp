@@ -106,7 +106,8 @@ def _synthetic_inputs(tmp_path: Path):
     assembly_report.write_text(
         "12\tassembled-molecule\t12\tChromosome\tCM12\t=\tNC_006099.5\tPrimary Assembly\t1000\tchr12\n"
         "26\tassembled-molecule\t26\tChromosome\tCM26\t=\tNC_006113.5\tPrimary Assembly\t1000\tchr26\n"
-        "CHRUN_59\tunplaced-scaffold\tna\tna\tKZ1\t=\tNW_020110163.1\tPrimary Assembly\t1000\tchrUn\n",
+        "CHRUN_59\tunplaced-scaffold\tna\tna\tKZ1\t=\tNW_020110163.1\tPrimary Assembly\t1000\tchrUn\n"
+        "\n解释\n",
         encoding="utf-8",
     )
     gff = tmp_path / "annotation.gff.gz"
@@ -210,6 +211,15 @@ def test_builder_is_read_only_create_only_and_keeps_every_authorization_false(
     assert manifest["full_targeted_scan_authorized"] is False
     assert manifest["formal_shadow_authorized"] is False
     assert environment["status"] == "draft_missing_inputs"
+    assert (
+        sum(
+            1
+            for _ in (
+                output / "mapping-evidence/source-format-anomalies.tsv"
+            ).read_text(encoding="utf-8").splitlines()[1:]
+        )
+        == 1
+    )
     assert all(
         item["status"] == "expected_curator_artifact"
         and item["sha256"] is None
@@ -252,4 +262,3 @@ def test_validator_rejects_checksum_drift(tmp_path: Path):
     )
     assert not report.ok
     assert any("checksum mismatch" in error for error in report.errors)
-

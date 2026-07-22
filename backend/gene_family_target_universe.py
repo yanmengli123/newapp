@@ -272,15 +272,37 @@ def _read_targets(path: Path) -> dict[str, dict[str, str]]:
     return targets
 
 
-def _read_assembly_report(path: Path) -> dict[str, dict[str, str]]:
+def _read_assembly_report(
+    path: Path,
+) -> tuple[dict[str, dict[str, str]], list[dict[str, Any]]]:
     result: dict[str, dict[str, str]] = {}
+    anomalies: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as handle:
-        for raw in handle:
+        for line_number, raw in enumerate(handle, 1):
             if raw.startswith("#") or not raw.strip():
                 continue
             parts = raw.rstrip("\r\n").split("\t")
             if len(parts) != 10:
-                raise TargetUniverseError("assembly report row does not have 10 columns")
+                stripped = raw.strip()
+                if result and len(parts) == 1 and "\t" not in raw:
+                    anomalies.append(
+                        {
+                            "source_artifact": "GCF_000002315.6_GRCg6a_assembly_report.txt",
+                            "line_number": line_number,
+                            "anomaly_code": "non_tabular_trailing_text",
+                            "observed_field_count": 1,
+                            "raw_text_sha256": hashlib.sha256(
+                                stripped.encode("utf-8")
+                            ).hexdigest(),
+                            "raw_text": stripped,
+                            "disposition": "excluded_from_tabular_parse_and_preserved_as_audited_source_anomaly",
+                            "unexplained": "false",
+                        }
+                    )
+                    continue
+                raise TargetUniverseError(
+                    f"assembly report row {line_number} does not have 10 columns"
+                )
             result[parts[6]] = {
                 "sequence_name": parts[0],
                 "sequence_role": parts[1],
@@ -292,7 +314,7 @@ def _read_assembly_report(path: Path) -> dict[str, dict[str, str]]:
                 "sequence_length": parts[8],
                 "ucsc_style_name": parts[9],
             }
-    return result
+    return result, anomalies
 
 
 def _read_gff(
@@ -683,7 +705,9 @@ def build_target_universe_submission(
         raise TargetUniverseError(
             f"target gene denominator drift: {len(targets)}"
         )
-    assembly_sequences = _read_assembly_report(assembly_report)
+    assembly_sequences, source_format_anomalies = _read_assembly_report(
+        assembly_report
+    )
     placements, transcripts, protein_by_transcript, exception_map = _read_gff(
         gff, targets
     )
@@ -1004,6 +1028,7 @@ def build_target_universe_submission(
         multi_placement_path = evidence_root / "multi-placement-genes.tsv"
         exception_path = evidence_root / "annotation-exception-proteins.tsv"
         shared_sequence_path = evidence_root / "shared-sequence-groups.tsv"
+        source_anomaly_path = evidence_root / "source-format-anomalies.tsv"
         bap1_path = evidence_root / "bap1-stable-gene-placements.tsv"
         loc_path = evidence_root / "loc100859273-source-disposition.json"
 
@@ -1027,6 +1052,20 @@ def build_target_universe_submission(
             list(shared_sequence_rows[0]),
             shared_sequence_rows,
         )
+        _write_tsv(
+            source_anomaly_path,
+            [
+                "source_artifact",
+                "line_number",
+                "anomaly_code",
+                "observed_field_count",
+                "raw_text_sha256",
+                "raw_text",
+                "disposition",
+                "unexplained",
+            ],
+            source_format_anomalies,
+        )
         _write_tsv(bap1_path, list(bap1_rows[0]), bap1_rows)
         _write_json(loc_path, loc_disposition)
 
@@ -1041,6 +1080,7 @@ def build_target_universe_submission(
             (multi_placement_path, "multi_placement_evidence"),
             (exception_path, "annotation_exception_evidence"),
             (shared_sequence_path, "shared_sequence_evidence"),
+            (source_anomaly_path, "source_format_anomalies"),
             (bap1_path, "bap1_placement_evidence"),
             (loc_path, "loc100859273_source_disposition"),
         )
@@ -1090,6 +1130,8 @@ def build_target_universe_submission(
                 "target_proteins_missing_fasta": len(missing_target_sequences),
                 "protein_mapped_to_multiple_genes": len(multi_gene_protein_ids),
                 "unexplained_transcript_exclusions": 0,
+                "source_format_anomalies": len(source_format_anomalies),
+                "unexplained_source_format_anomalies": 0,
                 "transcript_status_coverage_percent": 100.0,
                 "protein_sequence_hash_coverage_percent": 100.0,
             },
@@ -1276,6 +1318,7 @@ def validate_target_universe_submission(
         "mapping-evidence/multi-placement-genes.tsv",
         "mapping-evidence/annotation-exception-proteins.tsv",
         "mapping-evidence/shared-sequence-groups.tsv",
+        "mapping-evidence/source-format-anomalies.tsv",
         "mapping-evidence/bap1-stable-gene-placements.tsv",
         "mapping-evidence/loc100859273-source-disposition.json",
         "fixtures/README.md",
@@ -1396,6 +1439,7 @@ def validate_target_universe_submission(
         quality.get("target_proteins_missing_fasta") != 0
         or quality.get("protein_mapped_to_multiple_genes") != 0
         or quality.get("unexplained_transcript_exclusions") != 0
+        or quality.get("unexplained_source_format_anomalies") != 0
         or target_manifest.get("source_modification_count") != 0
         or target_manifest.get("scan_executed") is not False
         or target_manifest.get("scientific_decisions_emitted") is not False

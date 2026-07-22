@@ -112,6 +112,7 @@
             "multi_placement_evidence",
             "annotation_exception_evidence",
             "shared_sequence_evidence",
+            "source_format_anomalies",
             "bap1_placement_evidence",
             "loc100859273_source_disposition",
             "scan_command_manifest",

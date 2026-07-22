@@ -13,7 +13,7 @@
     },
     {
       "path": "decision-submission-manifest.schema.json",
-      "sha256": "9e6965d1b8336aea1d41904e472cd90109d220e454c752f61a9482a4efa50f64"
+      "sha256": "467789c1ed6ece62c43f6bce0b85257b7e76e210034a4459b3c17e2cf6f12833"
     },
     {
       "path": "dual-scan-policy-v1.json",
@@ -21,7 +21,7 @@
     },
     {
       "path": "rc2b2-p0-qc-gates-v1.json",
-      "sha256": "41077e1d8754cd9de576ed6a2bd07c9596a0c45a8564e6f07f324cc051620747"
+      "sha256": "76d84a02260b58285e39070266fc20e9929a96ec4dabdc913d9417019e60dcc6"
     },
     {
       "path": "scan-environment-manifest.schema.json",
@@ -29,7 +29,7 @@
     },
     {
       "path": "target-universe-manifest.schema.json",
-      "sha256": "bb2d75caa04cc0c130a433b39a5497827f2699ad2bf22cdffff5b67022b9a5ef"
+      "sha256": "0da40b1a6e4406287f7f3087a308715f7a8bc6bfa7d71efae33c6348df4e684a"
     }
   ],
   "identity_policy": {
