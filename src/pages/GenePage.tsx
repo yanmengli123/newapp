@@ -39,6 +39,7 @@ import KeggPathwaysSection from "../components/kegg/KeggPathwaysSection";
 import GOTermCard from "../components/go/GOTermCard";
 import ExpressionSection from "../components/expression/ExpressionSection";
 import GeneStructurePlot from "../components/gene/GeneStructurePlot";
+import GeneFamilySection from "../components/gene_family/GeneFamilySection";
 
 // NC_ accession → chr ID (same mapping as JBrowsePage)
 const NC_TO_CHR: [string, string][] = [
@@ -713,6 +714,8 @@ export default function GenePage() {
           </Box>
         </Group>
       </Paper>
+
+      <GeneFamilySection key={gene.gene_id} internalGeneId={gene.gene_id} />
 
       {/* GO Annotations */}
       <Paper withBorder radius="xl" p="xl">

@@ -10,6 +10,9 @@ by environment variables. Set these env vars before running:
     GRCG6A_SAMPLE_RESULTS   → outputs\\sample_results\\ (pre-generated results)
     GRCG6A_PUBLIC_GENOME    → public\\genome\\ (served via FastAPI static)
     GRCG6A_HMMER_DB         → hmmer_db\\Pfam-A.hmm (HMMER/Pfam domain DB)
+    GRCG6A_GENE_FAMILY_RELEASE_ROOT → gene family\\releases\\
+    GRCG6A_GENE_FAMILY_RELEASE_ID   → active immutable catalog release
+    GRCG6A_GENE_FAMILY_DB           → active catalog SQLite (optional override)
 """
 
 import os
@@ -61,8 +64,21 @@ GRCG6A_HMMER_DB: Path = Path(
     os.getenv("GRCG6A_HMMER_DB", str(_BASE / "hmmer_db" / "Pfam-A.hmm"))
 ).resolve()
 
+# Versioned gene/protein family and domain annotation catalog.
+GRCG6A_GENE_FAMILY_RELEASE_ROOT: Path = Path(
+    os.getenv("GRCG6A_GENE_FAMILY_RELEASE_ROOT", str(_BASE / "gene family" / "releases"))
+).resolve()
+GRCG6A_GENE_FAMILY_RELEASE_ID: str = os.getenv(
+    "GRCG6A_GENE_FAMILY_RELEASE_ID", "gg-gf-2026-07-rc1"
+)
+GRCG6A_GENE_FAMILY_DB: Path = Path(
+    os.getenv(
+        "GRCG6A_GENE_FAMILY_DB",
+        str(GRCG6A_GENE_FAMILY_RELEASE_ROOT / GRCG6A_GENE_FAMILY_RELEASE_ID / "gene_family.sqlite"),
+    )
+).resolve()
+
 # KEGG pathway images (derived from static root)
 KEGG_IMAGE_DIR: Path = GRCG6A_STATIC_ROOT / "kegg_pathways"
-
 
 

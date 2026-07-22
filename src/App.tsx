@@ -12,6 +12,9 @@ const ComparativeGenomicsPage = lazy(() => import('./pages/ComparativeGenomicsPa
 const DataPage = lazy(() => import('./pages/DataPage'));
 const DownloadsPage = lazy(() => import('./pages/DownloadsPage'));
 const GenePage = lazy(() => import('./pages/GenePage'));
+const GeneFamilyCatalogPage = lazy(() => import('./pages/GeneFamilyCatalogPage'));
+const GeneFamilyEntryPage = lazy(() => import('./pages/GeneFamilyEntryPage'));
+const GeneFamilyDownloadsPage = lazy(() => import('./pages/GeneFamilyDownloadsPage'));
 const GeneQueryPage = lazy(() => import('./pages/GeneQueryPage'));
 const GenomeDownloadsPage = lazy(() => import('./pages/GenomeDownloadsPage'));
 const GenomeFilesPage = lazy(() => import('./pages/GenomeFilesPage'));
@@ -57,6 +60,9 @@ export default function App() {
               <Route path="/viz" element={<VizPage />} />
               <Route path="/data" element={<DataPage />} />
               <Route path="/gene/:geneId" element={<GenePage />} />
+              <Route path="/gene-families" element={<GeneFamilyCatalogPage />} />
+              <Route path="/gene-families/entry/:entryId" element={<GeneFamilyEntryPage />} />
+              <Route path="/gene-families/downloads" element={<GeneFamilyDownloadsPage />} />
               <Route path="/chromosome/:seqid" element={<ChromosomePage />} />
               <Route path="/tools" element={<ToolsPage />} />
               <Route path="/genome" element={<GenomeHomePage />} />

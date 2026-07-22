@@ -14,6 +14,25 @@ function HeaderNav() {
       <Button variant="subtle" component={Link} to="/jbrowse">
         JBrowse
       </Button>
+      <Menu shadow="md" width={235}>
+        <Menu.Target>
+          <Button variant="subtle" leftSection={<IconDna size={16} />}>
+            Annotations
+          </Button>
+        </Menu.Target>
+        <Menu.Dropdown>
+          <Menu.Label>Annotation Catalogs</Menu.Label>
+          <Menu.Item component={Link} to="/gene-families" leftSection={<IconDna size={14} />}>
+            Gene Families & Domains
+          </Menu.Item>
+          <Menu.Item component={Link} to="/go-enrichment" leftSection={<IconChartBar size={14} />}>
+            GO Enrichment
+          </Menu.Item>
+          <Menu.Item component={Link} to="/tools" leftSection={<IconBox size={14} />}>
+            Domain Search
+          </Menu.Item>
+        </Menu.Dropdown>
+      </Menu>
       <Menu shadow="md" width={220}>
         <Menu.Target>
           <Button variant="subtle" leftSection={<IconChartBar size={16} />}>
@@ -64,13 +83,6 @@ function HeaderNav() {
           >
             Primer3 Design
           </Menu.Item>
-          <Menu.Item
-            component={Link}
-            to="/tools"
-            leftSection={<IconBox size={14} />}
-          >
-            Domain Search
-          </Menu.Item>
         </Menu.Dropdown>
       </Menu>
       <Button variant="subtle" component={Link} to="/viz">
@@ -78,9 +90,6 @@ function HeaderNav() {
       </Button>
       <Button variant="subtle" component={Link} to="/picture-maker" leftSection={<IconPhoto size={16} />}>
         Picture Maker
-      </Button>
-      <Button variant="subtle" component={Link} to="/go-enrichment" leftSection={<IconDna size={16} />}>
-        GO Enrichment
       </Button>
       <Button variant="subtle" component={Link} to="/comparative" leftSection={<IconDna size={16} />}>
         Comparative
