@@ -32,6 +32,7 @@ import {
   IconShieldCheck,
 } from '@tabler/icons-react';
 import { Link } from 'react-router-dom';
+import CatalogStatusBadge from '../components/gene_family/CatalogStatusBadge';
 import {
   getCatalogSummary,
   getEntries,
@@ -206,9 +207,14 @@ export default function GeneFamilyCatalogPage() {
           value={globalQuery}
           onChange={(event) => setGlobalQuery(event.currentTarget.value)}
         />
-        {searchResult && (searchResult.entries.length > 0 || searchResult.genes.length > 0 || searchResult.proteins.length > 0) && (
+        {searchResult && (
+          searchResult.entries.length > 0
+          || searchResult.genes.length > 0
+          || searchResult.proteins.length > 0
+          || searchResult.source_assertions.length > 0
+        ) && (
           <Paper mt="xs" p="md" radius="md" c="dark" bg="white">
-            <SimpleGrid cols={{ base: 1, md: 3 }} spacing="lg">
+            <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }} spacing="lg">
               <Box>
                 <Text fw={700} size="sm" mb="xs">Catalog entries</Text>
                 <Stack gap={5}>
@@ -239,9 +245,34 @@ export default function GeneFamilyCatalogPage() {
                   ))}
                 </Stack>
               </Box>
+              <Box>
+                <Text fw={700} size="sm" mb="xs">Source assertions needing mapping</Text>
+                <Stack gap="sm">
+                  {searchResult.source_assertions.slice(0, 5).map((assertion) => (
+                    <Box key={assertion.assertion_id} data-source-assertion={assertion.assertion_id}>
+                      <Anchor component={Link} to={assertion.entry_url} size="sm" fw={650}>
+                        {assertion.gene_symbol || assertion.source_accession}
+                      </Anchor>
+                      <Text size="xs" c="dimmed">{assertion.entry_name} · {assertion.ncbi_gene_id || assertion.source_accession}</Text>
+                      <Group gap={5} mt={3}>
+                        <CatalogStatusBadge value={assertion.assertion_state} size="xs" />
+                        <CatalogStatusBadge value={assertion.mapping_state} size="xs" />
+                        <CatalogStatusBadge value={assertion.review_state} size="xs" />
+                      </Group>
+                      <Text size="xs" c="dimmed" mt={3}>Internal gene: Not assigned</Text>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
             </SimpleGrid>
           </Paper>
         )}
+        {searchResult
+          && searchResult.entries.length === 0
+          && searchResult.genes.length === 0
+          && searchResult.proteins.length === 0
+          && searchResult.source_assertions.length === 0
+          && <Text size="sm" mt="xs" c="cyan.0">No catalog records match this search.</Text>}
       </Paper>
 
       {summaryError && <Alert color="red" title="Catalog unavailable">{summaryError}</Alert>}

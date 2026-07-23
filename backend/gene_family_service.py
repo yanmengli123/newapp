@@ -279,14 +279,9 @@ class GeneFamilyCatalogService:
             ]
             result["available_sections"] = {
                 "domain_architecture": result["scheme_id"] == "pfam",
-                "expression_profile": result["accepted_genes"] > 0,
-                "genomic_distribution": result["accepted_genes"] > 0,
-                "change_history": bool(
-                    conn.execute(
-                        "SELECT 1 FROM gf_review_event r JOIN gf_assertion a ON a.assertion_id = r.assertion_id WHERE a.entry_id = ? LIMIT 1",
-                        (entry_id,),
-                    ).fetchone()
-                ),
+                "expression_profile": False,
+                "genomic_distribution": False,
+                "change_history": False,
             }
             return result
 
@@ -397,6 +392,8 @@ class GeneFamilyCatalogService:
                            ev.description, ae.evidence_role, ae.evidence_rank,
                            a.assertion_id, a.assertion_state,
                            s.internal_gene_id, s.gene_symbol, s.protein_accession,
+                           s.protein_length,
+                           CASE WHEN s.protein_length IS NULL THEN 'not_reported' ELSE 'observed' END AS protein_length_status,
                            dh.ali_from, dh.ali_to, dh.env_from, dh.env_to,
                            dh.domain_index, dh.domain_total
                     FROM gf_assertion_evidence ae
@@ -552,7 +549,7 @@ class GeneFamilyCatalogService:
     def search(self, query: str, limit: int = 12) -> dict[str, Any]:
         query = query.strip()
         if not query:
-            return {"query": query, "entries": [], "genes": [], "proteins": []}
+            return {"query": query, "entries": [], "genes": [], "proteins": [], "source_assertions": []}
         limit = max(1, min(limit, 25))
         token = f"%{query.lower()}%"
         with self.connect() as conn:
@@ -606,7 +603,42 @@ class GeneFamilyCatalogService:
                     (token, limit),
                 )
             ]
-            return {"query": query, "entries": entries, "genes": genes, "proteins": proteins}
+            source_assertions = [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT a.assertion_id, s.subject_key, s.gene_symbol, s.ncbi_gene_id,
+                           s.source_namespace, s.source_accession, a.scheme_id,
+                           a.entry_id, e.name AS entry_name, a.assertion_state,
+                           s.mapping_state, a.review_state, s.internal_gene_id
+                    FROM gf_assertion a
+                    JOIN gf_subject s ON s.subject_pk = a.subject_pk
+                    JOIN gf_entry e ON e.entry_id = a.entry_id
+                    WHERE s.subject_type = 'gene'
+                      AND s.internal_gene_id IS NULL
+                      AND s.mapping_state IN ('ambiguous', 'unmapped')
+                      AND (
+                          LOWER(COALESCE(s.gene_symbol, '')) LIKE ?
+                          OR LOWER(COALESCE(s.ncbi_gene_id, '')) LIKE ?
+                          OR LOWER(COALESCE(s.source_accession, '')) LIKE ?
+                      )
+                    ORDER BY CASE WHEN LOWER(COALESCE(s.gene_symbol, '')) = ? THEN 0 ELSE 1 END,
+                             CASE a.assertion_state WHEN 'accepted' THEN 0 WHEN 'candidate' THEN 1 ELSE 2 END,
+                             s.subject_key, a.scheme_id, a.entry_id, a.assertion_id
+                    LIMIT ?
+                    """,
+                    (token, token, token, query.lower(), limit),
+                )
+            ]
+            for assertion in source_assertions:
+                assertion["entry_url"] = f"/gene-families/entry/{assertion['entry_id']}"
+            return {
+                "query": query,
+                "entries": entries,
+                "genes": genes,
+                "proteins": proteins,
+                "source_assertions": source_assertions,
+            }
 
     def downloads(self, release_id: str) -> list[dict[str, Any]]:
         with self.connect() as conn:

@@ -17,6 +17,8 @@ const COLORS: Record<string, string> = {
   in_review: 'yellow',
   approved: 'teal',
   needs_mapping: 'red',
+  ambiguous: 'orange',
+  unmapped: 'red',
   external_curated: 'blue',
   multi_source_supported: 'teal',
   model_supported: 'cyan',

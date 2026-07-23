@@ -155,10 +155,14 @@ export interface EvidenceRecord {
   internal_gene_id: string | null;
   gene_symbol: string | null;
   protein_accession: string | null;
+  protein_length: number | null;
+  protein_length_status: 'observed' | 'not_reported';
   ali_from?: number | null;
   ali_to?: number | null;
   env_from?: number | null;
   env_to?: number | null;
+  domain_index?: number | null;
+  domain_total?: number | null;
 }
 
 export interface EvidenceListResponse {
@@ -207,6 +211,8 @@ export interface ProteinDomainArchitecture {
   domain_hits: DomainHit[];
 }
 
+export type ProteinLengthStatus = 'observed' | 'not_reported';
+
 export interface GeneFamilyAnnotations {
   release_id: string;
   internal_gene_id: string;
@@ -235,6 +241,22 @@ export interface CatalogSearchResponse {
     protein_length: number | null;
     internal_gene_id: string | null;
     gene_symbol: string | null;
+  }>;
+  source_assertions: Array<{
+    assertion_id: string;
+    subject_key: string;
+    gene_symbol: string | null;
+    ncbi_gene_id: string | null;
+    source_namespace: string;
+    source_accession: string;
+    scheme_id: string;
+    entry_id: string;
+    entry_name: string;
+    assertion_state: AssertionState;
+    mapping_state: 'ambiguous' | 'unmapped';
+    review_state: ReviewState;
+    internal_gene_id: null;
+    entry_url: string;
   }>;
 }
 

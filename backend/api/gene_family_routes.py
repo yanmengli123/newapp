@@ -7,6 +7,20 @@ from functools import lru_cache
 from fastapi import APIRouter, HTTPException, Query
 from starlette.responses import FileResponse
 
+from backend.api.gene_family_models import (
+    AssertionDetail,
+    CatalogEntry,
+    CatalogRelease,
+    CatalogSearchResponse,
+    CatalogSummary,
+    EntryListResponse,
+    ErrorResponse,
+    EvidenceListResponse,
+    GeneFamilyAnnotations,
+    MemberListResponse,
+    ProteinDomainHits,
+    ReleaseDownloads,
+)
 from backend.config import GRCG6A_GENE_FAMILY_DB, GRCG6A_GENE_FAMILY_RELEASE_ROOT
 from backend.gene_family_service import GeneFamilyCatalogService
 
@@ -34,17 +48,29 @@ def _bad_cursor(exc: ValueError) -> HTTPException:
     return HTTPException(status_code=400, detail=str(exc))
 
 
-@catalog_router.get("/releases/current")
+@catalog_router.get(
+    "/releases/current",
+    response_model=CatalogRelease,
+    responses={503: {"model": ErrorResponse, "description": "Catalog release unavailable"}},
+)
 def current_release():
     return _service_or_503().current_release()
 
 
-@catalog_router.get("/summary")
+@catalog_router.get(
+    "/summary",
+    response_model=CatalogSummary,
+    responses={503: {"model": ErrorResponse, "description": "Catalog release unavailable"}},
+)
 def catalog_summary():
     return _service_or_503().summary()
 
 
-@catalog_router.get("/search")
+@catalog_router.get(
+    "/search",
+    response_model=CatalogSearchResponse,
+    responses={503: {"model": ErrorResponse, "description": "Catalog release unavailable"}},
+)
 def catalog_search(
     q: str = Query(min_length=1, max_length=200),
     limit: int = Query(default=12, ge=1, le=25),
@@ -52,7 +78,11 @@ def catalog_search(
     return _service_or_503().search(q, limit)
 
 
-@catalog_router.get("/entries")
+@catalog_router.get(
+    "/entries",
+    response_model=EntryListResponse,
+    responses={400: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def entries(
     scheme: str | None = None,
     entry_type: str | None = None,
@@ -76,7 +106,11 @@ def entries(
         raise _bad_cursor(exc) from exc
 
 
-@catalog_router.get("/entries/{entry_id}")
+@catalog_router.get(
+    "/entries/{entry_id}",
+    response_model=CatalogEntry,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def entry(entry_id: str):
     result = _service_or_503().entry(entry_id)
     if result is None:
@@ -84,7 +118,11 @@ def entry(entry_id: str):
     return result
 
 
-@catalog_router.get("/entries/{entry_id}/members")
+@catalog_router.get(
+    "/entries/{entry_id}/members",
+    response_model=MemberListResponse,
+    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def entry_members(
     entry_id: str,
     include_candidates: bool = False,
@@ -118,7 +156,11 @@ def entry_members(
         raise _bad_cursor(exc) from exc
 
 
-@catalog_router.get("/entries/{entry_id}/evidence")
+@catalog_router.get(
+    "/entries/{entry_id}/evidence",
+    response_model=EvidenceListResponse,
+    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def entry_evidence(
     entry_id: str,
     cursor: str | None = None,
@@ -132,7 +174,11 @@ def entry_evidence(
         raise _bad_cursor(exc) from exc
 
 
-@catalog_router.get("/assertions/{assertion_id}")
+@catalog_router.get(
+    "/assertions/{assertion_id}",
+    response_model=AssertionDetail,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def assertion(assertion_id: str):
     result = _service_or_503().assertion(assertion_id)
     if result is None:
@@ -140,7 +186,11 @@ def assertion(assertion_id: str):
     return result
 
 
-@catalog_router.get("/releases/{release_id}/downloads")
+@catalog_router.get(
+    "/releases/{release_id}/downloads",
+    response_model=ReleaseDownloads,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def release_downloads(release_id: str):
     assets = _service_or_503().downloads(release_id)
     if not assets:
@@ -148,7 +198,14 @@ def release_downloads(release_id: str):
     return {"release_id": release_id, "data": assets}
 
 
-@catalog_router.get("/releases/{release_id}/downloads/{asset_name}")
+@catalog_router.get(
+    "/releases/{release_id}/downloads/{asset_name}",
+    responses={
+        200: {"content": {"application/octet-stream": {}}, "description": "Immutable release asset"},
+        404: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
+    },
+)
 def release_download(release_id: str, asset_name: str):
     path = _service_or_503().download_path(release_id, asset_name)
     if path is None:
@@ -156,15 +213,22 @@ def release_download(release_id: str, asset_name: str):
     return FileResponse(path, filename=path.name, media_type="application/octet-stream")
 
 
-@gene_annotation_router.get("/genes/{internal_gene_id}/family-annotations")
+@gene_annotation_router.get(
+    "/genes/{internal_gene_id}/family-annotations",
+    response_model=GeneFamilyAnnotations,
+    responses={503: {"model": ErrorResponse}},
+)
 def gene_family_annotations(internal_gene_id: str):
     return _service_or_503().gene_annotations(internal_gene_id)
 
 
-@gene_annotation_router.get("/proteins/{protein_id}/domain-hits")
+@gene_annotation_router.get(
+    "/proteins/{protein_id}/domain-hits",
+    response_model=ProteinDomainHits,
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
+)
 def protein_domain_hits(protein_id: str):
     result = _service_or_503().protein_domain_hits(protein_id)
     if result["total"] == 0:
         raise HTTPException(status_code=404, detail=f"Protein domain hits not found: {protein_id}")
     return result
-

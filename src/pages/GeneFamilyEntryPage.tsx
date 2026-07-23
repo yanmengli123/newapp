@@ -122,18 +122,26 @@ export default function GeneFamilyEntryPage() {
 
   const proteinTracks = useMemo(() => {
     if (!entry || entry.scheme_id !== 'pfam' || !evidence) return [];
-    const grouped = new Map<string, DomainHit[]>();
+    const grouped = new Map<string, {
+      proteinLength: number | null;
+      proteinLengthStatus: 'observed' | 'not_reported';
+      hits: DomainHit[];
+    }>();
     for (const record of evidence.data) {
       if (!record.protein_accession || record.ali_from == null || record.ali_to == null) continue;
-      const list = grouped.get(record.protein_accession) ?? [];
-      list.push({
+      const track = grouped.get(record.protein_accession) ?? {
+        proteinLength: record.protein_length,
+        proteinLengthStatus: record.protein_length_status,
+        hits: [],
+      };
+      track.hits.push({
         entry_id: entry.entry_id,
         pfam_accession: entry.accession,
         pfam_name: entry.name,
         definition: entry.definition ?? null,
         assertion_id: record.assertion_id,
-        domain_index: null,
-        domain_total: null,
+        domain_index: record.domain_index ?? null,
+        domain_total: record.domain_total ?? null,
         ali_from: record.ali_from,
         ali_to: record.ali_to,
         env_from: record.env_from ?? null,
@@ -143,9 +151,9 @@ export default function GeneFamilyEntryPage() {
         accuracy: null,
         threshold_pass: record.threshold_pass,
       });
-      grouped.set(record.protein_accession, list);
+      grouped.set(record.protein_accession, track);
     }
-    return Array.from(grouped, ([proteinId, hits]) => ({ proteinId, hits }));
+    return Array.from(grouped, ([proteinId, track]) => ({ proteinId, ...track }));
   }, [entry, evidence]);
 
   if (loading) return <Group justify="center" py="xl"><Loader /></Group>;
@@ -344,7 +352,15 @@ export default function GeneFamilyEntryPage() {
                 These tracks show positional evidence for this Pfam entry. Open a gene page to view the complete multi-domain architecture for each isoform.
               </Alert>
               <Stack gap="xl">
-                {proteinTracks.map((track) => <DomainArchitecture key={track.proteinId} proteinId={track.proteinId} proteinLength={null} hits={track.hits} />)}
+                {proteinTracks.map((track) => (
+                  <DomainArchitecture
+                    key={track.proteinId}
+                    proteinId={track.proteinId}
+                    proteinLength={track.proteinLength}
+                    proteinLengthStatus={track.proteinLengthStatus}
+                    hits={track.hits}
+                  />
+                ))}
               </Stack>
             </Paper>
           </Tabs.Panel>

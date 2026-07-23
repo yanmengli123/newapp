@@ -139,6 +139,7 @@ export default function GeneFamilySection({ internalGeneId }: { internalGeneId: 
               <DomainArchitecture
                 proteinId={selectedProtein.protein_id}
                 proteinLength={selectedProtein.protein_length}
+                proteinLengthStatus={selectedProtein.protein_length == null ? 'not_reported' : 'observed'}
                 hits={selectedProtein.domain_hits}
               />
             ) : (
