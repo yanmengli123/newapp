@@ -8,3 +8,9 @@
 *.html text encoding=utf-8
 *.py text encoding=utf-8 eol=lf
 *.sql text encoding=utf-8
+.gitattributes text encoding=utf-8 eol=lf
+
+# Scientific contract and audit records are byte-hashed; preserve LF on Windows.
+contracts/gene-family/rc2b2-p1/** text encoding=utf-8 eol=lf
+docs/gene-family/rc2/RC2_B2_P1_SCAN_REPRODUCIBILITY.md text encoding=utf-8 eol=lf
+docs/gene-family/rc2/README.md text encoding=utf-8 eol=lf

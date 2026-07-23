@@ -43,3 +43,4 @@ Engineering execution records:
 - [RC2-B shadow preparation](RC2_B_SHADOW_PREPARATION.md)
 - [RC2-B.1 scientific handoff](RC2_B1_SCIENTIFIC_HANDOFF.md)
 - [RC2-B.2 P0 readiness freeze](RC2_B2_READINESS_FREEZE.md)
+- [RC2-B.2-P1 scan reproducibility record](RC2_B2_P1_SCAN_REPRODUCIBILITY.md)

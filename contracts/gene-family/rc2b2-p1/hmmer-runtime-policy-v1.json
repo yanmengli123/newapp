@@ -1,0 +1,29 @@
+{
+  "contract_id": "gg-gf-hmmer34-pilot-runtime-policy-1.0",
+  "schema_version": "1.0",
+  "hmmer_version": "3.4",
+  "container": {
+    "image_reference": "quay.io/biocontainers/hmmer:3.4--hdbdd923_0",
+    "manifest_digest": "sha256:85d118bad293e1a55372f80618512f72d939b14f6f62444fcd872f7c324fed0d",
+    "immutable_reference": "quay.io/biocontainers/hmmer@sha256:85d118bad293e1a55372f80618512f72d939b14f6f62444fcd872f7c324fed0d",
+    "platform": "linux/amd64"
+  },
+  "binaries": {
+    "hmmscan_path": "/usr/local/bin/hmmscan",
+    "hmmscan_sha256": "a8fa3e42c6539289554a778a8218b4a8b789d761ed5191a93e40158e0be41a93",
+    "hmmpress_path": "/usr/local/bin/hmmpress",
+    "hmmpress_sha256": "9c081cc328be009f28ce3839b8baf090d282e219f9148dfa3c9590d0e2db7b5f"
+  },
+  "environment": {
+    "LC_ALL": "C",
+    "LANG": "C",
+    "TZ": "UTC"
+  },
+  "pilot_parameters": {
+    "cpu": 1,
+    "seed": 42,
+    "qformat": "fasta"
+  },
+  "floating_image_tag_is_sufficient": false,
+  "runtime_binary_hash_verification_required": true
+}

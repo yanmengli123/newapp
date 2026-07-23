@@ -1,0 +1,77 @@
+{
+  "contract_id": "gg-gf-hmmer-output-parser-1.0",
+  "schema_version": "1.0",
+  "supported_hmmer_program": "hmmscan",
+  "supported_hmmer_version": "3.4",
+  "supported_formats": {
+    "tblout": {
+      "structured_column_count": 18,
+      "columns": [
+        "target_name",
+        "target_accession",
+        "query_name",
+        "query_accession",
+        "full_evalue",
+        "full_score",
+        "full_bias",
+        "best_domain_evalue",
+        "best_domain_score",
+        "best_domain_bias",
+        "expected_domains",
+        "regions",
+        "clusters",
+        "overlaps",
+        "envelopes",
+        "domains",
+        "reported_domains",
+        "included_domains"
+      ]
+    },
+    "domtblout": {
+      "structured_column_count": 22,
+      "columns": [
+        "target_name",
+        "target_accession",
+        "target_length",
+        "query_name",
+        "query_accession",
+        "query_length",
+        "full_evalue",
+        "full_score",
+        "full_bias",
+        "domain_index",
+        "domain_total",
+        "conditional_evalue",
+        "independent_evalue",
+        "domain_score",
+        "domain_bias",
+        "hmm_from",
+        "hmm_to",
+        "alignment_from",
+        "alignment_to",
+        "envelope_from",
+        "envelope_to",
+        "accuracy"
+      ]
+    }
+  },
+  "comment_prefix": "#",
+  "required_header_tokens": [
+    "# Program:         hmmscan",
+    "# Version:         3.4"
+  ],
+  "null_token": "-",
+  "model_accession_pattern": "^PF[0-9]{5}\\.[0-9]+$",
+  "query_name_pattern": "^sha256_[0-9a-f]{64}$",
+  "coordinate_system": "one_based_closed",
+  "duplicate_record_policy": "reject_exact_or_semantic_duplicate",
+  "failure_policy": {
+    "unrecognized_hmmer_format": "blocker",
+    "malformed_numeric_field": "blocker",
+    "invalid_coordinates": "blocker",
+    "unknown_model_accession": "blocker",
+    "unknown_query_name": "blocker",
+    "silent_parser_skip": "forbidden",
+    "rejected_records_artifact": "rejected-records.tsv"
+  }
+}

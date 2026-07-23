@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.example/contracts/gene-family/rc2b2-p1/pilot-run-manifest.schema.json",
+  "title": "RC2-B.2-P1 Pilot run manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "package_id",
+    "pilot_run_state",
+    "started_at_utc",
+    "completed_at_utc",
+    "p0_target_manifest_sha256",
+    "scan_environment_manifest_sha256",
+    "pilot_fixture_manifest_sha256",
+    "pilot_authorization_sha256",
+    "parser_contract_sha256",
+    "parser_implementation_sha256",
+    "semantic_hash_policy_sha256",
+    "commands",
+    "execution_counts",
+    "subject_counts",
+    "output_hashes",
+    "artifacts",
+    "rejected_record_count",
+    "source_modification_count",
+    "clan_resolution_state",
+    "full_scan_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "run_id": {"enum": ["pilot-run-a", "pilot-run-b"]},
+    "package_id": {"enum": ["rc2b2-p1-pilot-run-a", "rc2b2-p1-pilot-run-b"]},
+    "pilot_run_state": {"const": "completed"},
+    "started_at_utc": {"type": "string", "format": "date-time"},
+    "completed_at_utc": {"type": "string", "format": "date-time"},
+    "p0_target_manifest_sha256": {"const": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6"},
+    "scan_environment_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "pilot_fixture_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "pilot_authorization_sha256": {"$ref": "#/$defs/sha256"},
+    "parser_contract_sha256": {"$ref": "#/$defs/sha256"},
+    "parser_implementation_sha256": {"$ref": "#/$defs/sha256"},
+    "semantic_hash_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "commands": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/command"}
+    },
+    "execution_counts": {"$ref": "#/$defs/statusCounts"},
+    "subject_counts": {"$ref": "#/$defs/statusCounts"},
+    "output_hashes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authoritative_semantic_sha256",
+        "diagnostic_semantic_sha256",
+        "authoritative_canonical_sha256",
+        "diagnostic_canonical_sha256",
+        "execution_status_semantic_sha256",
+        "subject_status_semantic_sha256"
+      ],
+      "properties": {
+        "authoritative_semantic_sha256": {"$ref": "#/$defs/sha256"},
+        "diagnostic_semantic_sha256": {"$ref": "#/$defs/sha256"},
+        "authoritative_canonical_sha256": {"$ref": "#/$defs/sha256"},
+        "diagnostic_canonical_sha256": {"$ref": "#/$defs/sha256"},
+        "execution_status_semantic_sha256": {"$ref": "#/$defs/sha256"},
+        "subject_status_semantic_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 12,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "rejected_record_count": {"const": 0},
+    "source_modification_count": {"const": 0},
+    "clan_resolution_state": {"const": "not_applied"},
+    "full_scan_authorized": {"const": false}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_role",
+        "command_argv",
+        "command_text",
+        "command_canonical_sha256",
+        "stdout_sha256",
+        "stderr_sha256",
+        "exit_code",
+        "started_at_utc",
+        "completed_at_utc"
+      ],
+      "properties": {
+        "command_role": {"enum": ["authoritative", "diagnostic"]},
+        "command_argv": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+        "command_text": {"type": "string", "minLength": 1},
+        "command_canonical_sha256": {"$ref": "#/$defs/sha256"},
+        "stdout_sha256": {"$ref": "#/$defs/sha256"},
+        "stderr_sha256": {"$ref": "#/$defs/sha256"},
+        "exit_code": {"const": 0},
+        "started_at_utc": {"type": "string", "format": "date-time"},
+        "completed_at_utc": {"type": "string", "format": "date-time"}
+      }
+    },
+    "statusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completed_with_hits", "completed_no_hits", "failed", "not_attempted", "total", "coverage_percent"],
+      "properties": {
+        "completed_with_hits": {"type": "integer", "minimum": 0},
+        "completed_no_hits": {"type": "integer", "minimum": 0},
+        "failed": {"const": 0},
+        "not_attempted": {"const": 0},
+        "total": {"type": "integer", "minimum": 1},
+        "coverage_percent": {"const": 100.0}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_type", "relative_path", "byte_size", "sha256"],
+      "properties": {
+        "artifact_type": {"type": "string", "minLength": 1},
+        "relative_path": {"type": "string", "minLength": 1},
+        "byte_size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

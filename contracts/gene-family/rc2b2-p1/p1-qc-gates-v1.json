@@ -1,0 +1,39 @@
+{
+  "contract_id": "gg-gf-rc2b2-p1-pilot-qc-gates-1.0",
+  "schema_version": "1.0",
+  "environment": {
+    "scan_environment_state": "frozen",
+    "official_pfam_checksum_verified": true,
+    "sidecar_release_consistency_percent": 100,
+    "hmmer_version": "3.4",
+    "container_manifest_digest_recorded": true,
+    "pressed_indexes_reproducible": "4/4"
+  },
+  "execution": {
+    "attempted_percent": 100,
+    "not_attempted": 0,
+    "failed": 0,
+    "status_coverage_percent": 100
+  },
+  "subject": {
+    "status_coverage_percent": 100,
+    "reexpansion_match_percent": 100,
+    "missing_sequence": 0,
+    "mapped_to_multiple_genes": 0
+  },
+  "output": {
+    "ga_parsing_coverage_percent": 100,
+    "authoritative_diagnostic_separation_percent": 100,
+    "no_hit_represented_at_both_levels_percent": 100,
+    "silent_rejected_records": 0
+  },
+  "reproducibility": {
+    "independent_process_a": "completed",
+    "independent_process_b": "completed",
+    "fresh_output_directories": true,
+    "semantic_hashes_identical_percent": 100,
+    "canonical_output_hashes_identical_percent": 100,
+    "raw_input_modifications": 0
+  },
+  "automatic_full_scan_authorization": false
+}

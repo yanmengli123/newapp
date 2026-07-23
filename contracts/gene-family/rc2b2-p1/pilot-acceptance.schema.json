@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.example/contracts/gene-family/rc2b2-p1/pilot-acceptance.schema.json",
+  "title": "RC2-B.2-P1 Pilot acceptance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "acceptance_id",
+    "package_id",
+    "pilot_acceptance_state",
+    "decided_at_utc",
+    "reviewer",
+    "p0_target_manifest_sha256",
+    "scan_environment_manifest_sha256",
+    "pilot_fixture_manifest_sha256",
+    "pilot_authorization_sha256",
+    "run_a_manifest_sha256",
+    "run_b_manifest_sha256",
+    "gate_results",
+    "semantic_hash_comparison",
+    "canonical_hash_comparison",
+    "known_limitations",
+    "decision",
+    "full_scan_authorized",
+    "formal_shadow_authorized",
+    "rc2c_build_authorized",
+    "api_frontend_switch_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "acceptance_id": {"const": "gg-gf-rc2b2-p1-pilot-acceptance-v1"},
+    "package_id": {"const": "rc2b2-p1-pilot-acceptance-v001"},
+    "pilot_acceptance_state": {"enum": ["passed", "failed"]},
+    "decided_at_utc": {"type": "string", "format": "date-time"},
+    "reviewer": {"type": "string", "minLength": 1},
+    "p0_target_manifest_sha256": {"const": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6"},
+    "scan_environment_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "pilot_fixture_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "pilot_authorization_sha256": {"$ref": "#/$defs/sha256"},
+    "run_a_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "run_b_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "gate_results": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["gate_id", "passed", "observed", "required"],
+        "properties": {
+          "gate_id": {"type": "string", "minLength": 1},
+          "passed": {"type": "boolean"},
+          "observed": {},
+          "required": {}
+        }
+      }
+    },
+    "semantic_hash_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compared", "identical_percent"],
+      "properties": {
+        "compared": {"type": "integer", "minimum": 1},
+        "identical_percent": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "canonical_hash_comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compared", "identical_percent"],
+      "properties": {
+        "compared": {"type": "integer", "minimum": 1},
+        "identical_percent": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "known_limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "decision": {"enum": ["accept_pilot_only", "reject_pilot"]},
+    "full_scan_authorized": {"const": false},
+    "formal_shadow_authorized": {"const": false},
+    "rc2c_build_authorized": {"const": false},
+    "api_frontend_switch_authorized": {"const": false}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

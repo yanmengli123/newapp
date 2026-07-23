@@ -1,0 +1,81 @@
+{
+  "selection_id": "gg-gf-pfam35-pilot-fixture-selection-1.0",
+  "schema_version": "1.0",
+  "p0_target_manifest_sha256": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6",
+  "legacy_evidence_role": "historical_fixture_support_not_new_scan_truth",
+  "scientific_classification_claimed": false,
+  "fixtures": [
+    {
+      "fixture_id": "P1F-001",
+      "scientific_subject_key": "NP_001001765.1",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF00899"],
+      "must_not_report_base_accessions": [],
+      "rationale": "UBA5 E1-like ThiF-domain positive and annotation-exception subject"
+    },
+    {
+      "fixture_id": "P1F-002",
+      "scientific_subject_key": "NP_990196.1",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF00179"],
+      "must_not_report_base_accessions": [],
+      "rationale": "UBE2A canonical E2-domain positive"
+    },
+    {
+      "fixture_id": "P1F-003",
+      "scientific_subject_key": "NP_001025761.1",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF01088", "PF18031"],
+      "must_not_report_base_accessions": [],
+      "rationale": "BAP1 DUB positive with two separated UCH-related regions"
+    },
+    {
+      "fixture_id": "P1F-004",
+      "scientific_subject_key": "NP_989802.2",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF00443", "PF00917", "PF12436", "PF14533"],
+      "must_not_report_base_accessions": [],
+      "rationale": "USP7 long multi-domain DUB positive"
+    },
+    {
+      "fixture_id": "P1F-005",
+      "scientific_subject_key": "NP_001001767.2",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF00097", "PF05605", "PF18574"],
+      "must_not_report_base_accessions": [],
+      "rationale": "RNF114 zinc-finger-rich E3 positive and annotation-exception subject"
+    },
+    {
+      "fixture_id": "P1F-006",
+      "scientific_subject_key": "NP_001001293.1",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF00041", "PF09067", "PF12772"],
+      "must_not_report_base_accessions": [],
+      "rationale": "non-ubiquitin receptor control with three known Pfam regions"
+    },
+    {
+      "fixture_id": "P1F-007",
+      "scientific_subject_key": "XP_025008030.1",
+      "expected_authoritative_scan_outcome": "reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": ["PF00096", "PF00651"],
+      "must_not_report_base_accessions": [],
+      "rationale": "shared ZBTB20 sequence requiring expansion to 19 accessions"
+    },
+    {
+      "fixture_id": "P1F-008",
+      "scientific_subject_key": "XP_025009269.1",
+      "expected_authoritative_scan_outcome": "no_reported_hits_expected",
+      "expected_diagnostic_scan_outcome": "reported_hits_expected",
+      "expected_pfam_base_accessions": [],
+      "must_not_report_base_accessions": [],
+      "rationale": "97-aa historical authoritative no-hit and below-GA diagnostic boundary"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "manifest_id": "gg-gf-rc2b2-p1-contracts-1.0",
+  "status": "frozen_for_engineering",
+  "p0_target_manifest_sha256": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6",
+  "files": [
+    {"path": "full-scan-authorization.schema.json", "sha256": "8006844a1e36f02f277ff834b7285bd50999b1246bfefa418a4ceede69aeccfe"},
+    {"path": "hmmer-output-parser-contract-v1.json", "sha256": "ccb05d4f48cdcea8427a24ffee22a237e91378c3d5d39ec5e53b18305d8629fa"},
+    {"path": "hmmer-runtime-policy-v1.json", "sha256": "6ccffec150f38890bb2f97027358d0eaf065a2a983d2b41bd8d6a2dd5bd2a712"},
+    {"path": "p1-qc-gates-v1.json", "sha256": "1a71c57dafb5e92403d5814d9495efd210f65fdfbb4ae1812fe49be728cd2baf"},
+    {"path": "p1-state-machine-v1.json", "sha256": "8dd5e7045e801cde2b793ab6b8dc17c6a2d604aabd83ba5d6ce13fca26839cd9"},
+    {"path": "pfam-35-asset-policy-v1.json", "sha256": "330e475e17a89605d77ece3eb077a0c66491ece8c3990937cd49c6116a4c9a71"},
+    {"path": "pilot-acceptance.schema.json", "sha256": "eba5f35587a794f961f2b4a43af3a82e43c409a5de9d00506e2d5a6233b1e991"},
+    {"path": "pilot-authorization.schema.json", "sha256": "5b7f4d810acc5cc159dd9f930e10343b9bc4b3dfc915f4e80c8a6f32c57beee9"},
+    {"path": "pilot-fixture-selection-v1.json", "sha256": "cf34833e105ba8f40920a3f26230f402040b527ef01c3dd91001b020aaa9914b"},
+    {"path": "pilot-fixture-manifest.schema.json", "sha256": "f9f0c3f60d8e21c97aeb44b6d0f10b6d0ff8b0253752cd1237d5040fb56a555f"},
+    {"path": "pilot-run-manifest.schema.json", "sha256": "2d7d36da61a162aad71f1347e6091f42f3ffbe6f94c02e5525a7fa5b7684aa3c"},
+    {"path": "README.md", "sha256": "039010342876d6d64141406202e76099ce74342474669b683bc465e8dfc2a6b2"},
+    {"path": "scan-command-policy-v1.json", "sha256": "f94af4fb4e08a20a29870f7206d046cac2562fe98c5c1fdb43828c4974bf40ed"},
+    {"path": "scan-environment-manifest.schema.json", "sha256": "cc29e3e2d066f02bca881b6f12b96532fa7215ca8d525285377c5024c26f1e04"},
+    {"path": "semantic-hash-policy-v1.json", "sha256": "933707b11a4a2f75ea6e097cdba5b2089de6c36a3a8dddf7d94ab7b7aac01344"}
+  ],
+  "pilot_scan_authorized": false,
+  "full_scan_authorized": false,
+  "formal_shadow_authorized": false,
+  "rc2c_build_authorized": false,
+  "api_frontend_switch_authorized": false
+}

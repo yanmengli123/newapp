@@ -1,0 +1,34 @@
+{
+  "contract_id": "gg-gf-hmmer-semantic-hash-policy-1.0",
+  "schema_version": "1.0",
+  "hash_algorithm": "sha256",
+  "record_encoding": "utf-8",
+  "canonical_container": "json-array",
+  "json_object_keys_sorted": true,
+  "json_separators": [
+    ",",
+    ":"
+  ],
+  "unicode_normalization": "NFC",
+  "numeric_policy": {
+    "parser": "decimal_exact",
+    "finite_values_only": true,
+    "negative_zero_normalized_to_zero": true,
+    "canonical_form": "plain_decimal_without_insignificant_trailing_zeroes"
+  },
+  "null_policy": "preserve_as_json_null",
+  "description_whitespace_policy": "collapse_ascii_whitespace",
+  "record_sort_keys": [
+    "query_name",
+    "target_accession",
+    "domain_index",
+    "alignment_from",
+    "alignment_to",
+    "independent_evalue",
+    "domain_score"
+  ],
+  "raw_output_hash_is_semantic_hash": false,
+  "raw_output_hash_comparison_required": false,
+  "canonical_output_hash_comparison_required": true,
+  "semantic_hash_comparison_required": true
+}

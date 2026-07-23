@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.example/contracts/gene-family/rc2b2-p1/full-scan-authorization.schema.json",
+  "title": "RC2-B.2-P1 independent full-scan authorization decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "decision_id",
+    "package_id",
+    "decided_at_utc",
+    "decided_by",
+    "pilot_acceptance_sha256",
+    "p0_target_manifest_sha256",
+    "full_scan_authorized",
+    "decision",
+    "blocking_reasons",
+    "formal_shadow_authorized",
+    "rc2c_build_authorized",
+    "api_frontend_switch_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "decision_id": {"const": "gg-gf-rc2b2-p1-full-scan-authorization-v1"},
+    "package_id": {"const": "rc2b2-p1-full-scan-authorization-v001"},
+    "decided_at_utc": {"type": "string", "format": "date-time"},
+    "decided_by": {"type": "string", "minLength": 1},
+    "pilot_acceptance_sha256": {"$ref": "#/$defs/sha256"},
+    "p0_target_manifest_sha256": {"const": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6"},
+    "full_scan_authorized": {"type": "boolean"},
+    "decision": {"enum": ["authorized", "not_authorized"]},
+    "blocking_reasons": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "formal_shadow_authorized": {"const": false},
+    "rc2c_build_authorized": {"const": false},
+    "api_frontend_switch_authorized": {"const": false}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"full_scan_authorized": {"const": false}}},
+      "then": {
+        "properties": {
+          "decision": {"const": "not_authorized"},
+          "blocking_reasons": {"minItems": 1}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

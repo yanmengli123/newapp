@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.example/contracts/gene-family/rc2b2-p1/scan-environment-manifest.schema.json",
+  "title": "RC2-B.2-P1 frozen scan environment manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "environment_id",
+    "package_id",
+    "scan_environment_state",
+    "created_at_utc",
+    "p0_target_manifest_sha256",
+    "pilot_fixture_manifest_sha256",
+    "pfam_release",
+    "official_checksum_manifest_sha256",
+    "official_assets",
+    "pfam_model_count_total",
+    "pfam_model_count_with_ga",
+    "runtime",
+    "scan_commands",
+    "press_runs",
+    "pressed_index_reproducibility",
+    "source_pfam_directory_modified",
+    "source_modification_count",
+    "clan_resolution_state",
+    "pilot_scan_authorized",
+    "full_scan_authorized",
+    "formal_shadow_authorized",
+    "rc2c_build_authorized",
+    "api_frontend_switch_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "environment_id": {"const": "gg-gf-pfam35-hmmer34-pilot-environment-v1"},
+    "package_id": {"const": "rc2b2-p1-scan-environment-v001"},
+    "scan_environment_state": {"const": "frozen"},
+    "created_at_utc": {"type": "string", "format": "date-time"},
+    "p0_target_manifest_sha256": {
+      "const": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6"
+    },
+    "pilot_fixture_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "pfam_release": {"const": "35.0"},
+    "official_checksum_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "official_assets": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": {"$ref": "#/$defs/officialAsset"}
+    },
+    "pfam_model_count_total": {"const": 19632},
+    "pfam_model_count_with_ga": {"const": 19632},
+    "runtime": {"$ref": "#/$defs/runtime"},
+    "scan_commands": {"$ref": "#/$defs/scanCommands"},
+    "press_runs": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/commandExecution"}
+    },
+    "pressed_index_reproducibility": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {"$ref": "#/$defs/indexComparison"}
+    },
+    "source_pfam_directory_modified": {"const": false},
+    "source_modification_count": {"const": 0},
+    "clan_resolution_state": {"const": "policy_pending"},
+    "pilot_scan_authorized": {"const": false},
+    "full_scan_authorized": {"const": false},
+    "formal_shadow_authorized": {"const": false},
+    "rc2c_build_authorized": {"const": false},
+    "api_frontend_switch_authorized": {"const": false}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "md5": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "officialAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_name",
+        "official_url",
+        "release_id",
+        "retrieved_at_utc",
+        "byte_size",
+        "official_md5",
+        "observed_md5",
+        "compressed_sha256",
+        "uncompressed_sha256",
+        "verification_status"
+      ],
+      "properties": {
+        "artifact_name": {"type": "string", "minLength": 1},
+        "official_url": {"type": "string", "pattern": "^https://ftp\\.ebi\\.ac\\.uk/"},
+        "release_id": {"const": "Pfam 35.0"},
+        "retrieved_at_utc": {"type": "string", "format": "date-time"},
+        "byte_size": {"type": "integer", "minimum": 1},
+        "official_md5": {"oneOf": [{"$ref": "#/$defs/md5"}, {"type": "null"}]},
+        "observed_md5": {"$ref": "#/$defs/md5"},
+        "compressed_sha256": {"$ref": "#/$defs/sha256"},
+        "uncompressed_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "verification_status": {
+          "enum": ["official_md5_verified", "release_identity_anchor"]
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "container_runtime",
+        "container_runtime_version",
+        "image_reference",
+        "image_manifest_digest",
+        "immutable_image_reference",
+        "oci_platform",
+        "hmmer_version",
+        "hmmscan_binary_sha256",
+        "hmmpress_binary_sha256",
+        "environment"
+      ],
+      "properties": {
+        "container_runtime": {"const": "docker"},
+        "container_runtime_version": {"type": "string", "minLength": 1},
+        "image_reference": {"const": "quay.io/biocontainers/hmmer:3.4--hdbdd923_0"},
+        "image_manifest_digest": {"const": "sha256:85d118bad293e1a55372f80618512f72d939b14f6f62444fcd872f7c324fed0d"},
+        "immutable_image_reference": {"const": "quay.io/biocontainers/hmmer@sha256:85d118bad293e1a55372f80618512f72d939b14f6f62444fcd872f7c324fed0d"},
+        "oci_platform": {"const": "linux/amd64"},
+        "hmmer_version": {"const": "3.4"},
+        "hmmscan_binary_sha256": {"const": "a8fa3e42c6539289554a778a8218b4a8b789d761ed5191a93e40158e0be41a93"},
+        "hmmpress_binary_sha256": {"const": "9c081cc328be009f28ce3839b8baf090d282e219f9148dfa3c9590d0e2db7b5f"},
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["LC_ALL", "LANG", "TZ"],
+          "properties": {
+            "LC_ALL": {"const": "C"},
+            "LANG": {"const": "C"},
+            "TZ": {"const": "UTC"}
+          }
+        }
+      }
+    },
+    "scanCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command_argv", "command_text", "command_canonical_sha256", "execution_authorized"],
+      "properties": {
+        "command_argv": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+        "command_text": {"type": "string", "minLength": 1},
+        "command_canonical_sha256": {"$ref": "#/$defs/sha256"},
+        "execution_authorized": {"const": false}
+      }
+    },
+    "scanCommands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authoritative", "diagnostic"],
+      "properties": {
+        "authoritative": {"$ref": "#/$defs/scanCommand"},
+        "diagnostic": {"$ref": "#/$defs/scanCommand"}
+      }
+    },
+    "commandExecution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "command_argv",
+        "command_text",
+        "command_canonical_sha256",
+        "stdout_sha256",
+        "stderr_sha256",
+        "exit_code",
+        "started_at_utc",
+        "completed_at_utc"
+      ],
+      "properties": {
+        "run_id": {"enum": ["press-run-a", "press-run-b"]},
+        "command_argv": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+        "command_text": {"type": "string", "minLength": 1},
+        "command_canonical_sha256": {"$ref": "#/$defs/sha256"},
+        "stdout_sha256": {"$ref": "#/$defs/sha256"},
+        "stderr_sha256": {"$ref": "#/$defs/sha256"},
+        "exit_code": {"const": 0},
+        "started_at_utc": {"type": "string", "format": "date-time"},
+        "completed_at_utc": {"type": "string", "format": "date-time"}
+      }
+    },
+    "indexComparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["suffix", "run_a_sha256", "run_b_sha256", "hashes_equal"],
+      "properties": {
+        "suffix": {"enum": [".h3f", ".h3i", ".h3m", ".h3p"]},
+        "run_a_sha256": {"$ref": "#/$defs/sha256"},
+        "run_b_sha256": {"$ref": "#/$defs/sha256"},
+        "hashes_equal": {"const": true}
+      }
+    }
+  }
+}

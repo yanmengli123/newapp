@@ -1,0 +1,71 @@
+{
+  "contract_id": "gg-gf-pfam35-official-asset-policy-1.0",
+  "schema_version": "1.0",
+  "release_id": "Pfam 35.0",
+  "release_directory": "https://ftp.ebi.ac.uk/pub/databases/Pfam/releases/Pfam35.0",
+  "official_checksum_manifest": "md5_checksums",
+  "official_release_notes": "relnotes.txt",
+  "required_assets": [
+    {
+      "artifact_name": "md5_checksums",
+      "official_md5": null,
+      "official_byte_size": 1500,
+      "role": "official_checksum_manifest"
+    },
+    {
+      "artifact_name": "relnotes.txt",
+      "official_md5": "b892c7e636d5686f4a5b71c917111644",
+      "official_byte_size": 24988,
+      "role": "release_notes"
+    },
+    {
+      "artifact_name": "Pfam-A.hmm.gz",
+      "official_md5": "2cdbfbec0e3c6f0b1ecb6db1b8fc337f",
+      "official_byte_size": 293000230,
+      "role": "pfam_hmm_compressed"
+    },
+    {
+      "artifact_name": "Pfam-A.hmm.dat.gz",
+      "official_md5": "4e7d12ebd6fdda6f03db8761a43909a7",
+      "official_byte_size": 514890,
+      "role": "pfam_hmm_metadata"
+    },
+    {
+      "artifact_name": "Pfam-A.clans.tsv.gz",
+      "official_md5": "7710a3f8acbeeefbd6469e565a6202c8",
+      "official_byte_size": 358156,
+      "role": "pfam_clan_membership"
+    },
+    {
+      "artifact_name": "Pfam-A.dead.gz",
+      "official_md5": "31ae037a6c37f7583a8b445fc08e7668",
+      "official_byte_size": 23577,
+      "role": "pfam_dead_families"
+    },
+    {
+      "artifact_name": "Pfam-C.gz",
+      "official_md5": "ed1e849a44f496c0ac25f90641f708c9",
+      "official_byte_size": 170177,
+      "role": "pfam_clan_records"
+    }
+  ],
+  "uncompressed_hmm": {
+    "artifact_name": "Pfam-A.hmm",
+    "byte_size": 1572192814,
+    "sha256": "8d3e2ffa785f91ee0e24a3994d2dcfff6f382e3cf663784a47688e7d95297fee",
+    "model_count": 19632,
+    "model_count_with_ga": 19632
+  },
+  "release_note_required_text": [
+    "RELEASE 35.0",
+    "Release 35.0 contains a total of 19632 families"
+  ],
+  "cross_release_sidecar_mixing_allowed": false,
+  "identity_gate": {
+    "official_checksum_manifest_obtained": true,
+    "required_asset_md5_match_percent": 100,
+    "required_asset_byte_size_match_percent": 100,
+    "release_notes_archived": true,
+    "sidecar_release_consistency_percent": 100
+  }
+}

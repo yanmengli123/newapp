@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chickendata.example/contracts/gene-family/rc2b2-p1/pilot-authorization.schema.json",
+  "title": "RC2-B.2-P1 Pilot-only authorization",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "authorization_id",
+    "package_id",
+    "pilot_run_state",
+    "authorization_scope",
+    "issued_at_utc",
+    "authorized_by",
+    "scan_environment_manifest_sha256",
+    "pilot_fixture_manifest_sha256",
+    "p0_target_manifest_sha256",
+    "parser_contract_sha256",
+    "semantic_hash_policy_sha256",
+    "authoritative_command_sha256",
+    "diagnostic_command_sha256",
+    "full_scan_authorized",
+    "formal_shadow_authorized",
+    "rc2c_build_authorized",
+    "api_frontend_switch_authorized"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "authorization_id": {"const": "gg-gf-rc2b2-p1-pilot-authorization-v1"},
+    "package_id": {"const": "rc2b2-p1-pilot-authorization-v001"},
+    "pilot_run_state": {"const": "authorized"},
+    "authorization_scope": {"const": "pilot_fixture_set_only"},
+    "issued_at_utc": {"type": "string", "format": "date-time"},
+    "authorized_by": {"type": "string", "minLength": 1},
+    "scan_environment_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "pilot_fixture_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "p0_target_manifest_sha256": {"const": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6"},
+    "parser_contract_sha256": {"$ref": "#/$defs/sha256"},
+    "semantic_hash_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "authoritative_command_sha256": {"$ref": "#/$defs/sha256"},
+    "diagnostic_command_sha256": {"$ref": "#/$defs/sha256"},
+    "full_scan_authorized": {"const": false},
+    "formal_shadow_authorized": {"const": false},
+    "rc2c_build_authorized": {"const": false},
+    "api_frontend_switch_authorized": {"const": false}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

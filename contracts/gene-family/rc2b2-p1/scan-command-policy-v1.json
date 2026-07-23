@@ -1,0 +1,72 @@
+{
+  "contract_id": "gg-gf-pfam35-pilot-command-policy-1.0",
+  "schema_version": "1.0",
+  "authoritative": {
+    "evidence_role": "authoritative_ga",
+    "coverage_claim": "all_reported_hits_passing_model_ga_thresholds",
+    "command_argv": [
+      "hmmscan",
+      "--cut_ga",
+      "--acc",
+      "--noali",
+      "--cpu",
+      "1",
+      "--seed",
+      "42",
+      "--qformat",
+      "fasta",
+      "-o",
+      "authoritative.main.out",
+      "--tblout",
+      "authoritative.tblout",
+      "--domtblout",
+      "authoritative.domtblout",
+      "/db/Pfam-A.hmm",
+      "/input/pilot.fasta"
+    ],
+    "can_support_accepted": true
+  },
+  "pilot_diagnostic": {
+    "evidence_role": "diagnostic_only",
+    "coverage_claim": "non_exhaustive_reported_hits",
+    "command_argv": [
+      "hmmscan",
+      "--max",
+      "--acc",
+      "--noali",
+      "--cpu",
+      "1",
+      "--seed",
+      "42",
+      "--qformat",
+      "fasta",
+      "-E",
+      "1000",
+      "--domE",
+      "1000",
+      "-o",
+      "diagnostic.main.out",
+      "--tblout",
+      "diagnostic.tblout",
+      "--domtblout",
+      "diagnostic.domtblout",
+      "/db/Pfam-A.hmm",
+      "/input/pilot.fasta"
+    ],
+    "approved_postparse_domain_score_floor": "0",
+    "can_support_accepted": false
+  },
+  "full_scan_diagnostic_template": {
+    "execution_authorized": false,
+    "max_acceleration_disabled": false,
+    "coverage_claim": "non_exhaustive_reported_hits",
+    "evalue_threshold": "1000",
+    "domain_evalue_threshold": "1000"
+  },
+  "raw_authoritative_product": "raw-authoritative-ga-hits.tsv",
+  "raw_diagnostic_product": "reported-diagnostic-hits.tsv",
+  "reported_below_ga_product": "reported-below-ga-hits.tsv",
+  "clan_resolution_state": "policy_pending",
+  "raw_hits_are_final_domain_architecture": false,
+  "diagnostic_can_independently_support_accepted": false
+}

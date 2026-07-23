@@ -1,0 +1,35 @@
+{
+  "contract_id": "gg-gf-rc2b2-p1-state-machine-1.0",
+  "schema_version": "1.0",
+  "scan_environment_states": [
+    "draft_missing_inputs",
+    "frozen"
+  ],
+  "pilot_run_states": [
+    "draft",
+    "authorized",
+    "running",
+    "completed",
+    "failed"
+  ],
+  "pilot_acceptance_states": [
+    "pending",
+    "passed",
+    "failed"
+  ],
+  "full_scan_authorized_states": [
+    false,
+    true
+  ],
+  "required_transition_order": [
+    "scan_environment_state=frozen",
+    "independent_pilot_authorization",
+    "pilot_run_state=completed",
+    "independent_pilot_acceptance",
+    "pilot_acceptance_state=passed",
+    "independent_full_scan_authorization",
+    "full_scan_authorized=true"
+  ],
+  "implicit_downstream_transition_allowed": false,
+  "pilot_acceptance_implies_full_scan_authorization": false
+}
