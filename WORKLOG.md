@@ -2,6 +2,15 @@
 
 ## 2026-07-23
 
+- **Gene Families Tab v1.0.1 frozen-scope defect fix**: corrected Pfam domain
+  scaling with observed protein lengths and explicit unknown-length local
+  windows; exposed the two unresolved KCTD12 source assertions without
+  inventing mappings; made entry capabilities truthful; and established a
+  runtime-derived 12-route repository OpenAPI contract. All 67 Gene Families
+  backend tests, production build, ESLint, pure contract tests and four Chrome
+  visual/geometry regressions passed. RC1 and frozen P0/P1 artifacts remained
+  byte-identical; RC1 remains QC-blocked and non-citable. See
+  `docs/gene-family/GENE_FAMILY_TAB_V1_0_1_DEFECT_FIX.md`.
 - **Gene Families Tab v1.0 feature freeze**: page engineering is complete and
   the feature surface is frozen at `gene-family-tab-v1.0-feature-freeze`.
   Production build, TypeScript, targeted ESLint, API contract, read-only API

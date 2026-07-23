@@ -4,6 +4,9 @@ Freeze status: `engineering_complete / feature_frozen`
 
 Freeze tag: `gene-family-tab-v1.0-feature-freeze`
 
+Frozen-scope defect addendum:
+[v1.0.1 defect fix](GENE_FAMILY_TAB_V1_0_1_DEFECT_FIX.md)
+
 Validation completed: `2026-07-23T01:03:53Z`
 
 Parent engineering baseline: `1ef982693d7958f99667982fda0fe7e44e61d40f`
