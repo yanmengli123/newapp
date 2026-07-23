@@ -40,6 +40,7 @@ gate.
 
 Engineering execution records:
 
+- [Gene Families Tab v1.0 feature freeze](../GENE_FAMILY_TAB_FEATURE_FREEZE.md)
 - [RC2-B shadow preparation](RC2_B_SHADOW_PREPARATION.md)
 - [RC2-B.1 scientific handoff](RC2_B1_SCIENTIFIC_HANDOFF.md)
 - [RC2-B.2 P0 readiness freeze](RC2_B2_READINESS_FREEZE.md)

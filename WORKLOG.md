@@ -1,5 +1,15 @@
 # Worklog
 
+## 2026-07-23
+
+- **Gene Families Tab v1.0 feature freeze**: page engineering is complete and
+  the feature surface is frozen at `gene-family-tab-v1.0-feature-freeze`.
+  Production build, TypeScript, targeted ESLint, API contract, read-only API
+  smoke tests and all 62 Gene Families backend tests passed. The active data
+  remains `gg-gf-2026-07-rc1` (`release_candidate`, `qc_status=blocked`, five
+  blocking checks); no RC2 data switch or scientific publication is authorized.
+  See `docs/gene-family/GENE_FAMILY_TAB_FEATURE_FREEZE.md`.
+
 ## 2026-07-22
 
 - **Port separation**: 5173 is occupied by another project's nginx (Rice Endosperm Development). Switched newapp frontend to 5174 with `strictPort: true` in `vite.config.ts`. See `logs/frontend-restart.log` and `logs/backend-restart.log` for the full session.
