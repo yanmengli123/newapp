@@ -2,6 +2,11 @@
 
 ## 2026-07-23
 
+- **Gene Families primary navigation**: following explicit user authorization,
+  promoted `/gene-families` from the Annotations submenu to a direct
+  `Gene Families` header tab and removed the duplicate submenu item. This is a
+  navigation-only scope exception after feature freeze; no page, API,
+  classification or release data changed.
 - **Gene Families Tab v1.0.1 frozen-scope defect fix**: corrected Pfam domain
   scaling with observed protein lengths and explicit unknown-length local
   windows; exposed the two unresolved KCTD12 source assertions without

@@ -77,6 +77,15 @@ async function waitForHttp(url, child, timeoutMs = 45_000) {
   throw new Error(`Timed out waiting for ${url}: ${lastError}\n${child.testOutput.join('')}`);
 }
 
+async function httpIsHealthy(url) {
+  try {
+    const response = await fetch(url);
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 function compareSnapshot(name, actualBuffer) {
   const baselinePath = path.join(baselineDir, `${name}.png`);
   const actualPath = path.join(resultDir, `${name}.actual.png`);
@@ -176,20 +185,25 @@ async function mockEntryEvidence(page, responseBody) {
 
 async function run() {
   const python = process.env.GENE_FAMILY_PYTHON || 'D:\\soft\\Python310\\python.exe';
-  const backend = startProcess(
-    python,
-    ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', '8001', '--lifespan', 'off'],
-    'Gene Families backend',
-    { PYTHONDONTWRITEBYTECODE: '1' },
-  );
-  const vite = startProcess(
-    process.execPath,
-    [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1'],
-    'newapp Vite server',
-  );
-
-  await waitForHttp(`${backendBase}/api/v1/gene-family-catalog/releases/current`, backend);
-  await waitForHttp(`${frontendBase}/gene-families`, vite);
+  const backendHealthUrl = `${backendBase}/api/v1/gene-family-catalog/releases/current`;
+  const frontendHealthUrl = `${frontendBase}/gene-families`;
+  if (!(await httpIsHealthy(backendHealthUrl))) {
+    const backend = startProcess(
+      python,
+      ['-m', 'uvicorn', 'backend.main:app', '--host', '127.0.0.1', '--port', '8001', '--lifespan', 'off'],
+      'Gene Families backend',
+      { PYTHONDONTWRITEBYTECODE: '1' },
+    );
+    await waitForHttp(backendHealthUrl, backend);
+  }
+  if (!(await httpIsHealthy(frontendHealthUrl))) {
+    const vite = startProcess(
+      process.execPath,
+      [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1'],
+      'newapp Vite server',
+    );
+    await waitForHttp(frontendHealthUrl, vite);
+  }
 
   const evidenceResponse = await fetch(
     `${backendBase}/api/v1/gene-family-catalog/entries/${encodedEntryId}/evidence?limit=50`,
@@ -204,6 +218,28 @@ async function run() {
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+
+    const navigationPage = await context.newPage();
+    await navigationPage.goto(frontendBase, { waitUntil: 'networkidle' });
+    const geneFamiliesTab = navigationPage.getByRole('link', { name: 'Gene Families', exact: true });
+    await geneFamiliesTab.waitFor({ state: 'visible' });
+    assert.equal(await geneFamiliesTab.getAttribute('href'), '/gene-families');
+    await geneFamiliesTab.click();
+    await navigationPage.waitForURL(`${frontendBase}/gene-families`);
+    await navigationPage.getByRole('heading', {
+      name: 'Gene, Protein Family & Domain Annotation Catalog',
+    }).waitFor({ state: 'visible' });
+
+    const compactNavigationPage = await context.newPage();
+    await compactNavigationPage.setViewportSize({ width: 1024, height: 800 });
+    await compactNavigationPage.goto(frontendBase, { waitUntil: 'networkidle' });
+    await compactNavigationPage.getByRole('button', { name: 'Navigation' }).click();
+    const compactGeneFamiliesLink = compactNavigationPage.getByRole('menuitem', {
+      name: 'Gene Families',
+      exact: true,
+    });
+    await compactGeneFamiliesLink.waitFor({ state: 'visible' });
+    assert.equal(await compactGeneFamiliesLink.getAttribute('href'), '/gene-families');
 
     const searchPage = await context.newPage();
     await searchPage.goto(`${frontendBase}/gene-families`, { waitUntil: 'networkidle' });
