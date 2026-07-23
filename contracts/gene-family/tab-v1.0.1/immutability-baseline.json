@@ -1,0 +1,35 @@
+{
+  "baseline_id": "gene-family-tab-v1.0.1-immutability-baseline",
+  "schema_version": "1.0",
+  "feature_freeze_commit": "64e325c662484d56ed59e035af6da5b11e74aa32",
+  "feature_freeze_tag": "gene-family-tab-v1.0-feature-freeze",
+  "active_release_id": "gg-gf-2026-07-rc1",
+  "active_release": {
+    "sqlite_path": "D:/jbrowsedata/projectdata/gene family/releases/gg-gf-2026-07-rc1/gene_family.sqlite",
+    "sqlite_sha256": "b590a0bfd9d81b41bbf044eb7daba08f241c9a959362d59f06de8142ac84ad97",
+    "checksums_path": "D:/jbrowsedata/projectdata/gene family/releases/gg-gf-2026-07-rc1/checksums.sha256",
+    "checksums_sha256": "e17720f5a3c7d6454d0f5891a0761d83599188db2ab0ebb5a6ed6b95270544fc",
+    "source_inventory_path": "D:/jbrowsedata/projectdata/gene family/releases/gg-gf-2026-07-rc1/source_inventory.tsv",
+    "source_inventory_sha256": "9ffa73f36a7575a12b58b7e0daf45371093a38bb08bd432dc0681f7182ffd667",
+    "verified_source_files": 20,
+    "verified_release_checksums": 15
+  },
+  "frozen_rc2_inputs": {
+    "p0_target_manifest_path": "D:/jbrowsedata/projectdata/gene family/analysis/rc2b2-curation-submission-v001/target-universe/target-universe-manifest.json",
+    "p0_target_manifest_sha256": "1f74a288c9fcbf3d552fcd01145bb430b615652797057eb8784ea245f636b3e6",
+    "pilot_acceptance_path": "D:/jbrowsedata/projectdata/gene family/analysis/rc2b2-p1-pilot-acceptance-v001/pilot-acceptance.json",
+    "pilot_acceptance_sha256": "bbe542511175a6579c7e94abae586a044f051c8bdd2f3859b71cedd1b61ca3d4",
+    "full_scan_authorization_path": "D:/jbrowsedata/projectdata/gene family/analysis/rc2b2-p1-full-scan-authorization-v001/full-scan-authorization.json",
+    "full_scan_authorization_sha256": "32839179432a6e6a3254bfc1cc7735f1b9a85d4422d65f2b27dae9557157a5b4",
+    "full_scan_authorized": false,
+    "formal_shadow_authorized": false,
+    "rc2c_build_authorized": false,
+    "api_frontend_switch_authorized": false
+  },
+  "mutation_policy": {
+    "rc1_sqlite": "read_only",
+    "rc1_source_files": "read_only",
+    "rc1_release_package": "read_only",
+    "p0_p1_frozen_inputs": "read_only"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "contract_version": "1.0.1",
+  "generation": "FastAPI app.openapi() filtered to Gene Families namespaces",
+  "http_methods": ["get"],
+  "namespaces": [
+    "/api/v1/gene-family-catalog",
+    "/api/v1/genes/{internal_gene_id}/family-annotations",
+    "/api/v1/proteins/{protein_id}/domain-hits"
+  ],
+  "normalization": {
+    "json_object_keys": "lexicographic",
+    "paths": "lexicographic",
+    "schema_reference_closure": true,
+    "path_parameter_names": "preserved",
+    "nullable_and_enum_constraints": "preserved",
+    "response_content_types": "preserved"
+  },
+  "comparison": "byte-identical canonical JSON after runtime extraction",
+  "immutable_rc1_release_openapi_modified": false
+}

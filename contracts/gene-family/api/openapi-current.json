@@ -1,0 +1,3656 @@
+{
+  "components": {
+    "schemas": {
+      "AssertionDetail": {
+        "additionalProperties": true,
+        "properties": {
+          "assertion_id": {
+            "title": "Assertion Id",
+            "type": "string"
+          },
+          "assertion_state": {
+            "enum": [
+              "accepted",
+              "candidate",
+              "unresolved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Assertion State",
+            "type": "string"
+          },
+          "assignment_role": {
+            "enum": [
+              "primary",
+              "secondary",
+              "supplementary"
+            ],
+            "title": "Assignment Role",
+            "type": "string"
+          },
+          "ensembl_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ensembl Gene Id"
+          },
+          "entry_accession": {
+            "title": "Entry Accession",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_name": {
+            "title": "Entry Name",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/AssertionEvidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "internal_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Gene Id"
+          },
+          "mapping_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping Method"
+          },
+          "mapping_state": {
+            "enum": [
+              "exact",
+              "ambiguous",
+              "unmapped"
+            ],
+            "title": "Mapping State",
+            "type": "string"
+          },
+          "ncbi_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncbi Gene Id"
+          },
+          "protein_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Accession"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          },
+          "representative_protein_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Representative Protein Id"
+          },
+          "review_events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Review Events",
+            "type": "array"
+          },
+          "review_state": {
+            "enum": [
+              "not_required",
+              "unreviewed",
+              "in_review",
+              "approved",
+              "rejected",
+              "needs_mapping"
+            ],
+            "title": "Review State",
+            "type": "string"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "subject_pk": {
+            "title": "Subject Pk",
+            "type": "integer"
+          },
+          "subject_type": {
+            "enum": [
+              "gene",
+              "protein"
+            ],
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "support_tier": {
+            "title": "Support Tier",
+            "type": "string"
+          },
+          "transcript_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript Accession"
+          }
+        },
+        "required": [
+          "assertion_id",
+          "release_id",
+          "scheme_id",
+          "entry_id",
+          "entry_accession",
+          "entry_name",
+          "entry_type",
+          "assignment_role",
+          "assertion_state",
+          "support_tier",
+          "review_state",
+          "subject_pk",
+          "subject_type",
+          "mapping_state",
+          "evidence",
+          "review_events"
+        ],
+        "title": "AssertionDetail",
+        "type": "object"
+      },
+      "AssertionEvidence": {
+        "additionalProperties": true,
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "domain_ievalue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Ievalue"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "evidence_rank": {
+            "title": "Evidence Rank",
+            "type": "integer"
+          },
+          "evidence_role": {
+            "title": "Evidence Role",
+            "type": "string"
+          },
+          "evidence_type": {
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "model_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Accession"
+          },
+          "payload_json": {
+            "title": "Payload Json",
+            "type": "string"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sequence_evalue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence Evalue"
+          },
+          "source_file": {
+            "title": "Source File",
+            "type": "string"
+          },
+          "source_file_id": {
+            "title": "Source File Id",
+            "type": "integer"
+          },
+          "source_record_id": {
+            "title": "Source Record Id",
+            "type": "string"
+          },
+          "threshold_pass": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Pass"
+          },
+          "threshold_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Type"
+          },
+          "threshold_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Value"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "release_id",
+          "evidence_type",
+          "source_file_id",
+          "source_record_id",
+          "method",
+          "payload_json",
+          "source_file",
+          "evidence_role",
+          "evidence_rank"
+        ],
+        "title": "AssertionEvidence",
+        "type": "object"
+      },
+      "AvailableSections": {
+        "additionalProperties": true,
+        "properties": {
+          "change_history": {
+            "title": "Change History",
+            "type": "boolean"
+          },
+          "domain_architecture": {
+            "title": "Domain Architecture",
+            "type": "boolean"
+          },
+          "expression_profile": {
+            "title": "Expression Profile",
+            "type": "boolean"
+          },
+          "genomic_distribution": {
+            "title": "Genomic Distribution",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "domain_architecture",
+          "expression_profile",
+          "genomic_distribution",
+          "change_history"
+        ],
+        "title": "AvailableSections",
+        "type": "object"
+      },
+      "BlockingCheck": {
+        "additionalProperties": true,
+        "properties": {
+          "check_name": {
+            "title": "Check Name",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "expected_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Value"
+          },
+          "observed_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Value"
+          }
+        },
+        "required": [
+          "check_name"
+        ],
+        "title": "BlockingCheck",
+        "type": "object"
+      },
+      "CatalogEntry": {
+        "additionalProperties": true,
+        "properties": {
+          "accepted_genes": {
+            "title": "Accepted Genes",
+            "type": "integer"
+          },
+          "accepted_proteins": {
+            "title": "Accepted Proteins",
+            "type": "integer"
+          },
+          "accession": {
+            "title": "Accession",
+            "type": "string"
+          },
+          "assertion_states": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "accepted",
+                "candidate",
+                "unresolved",
+                "rejected",
+                "withdrawn"
+              ]
+            },
+            "title": "Assertion States",
+            "type": "object"
+          },
+          "available_sections": {
+            "$ref": "#/components/schemas/AvailableSections"
+          },
+          "candidate_genes": {
+            "title": "Candidate Genes",
+            "type": "integer"
+          },
+          "candidate_proteins": {
+            "title": "Candidate Proteins",
+            "type": "integer"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/EntryChild"
+            },
+            "title": "Children",
+            "type": "array"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "evidence_coverage": {
+            "title": "Evidence Coverage",
+            "type": "number"
+          },
+          "external_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Url"
+          },
+          "is_active": {
+            "title": "Is Active",
+            "type": "integer"
+          },
+          "mapping_coverage": {
+            "title": "Mapping Coverage",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Entry Id"
+          },
+          "parent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Name"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "scheme_name": {
+            "title": "Scheme Name",
+            "type": "string"
+          },
+          "source_name": {
+            "title": "Source Name",
+            "type": "string"
+          },
+          "source_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Version"
+          },
+          "subject_level": {
+            "enum": [
+              "gene",
+              "protein",
+              "mixed"
+            ],
+            "title": "Subject Level",
+            "type": "string"
+          },
+          "support_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/SupportTierCount"
+            },
+            "title": "Support Tiers",
+            "type": "array"
+          },
+          "unresolved_genes": {
+            "title": "Unresolved Genes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_id",
+          "scheme_id",
+          "accession",
+          "name",
+          "entry_type",
+          "is_active",
+          "scheme_name",
+          "source_name",
+          "subject_level",
+          "accepted_genes",
+          "candidate_genes",
+          "unresolved_genes",
+          "accepted_proteins",
+          "candidate_proteins",
+          "evidence_coverage",
+          "mapping_coverage",
+          "children",
+          "assertion_states",
+          "support_tiers",
+          "available_sections"
+        ],
+        "title": "CatalogEntry",
+        "type": "object"
+      },
+      "CatalogMember": {
+        "additionalProperties": true,
+        "properties": {
+          "assertion_id": {
+            "title": "Assertion Id",
+            "type": "string"
+          },
+          "assertion_state": {
+            "enum": [
+              "accepted",
+              "candidate",
+              "unresolved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Assertion State",
+            "type": "string"
+          },
+          "assignment_role": {
+            "enum": [
+              "primary",
+              "secondary",
+              "supplementary"
+            ],
+            "title": "Assignment Role",
+            "type": "string"
+          },
+          "ensembl_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ensembl Gene Id"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "evidence_count": {
+            "title": "Evidence Count",
+            "type": "integer"
+          },
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "internal_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Gene Id"
+          },
+          "internal_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Url"
+          },
+          "mapping_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapping Method"
+          },
+          "mapping_state": {
+            "enum": [
+              "exact",
+              "ambiguous",
+              "unmapped"
+            ],
+            "title": "Mapping State",
+            "type": "string"
+          },
+          "ncbi_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncbi Gene Id"
+          },
+          "protein_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Accession"
+          },
+          "protein_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Length"
+          },
+          "representative_protein_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Representative Protein Id"
+          },
+          "review_state": {
+            "enum": [
+              "not_required",
+              "unreviewed",
+              "in_review",
+              "approved",
+              "rejected",
+              "needs_mapping"
+            ],
+            "title": "Review State",
+            "type": "string"
+          },
+          "rule_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rule Id"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "subject_type": {
+            "enum": [
+              "gene",
+              "protein"
+            ],
+            "title": "Subject Type",
+            "type": "string"
+          },
+          "support_tier": {
+            "title": "Support Tier",
+            "type": "string"
+          },
+          "transcript_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript Accession"
+          }
+        },
+        "required": [
+          "assertion_id",
+          "scheme_id",
+          "entry_id",
+          "assignment_role",
+          "assertion_state",
+          "support_tier",
+          "review_state",
+          "subject_type",
+          "mapping_state",
+          "evidence_count"
+        ],
+        "title": "CatalogMember",
+        "type": "object"
+      },
+      "CatalogRelease": {
+        "additionalProperties": true,
+        "properties": {
+          "annotation_release": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Release"
+          },
+          "assembly_accession": {
+            "title": "Assembly Accession",
+            "type": "string"
+          },
+          "assembly_name": {
+            "title": "Assembly Name",
+            "type": "string"
+          },
+          "blocking_checks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockingCheck"
+            },
+            "title": "Blocking Checks",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "etl_git_commit": {
+            "title": "Etl Git Commit",
+            "type": "string"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "previous_release_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Release Id"
+          },
+          "proteome_source": {
+            "title": "Proteome Source",
+            "type": "string"
+          },
+          "proteome_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proteome Version"
+          },
+          "qc": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qc"
+          },
+          "qc_status": {
+            "enum": [
+              "pending",
+              "passed",
+              "warning",
+              "blocked"
+            ],
+            "title": "Qc Status",
+            "type": "string"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          },
+          "release_status": {
+            "enum": [
+              "release_candidate",
+              "published",
+              "withdrawn"
+            ],
+            "title": "Release Status",
+            "type": "string"
+          },
+          "schema_version": {
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "species_name": {
+            "title": "Species Name",
+            "type": "string"
+          },
+          "taxon_id": {
+            "title": "Taxon Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "release_id",
+          "schema_version",
+          "release_status",
+          "taxon_id",
+          "species_name",
+          "assembly_accession",
+          "assembly_name",
+          "proteome_source",
+          "created_at",
+          "etl_git_commit",
+          "qc_status"
+        ],
+        "title": "CatalogRelease",
+        "type": "object"
+      },
+      "CatalogSearchResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/SearchEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "genes": {
+            "items": {
+              "$ref": "#/components/schemas/SearchGene"
+            },
+            "title": "Genes",
+            "type": "array"
+          },
+          "proteins": {
+            "items": {
+              "$ref": "#/components/schemas/SearchProtein"
+            },
+            "title": "Proteins",
+            "type": "array"
+          },
+          "query": {
+            "title": "Query",
+            "type": "string"
+          },
+          "source_assertions": {
+            "items": {
+              "$ref": "#/components/schemas/SearchSourceAssertion"
+            },
+            "title": "Source Assertions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "query",
+          "entries",
+          "genes",
+          "proteins",
+          "source_assertions"
+        ],
+        "title": "CatalogSearchResponse",
+        "type": "object"
+      },
+      "CatalogSummary": {
+        "additionalProperties": true,
+        "properties": {
+          "release": {
+            "$ref": "#/components/schemas/CatalogRelease"
+          },
+          "schemes": {
+            "items": {
+              "$ref": "#/components/schemas/SchemeSummary"
+            },
+            "title": "Schemes",
+            "type": "array"
+          },
+          "top_entries": {
+            "items": {
+              "$ref": "#/components/schemas/TopEntry"
+            },
+            "title": "Top Entries",
+            "type": "array"
+          },
+          "unique_annotated_genes": {
+            "title": "Unique Annotated Genes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "release",
+          "unique_annotated_genes",
+          "schemes",
+          "top_entries"
+        ],
+        "title": "CatalogSummary",
+        "type": "object"
+      },
+      "CursorMeta": {
+        "additionalProperties": true,
+        "properties": {
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit"
+        ],
+        "title": "CursorMeta",
+        "type": "object"
+      },
+      "DomainHit": {
+        "additionalProperties": true,
+        "properties": {
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "ali_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ali From"
+          },
+          "ali_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ali To"
+          },
+          "assertion_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assertion Id"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "domain_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Index"
+          },
+          "domain_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Score"
+          },
+          "domain_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Total"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "env_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env From"
+          },
+          "env_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env To"
+          },
+          "independent_evalue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Independent Evalue"
+          },
+          "internal_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Gene Id"
+          },
+          "pfam_accession": {
+            "title": "Pfam Accession",
+            "type": "string"
+          },
+          "pfam_name": {
+            "title": "Pfam Name",
+            "type": "string"
+          },
+          "protein_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Accession"
+          },
+          "protein_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Length"
+          },
+          "threshold_pass": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Pass"
+          }
+        },
+        "required": [
+          "pfam_accession",
+          "pfam_name"
+        ],
+        "title": "DomainHit",
+        "type": "object"
+      },
+      "EntryChild": {
+        "additionalProperties": true,
+        "properties": {
+          "accession": {
+            "title": "Accession",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "accession",
+          "name",
+          "entry_type"
+        ],
+        "title": "EntryChild",
+        "type": "object"
+      },
+      "EntryListMeta": {
+        "additionalProperties": true,
+        "properties": {
+          "include_candidates": {
+            "title": "Include Candidates",
+            "type": "boolean"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          },
+          "sort": {
+            "enum": [
+              "accepted_genes",
+              "candidate_genes",
+              "name"
+            ],
+            "title": "Sort",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "unit": {
+            "const": "catalog_entries",
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "release_id",
+          "unit",
+          "sort",
+          "include_candidates"
+        ],
+        "title": "EntryListMeta",
+        "type": "object"
+      },
+      "EntryListResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EntrySummary"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/EntryListMeta"
+          }
+        },
+        "required": [
+          "meta",
+          "data"
+        ],
+        "title": "EntryListResponse",
+        "type": "object"
+      },
+      "EntrySummary": {
+        "additionalProperties": true,
+        "properties": {
+          "accepted_assertions": {
+            "title": "Accepted Assertions",
+            "type": "integer"
+          },
+          "accepted_genes": {
+            "title": "Accepted Genes",
+            "type": "integer"
+          },
+          "accepted_proteins": {
+            "title": "Accepted Proteins",
+            "type": "integer"
+          },
+          "accession": {
+            "title": "Accession",
+            "type": "string"
+          },
+          "candidate_assertions": {
+            "title": "Candidate Assertions",
+            "type": "integer"
+          },
+          "candidate_genes": {
+            "title": "Candidate Genes",
+            "type": "integer"
+          },
+          "candidate_proteins": {
+            "title": "Candidate Proteins",
+            "type": "integer"
+          },
+          "definition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Definition"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "evidence_coverage": {
+            "title": "Evidence Coverage",
+            "type": "number"
+          },
+          "external_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Url"
+          },
+          "mapping_coverage": {
+            "title": "Mapping Coverage",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "parent_entry_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Entry Id"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "scheme_name": {
+            "title": "Scheme Name",
+            "type": "string"
+          },
+          "unresolved_genes": {
+            "title": "Unresolved Genes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_id",
+          "scheme_id",
+          "scheme_name",
+          "accession",
+          "name",
+          "entry_type",
+          "accepted_genes",
+          "candidate_genes",
+          "unresolved_genes",
+          "accepted_proteins",
+          "candidate_proteins",
+          "evidence_coverage",
+          "mapping_coverage",
+          "accepted_assertions",
+          "candidate_assertions"
+        ],
+        "title": "EntrySummary",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      },
+      "EvidenceListResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRecord"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/CursorMeta"
+          }
+        },
+        "required": [
+          "meta",
+          "data"
+        ],
+        "title": "EvidenceListResponse",
+        "type": "object"
+      },
+      "EvidenceRecord": {
+        "additionalProperties": true,
+        "properties": {
+          "ali_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ali From"
+          },
+          "ali_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ali To"
+          },
+          "assertion_id": {
+            "title": "Assertion Id",
+            "type": "string"
+          },
+          "assertion_state": {
+            "enum": [
+              "accepted",
+              "candidate",
+              "unresolved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Assertion State",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "domain_ievalue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Ievalue"
+          },
+          "domain_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Index"
+          },
+          "domain_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Total"
+          },
+          "env_from": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env From"
+          },
+          "env_to": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Env To"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "evidence_rank": {
+            "title": "Evidence Rank",
+            "type": "integer"
+          },
+          "evidence_role": {
+            "title": "Evidence Role",
+            "type": "string"
+          },
+          "evidence_type": {
+            "title": "Evidence Type",
+            "type": "string"
+          },
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "internal_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Gene Id"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "model_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Accession"
+          },
+          "protein_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Accession"
+          },
+          "protein_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Length"
+          },
+          "protein_length_status": {
+            "enum": [
+              "observed",
+              "not_reported"
+            ],
+            "title": "Protein Length Status",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "sequence_evalue": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence Evalue"
+          },
+          "source_file": {
+            "title": "Source File",
+            "type": "string"
+          },
+          "source_record_id": {
+            "title": "Source Record Id",
+            "type": "string"
+          },
+          "threshold_pass": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Pass"
+          },
+          "threshold_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Type"
+          },
+          "threshold_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Value"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "evidence_type",
+          "source_record_id",
+          "source_file",
+          "method",
+          "evidence_role",
+          "evidence_rank",
+          "assertion_id",
+          "assertion_state",
+          "protein_length_status"
+        ],
+        "title": "EvidenceRecord",
+        "type": "object"
+      },
+      "GeneAnnotationSummary": {
+        "additionalProperties": true,
+        "properties": {
+          "candidate_count": {
+            "title": "Candidate Count",
+            "type": "integer"
+          },
+          "classification_count": {
+            "title": "Classification Count",
+            "type": "integer"
+          },
+          "domain_hit_count": {
+            "title": "Domain Hit Count",
+            "type": "integer"
+          },
+          "protein_count": {
+            "title": "Protein Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "classification_count",
+          "protein_count",
+          "domain_hit_count",
+          "candidate_count"
+        ],
+        "title": "GeneAnnotationSummary",
+        "type": "object"
+      },
+      "GeneClassification": {
+        "additionalProperties": true,
+        "properties": {
+          "accession": {
+            "title": "Accession",
+            "type": "string"
+          },
+          "assertion_id": {
+            "title": "Assertion Id",
+            "type": "string"
+          },
+          "assertion_state": {
+            "enum": [
+              "accepted",
+              "candidate",
+              "unresolved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Assertion State",
+            "type": "string"
+          },
+          "assignment_role": {
+            "enum": [
+              "primary",
+              "secondary",
+              "supplementary"
+            ],
+            "title": "Assignment Role",
+            "type": "string"
+          },
+          "ensembl_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ensembl Gene Id"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_name": {
+            "title": "Entry Name",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "evidence_count": {
+            "title": "Evidence Count",
+            "type": "integer"
+          },
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "ncbi_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncbi Gene Id"
+          },
+          "representative_protein_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Representative Protein Id"
+          },
+          "review_state": {
+            "enum": [
+              "not_required",
+              "unreviewed",
+              "in_review",
+              "approved",
+              "rejected",
+              "needs_mapping"
+            ],
+            "title": "Review State",
+            "type": "string"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "scheme_name": {
+            "title": "Scheme Name",
+            "type": "string"
+          },
+          "support_tier": {
+            "title": "Support Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assertion_id",
+          "scheme_id",
+          "scheme_name",
+          "entry_id",
+          "accession",
+          "entry_name",
+          "entry_type",
+          "assignment_role",
+          "assertion_state",
+          "support_tier",
+          "review_state",
+          "evidence_count"
+        ],
+        "title": "GeneClassification",
+        "type": "object"
+      },
+      "GeneFamilyAnnotations": {
+        "additionalProperties": true,
+        "properties": {
+          "classifications": {
+            "items": {
+              "$ref": "#/components/schemas/GeneClassification"
+            },
+            "title": "Classifications",
+            "type": "array"
+          },
+          "internal_gene_id": {
+            "title": "Internal Gene Id",
+            "type": "string"
+          },
+          "proteins": {
+            "items": {
+              "$ref": "#/components/schemas/ProteinArchitecture"
+            },
+            "title": "Proteins",
+            "type": "array"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/GeneAnnotationSummary"
+          }
+        },
+        "required": [
+          "release_id",
+          "internal_gene_id",
+          "summary",
+          "classifications",
+          "proteins"
+        ],
+        "title": "GeneFamilyAnnotations",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MemberListMeta": {
+        "additionalProperties": true,
+        "properties": {
+          "include_candidates": {
+            "title": "Include Candidates",
+            "type": "boolean"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "limit",
+          "include_candidates"
+        ],
+        "title": "MemberListMeta",
+        "type": "object"
+      },
+      "MemberListResponse": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogMember"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/MemberListMeta"
+          }
+        },
+        "required": [
+          "meta",
+          "data"
+        ],
+        "title": "MemberListResponse",
+        "type": "object"
+      },
+      "ProteinArchitecture": {
+        "additionalProperties": true,
+        "properties": {
+          "domain_hits": {
+            "items": {
+              "$ref": "#/components/schemas/DomainHit"
+            },
+            "title": "Domain Hits",
+            "type": "array"
+          },
+          "protein_id": {
+            "title": "Protein Id",
+            "type": "string"
+          },
+          "protein_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Length"
+          },
+          "transcript_accession": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript Accession"
+          }
+        },
+        "required": [
+          "protein_id",
+          "domain_hits"
+        ],
+        "title": "ProteinArchitecture",
+        "type": "object"
+      },
+      "ProteinDomainHits": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DomainHit"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "protein_id": {
+            "title": "Protein Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "protein_id",
+          "total",
+          "data"
+        ],
+        "title": "ProteinDomainHits",
+        "type": "object"
+      },
+      "ReleaseAsset": {
+        "additionalProperties": true,
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "integer"
+          },
+          "asset_name": {
+            "title": "Asset Name",
+            "type": "string"
+          },
+          "byte_size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Byte Size"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "download_url": {
+            "title": "Download Url",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "relative_path": {
+            "title": "Relative Path",
+            "type": "string"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256"
+          }
+        },
+        "required": [
+          "asset_id",
+          "release_id",
+          "asset_name",
+          "relative_path",
+          "media_type",
+          "description",
+          "download_url"
+        ],
+        "title": "ReleaseAsset",
+        "type": "object"
+      },
+      "ReleaseDownloads": {
+        "additionalProperties": true,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ReleaseAsset"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "release_id": {
+            "title": "Release Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "release_id",
+          "data"
+        ],
+        "title": "ReleaseDownloads",
+        "type": "object"
+      },
+      "SchemeSummary": {
+        "additionalProperties": true,
+        "properties": {
+          "accepted_assertions": {
+            "title": "Accepted Assertions",
+            "type": "integer"
+          },
+          "accepted_genes": {
+            "title": "Accepted Genes",
+            "type": "integer"
+          },
+          "accepted_proteins": {
+            "title": "Accepted Proteins",
+            "type": "integer"
+          },
+          "annotated_proteins": {
+            "title": "Annotated Proteins",
+            "type": "integer"
+          },
+          "candidate_assertions": {
+            "title": "Candidate Assertions",
+            "type": "integer"
+          },
+          "candidate_genes": {
+            "title": "Candidate Genes",
+            "type": "integer"
+          },
+          "candidate_proteins": {
+            "title": "Candidate Proteins",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "domain_hits": {
+            "title": "Domain Hits",
+            "type": "integer"
+          },
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "mapping_coverage": {
+            "title": "Mapping Coverage",
+            "type": "number"
+          },
+          "mapping_unresolved": {
+            "title": "Mapping Unresolved",
+            "type": "integer"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "scheme_name": {
+            "title": "Scheme Name",
+            "type": "string"
+          },
+          "source_name": {
+            "title": "Source Name",
+            "type": "string"
+          },
+          "source_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Version"
+          },
+          "subject_level": {
+            "enum": [
+              "gene",
+              "protein",
+              "mixed"
+            ],
+            "title": "Subject Level",
+            "type": "string"
+          },
+          "unresolved_genes": {
+            "title": "Unresolved Genes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scheme_id",
+          "scheme_name",
+          "source_name",
+          "subject_level",
+          "description",
+          "entry_count",
+          "accepted_genes",
+          "candidate_genes",
+          "unresolved_genes",
+          "accepted_proteins",
+          "candidate_proteins",
+          "annotated_proteins",
+          "domain_hits",
+          "mapping_coverage",
+          "accepted_assertions",
+          "candidate_assertions",
+          "mapping_unresolved"
+        ],
+        "title": "SchemeSummary",
+        "type": "object"
+      },
+      "SearchEntry": {
+        "additionalProperties": true,
+        "properties": {
+          "accepted_genes": {
+            "title": "Accepted Genes",
+            "type": "integer"
+          },
+          "accepted_proteins": {
+            "title": "Accepted Proteins",
+            "type": "integer"
+          },
+          "accession": {
+            "title": "Accession",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "scheme_id",
+          "accession",
+          "name",
+          "entry_type",
+          "accepted_genes",
+          "accepted_proteins"
+        ],
+        "title": "SearchEntry",
+        "type": "object"
+      },
+      "SearchGene": {
+        "additionalProperties": true,
+        "properties": {
+          "ensembl_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ensembl Gene Id"
+          },
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "internal_gene_id": {
+            "title": "Internal Gene Id",
+            "type": "string"
+          },
+          "internal_url": {
+            "title": "Internal Url",
+            "type": "string"
+          },
+          "ncbi_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncbi Gene Id"
+          },
+          "subject_count": {
+            "title": "Subject Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "internal_gene_id",
+          "subject_count",
+          "internal_url"
+        ],
+        "title": "SearchGene",
+        "type": "object"
+      },
+      "SearchProtein": {
+        "additionalProperties": true,
+        "properties": {
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "internal_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internal Gene Id"
+          },
+          "protein_accession": {
+            "title": "Protein Accession",
+            "type": "string"
+          },
+          "protein_length": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protein Length"
+          }
+        },
+        "required": [
+          "protein_accession"
+        ],
+        "title": "SearchProtein",
+        "type": "object"
+      },
+      "SearchSourceAssertion": {
+        "additionalProperties": true,
+        "properties": {
+          "assertion_id": {
+            "title": "Assertion Id",
+            "type": "string"
+          },
+          "assertion_state": {
+            "enum": [
+              "accepted",
+              "candidate",
+              "unresolved",
+              "rejected",
+              "withdrawn"
+            ],
+            "title": "Assertion State",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_name": {
+            "title": "Entry Name",
+            "type": "string"
+          },
+          "entry_url": {
+            "title": "Entry Url",
+            "type": "string"
+          },
+          "gene_symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gene Symbol"
+          },
+          "internal_gene_id": {
+            "title": "Internal Gene Id",
+            "type": "null"
+          },
+          "mapping_state": {
+            "enum": [
+              "ambiguous",
+              "unmapped"
+            ],
+            "title": "Mapping State",
+            "type": "string"
+          },
+          "ncbi_gene_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncbi Gene Id"
+          },
+          "review_state": {
+            "enum": [
+              "not_required",
+              "unreviewed",
+              "in_review",
+              "approved",
+              "rejected",
+              "needs_mapping"
+            ],
+            "title": "Review State",
+            "type": "string"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          },
+          "source_accession": {
+            "title": "Source Accession",
+            "type": "string"
+          },
+          "source_namespace": {
+            "title": "Source Namespace",
+            "type": "string"
+          },
+          "subject_key": {
+            "title": "Subject Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "assertion_id",
+          "subject_key",
+          "source_namespace",
+          "source_accession",
+          "scheme_id",
+          "entry_id",
+          "entry_name",
+          "assertion_state",
+          "mapping_state",
+          "review_state",
+          "entry_url"
+        ],
+        "title": "SearchSourceAssertion",
+        "type": "object"
+      },
+      "SupportTierCount": {
+        "additionalProperties": true,
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "support_tier": {
+            "title": "Support Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "support_tier",
+          "count"
+        ],
+        "title": "SupportTierCount",
+        "type": "object"
+      },
+      "TopEntry": {
+        "additionalProperties": true,
+        "properties": {
+          "accepted_genes": {
+            "title": "Accepted Genes",
+            "type": "integer"
+          },
+          "accepted_proteins": {
+            "title": "Accepted Proteins",
+            "type": "integer"
+          },
+          "accession": {
+            "title": "Accession",
+            "type": "string"
+          },
+          "candidate_genes": {
+            "title": "Candidate Genes",
+            "type": "integer"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "string"
+          },
+          "entry_type": {
+            "title": "Entry Type",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "scheme_id": {
+            "title": "Scheme Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "scheme_id",
+          "accession",
+          "name",
+          "entry_type",
+          "accepted_genes",
+          "candidate_genes",
+          "accepted_proteins"
+        ],
+        "title": "TopEntry",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Repository-authoritative read-only API contract for the feature-frozen Gene Families client. The immutable RC1 release-package OpenAPI remains unchanged.",
+    "title": "ChickenData Gene Family Catalog API",
+    "version": "1.0.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/gene-family-catalog/assertions/{assertion_id}": {
+      "get": {
+        "operationId": "assertion_api_v1_gene_family_catalog_assertions__assertion_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "assertion_id",
+            "required": true,
+            "schema": {
+              "title": "Assertion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssertionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Assertion",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/entries": {
+      "get": {
+        "operationId": "entries_api_v1_gene_family_catalog_entries_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "scheme",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Scheme"
+            }
+          },
+          {
+            "in": "query",
+            "name": "entry_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Entry Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_candidates",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Candidates",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "accepted_genes",
+              "pattern": "^(accepted_genes|candidate_genes|name)$",
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Entries",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/entries/{entry_id}": {
+      "get": {
+        "operationId": "entry_api_v1_gene_family_catalog_entries__entry_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Entry",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/entries/{entry_id}/evidence": {
+      "get": {
+        "operationId": "entry_evidence_api_v1_gene_family_catalog_entries__entry_id__evidence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Entry Evidence",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/entries/{entry_id}/members": {
+      "get": {
+        "operationId": "entry_members_api_v1_gene_family_catalog_entries__entry_id__members_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_candidates",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Candidates",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assertion_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(accepted|candidate|unresolved|rejected|withdrawn)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assertion State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "support_tier",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Support Tier"
+            }
+          },
+          {
+            "in": "query",
+            "name": "review_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(not_required|unreviewed|in_review|approved|rejected|needs_mapping)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Review State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assignment_role",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(primary|secondary|supplementary)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Assignment Role"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Entry Members",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/releases/current": {
+      "get": {
+        "operationId": "current_release_api_v1_gene_family_catalog_releases_current_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogRelease"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Catalog release unavailable"
+          }
+        },
+        "summary": "Current Release",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/releases/{release_id}/downloads": {
+      "get": {
+        "operationId": "release_downloads_api_v1_gene_family_catalog_releases__release_id__downloads_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "title": "Release Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDownloads"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Release Downloads",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/releases/{release_id}/downloads/{asset_name}": {
+      "get": {
+        "operationId": "release_download_api_v1_gene_family_catalog_releases__release_id__downloads__asset_name__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "title": "Release Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "asset_name",
+            "required": true,
+            "schema": {
+              "title": "Asset Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/octet-stream": {}
+            },
+            "description": "Immutable release asset"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Release Download",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/search": {
+      "get": {
+        "operationId": "catalog_search_api_v1_gene_family_catalog_search_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 12,
+              "maximum": 25,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSearchResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Catalog release unavailable"
+          }
+        },
+        "summary": "Catalog Search",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/gene-family-catalog/summary": {
+      "get": {
+        "operationId": "catalog_summary_api_v1_gene_family_catalog_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Catalog release unavailable"
+          }
+        },
+        "summary": "Catalog Summary",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/genes/{internal_gene_id}/family-annotations": {
+      "get": {
+        "operationId": "gene_family_annotations_api_v1_genes__internal_gene_id__family_annotations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "internal_gene_id",
+            "required": true,
+            "schema": {
+              "title": "Internal Gene Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneFamilyAnnotations"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Gene Family Annotations",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    },
+    "/api/v1/proteins/{protein_id}/domain-hits": {
+      "get": {
+        "operationId": "protein_domain_hits_api_v1_proteins__protein_id__domain_hits_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "protein_id",
+            "required": true,
+            "schema": {
+              "title": "Protein Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProteinDomainHits"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Protein Domain Hits",
+        "tags": [
+          "Gene Family Catalog"
+        ]
+      }
+    }
+  }
+}

@@ -10,6 +10,9 @@
     "test:paf-synteny": "node src/lib/pafSynteny.test.mjs",
     "test:blast-config": "node src/lib/blastConfig.test.mjs",
     "test:api-contract": "node qa-api-contract.mjs",
+    "test:gene-family-contract": "node qa-gene-family-contract.mjs",
+    "test:gene-family-domain-scale": "node qa-gene-family-domain-scale.mjs",
+    "test:gene-family-browser": "node qa-gene-family-browser.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -36,6 +39,7 @@
     "@types/dagre": "^0.7.54",
     "@types/node": "^24.10.1",
     "@types/plotly.js": "^3.0.10",
+    "@types/pngjs": "^6.0.5",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
@@ -43,7 +47,9 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
+    "pixelmatch": "^7.2.0",
     "playwright": "^1.59.1",
+    "pngjs": "^7.0.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",
     "vite": "^7.3.1"
