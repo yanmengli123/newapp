@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import re
 
+import backend.comparative_gold as comparative_gold
 from backend.comparative_paf import (
     GRCG6A_REFSEQ_TO_CHR,
     GRCG7B_PRIMARY_CHROMOSOMES,
@@ -155,6 +156,51 @@ def test_gold_standard_tabix_seqid_mapping(tmp_path: Path):
     assert store._tabix_seqid("target", "1") == "chr1"
     assert store._tabix_seqid("target", "chr1") == "chr1"
     assert store._tabix_seqid("target", "MT") == "chrMT"
+
+
+def test_wsl_tabix_reads_until_limit_before_stopping(tmp_path: Path, monkeypatch):
+    store = GoldStandardComparativeStore(tmp_path)
+
+    class FakeStream:
+        def __init__(self, lines):
+            self._lines = lines
+
+        def __iter__(self):
+            return iter(self._lines)
+
+        def read(self):
+            return ""
+
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = FakeStream(["first\n", "second\n", "third\n"])
+            self.stderr = FakeStream([])
+            self.killed = False
+
+        def kill(self):
+            self.killed = True
+
+        def wait(self):
+            return -9 if self.killed else 0
+
+    process = FakeProcess()
+    monkeypatch.setattr(store, "_wsl_executable", lambda: "wsl.exe")
+    monkeypatch.setattr(store, "_to_wsl_path", lambda path: str(path))
+    monkeypatch.setattr(comparative_gold.subprocess, "Popen", lambda *_args, **_kwargs: process)
+
+    lines, error, backend = store._extract_tabix_lines_wsl(
+        path=tmp_path / "alignment.paf.gz",
+        side="query",
+        chr_name="1",
+        start=0,
+        end=100,
+        limit=2,
+    )
+
+    assert lines == ["first", "second"]
+    assert error is None
+    assert backend == "wsl-tabix"
+    assert process.killed is True
 
 
 def test_chromosome_sort_key_keeps_chicken_karyotype_order():

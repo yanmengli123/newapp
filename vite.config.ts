@@ -2,6 +2,18 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import type { Plugin } from 'vite'
 
+const genomeUiRoute = /^\/genome(?:\/(?:files|run|jobs(?:\/[^/]+(?:\/(?:result|downloads))?)?))?\/?$/
+
+function isSpaRoute(pathname: string) {
+  return pathname === '/go-enrichment'
+    || pathname === '/go-enrichment/'
+    || pathname === '/comparative'
+    || pathname === '/comparative/'
+    || pathname === '/tools'
+    || pathname === '/tools/'
+    || genomeUiRoute.test(pathname)
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -10,14 +22,14 @@ export default defineConfig({
       name: 'spa-fallback',
       configureServer(server) {
         server.middlewares.use((req, _res, next) => {
-          if (req.url === '/go-enrichment' || req.url === '/go-enrichment/') {
-            req.url = '/';
+          const pathname = req.url
+            ? new URL(req.url, 'http://localhost').pathname
+            : ''
+          if (isSpaRoute(pathname)) {
+            req.url = '/'
           }
-          if (req.url === '/comparative' || req.url === '/comparative/') {
-            req.url = '/';
-          }
-          next();
-        });
+          next()
+        })
       },
     } satisfies Plugin,
   ],

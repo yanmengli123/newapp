@@ -6,6 +6,7 @@ const entryPage = readFileSync('src/pages/GeneFamilyEntryPage.tsx', 'utf8');
 const geneSection = readFileSync('src/components/gene_family/GeneFamilySection.tsx', 'utf8');
 const genePage = readFileSync('src/pages/GenePage.tsx', 'utf8');
 const scale = readFileSync('src/lib/domainScale.ts', 'utf8');
+const browserAcceptance = readFileSync('qa-gene-family-browser.mjs', 'utf8');
 
 assert.ok(
   architecture.includes('resolveDomainScale(') && architecture.includes('domainGeometry('),
@@ -48,6 +49,15 @@ assert.ok(
   genePage.includes("import GeneFamilySection from \"../components/gene_family/GeneFamilySection\"")
     && genePage.includes('<GeneFamilySection'),
   'GenePage must embed the same GeneFamilySection that uses the shared DomainArchitecture component',
+);
+
+assert.ok(
+  browserAcceptance.includes("const frontendMarker = '<title>newapp</title>'")
+    && browserAcceptance.includes('httpIsHealthy(frontendHealthUrl, frontendMarker)')
+    && browserAcceptance.includes('await getAvailablePort()')
+    && browserAcceptance.includes("'--port'")
+    && browserAcceptance.includes('String(frontendPort)'),
+  'Browser acceptance must verify the frontend identity instead of trusting any HTTP 200 response',
 );
 
 console.log('Gene Families frontend contract checks passed.');

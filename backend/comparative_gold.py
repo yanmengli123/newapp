@@ -616,8 +616,8 @@ class GoldStandardComparativeStore:
                 lines.append(line.rstrip("\n"))
             if len(lines) >= limit:
                 reached_limit = True
-            process.kill()
-            break
+                process.kill()
+                break
         stderr = process.stderr.read() if process.stderr is not None else ""
         return_code = process.wait()
         if reached_limit and lines:

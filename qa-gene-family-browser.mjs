@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:net';
 import {
   existsSync,
   mkdirSync,
@@ -13,14 +14,38 @@ import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 
 const root = process.cwd();
-const frontendBase = 'http://127.0.0.1:5174';
 const backendBase = 'http://127.0.0.1:8001';
+const frontendMarker = '<title>newapp</title>';
 const entryId = 'pfam:PF00069';
 const encodedEntryId = encodeURIComponent(entryId);
 const baselineDir = path.join(root, 'qa', 'baselines', 'gene-family');
 const resultDir = path.join(root, 'test-results', 'gene-family');
 const updateSnapshots = process.env.UPDATE_GENE_FAMILY_SNAPSHOTS === '1';
 const children = [];
+
+function getAvailablePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.unref();
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close();
+        reject(new Error('Could not allocate a local frontend port'));
+        return;
+      }
+      const { port } = address;
+      server.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
+}
+
+const configuredFrontendPort = Number.parseInt(process.env.GENE_FAMILY_FRONTEND_PORT || '', 10);
+const frontendPort = Number.isInteger(configuredFrontendPort) && configuredFrontendPort > 0
+  ? configuredFrontendPort
+  : await getAvailablePort();
+const frontendBase = `http://127.0.0.1:${frontendPort}`;
 
 mkdirSync(baselineDir, { recursive: true });
 mkdirSync(resultDir, { recursive: true });
@@ -58,7 +83,7 @@ function stopProcess(child) {
   }
 }
 
-async function waitForHttp(url, child, timeoutMs = 45_000) {
+async function waitForHttp(url, child, timeoutMs = 45_000, expectedMarker = null) {
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
   while (Date.now() < deadline) {
@@ -67,8 +92,12 @@ async function waitForHttp(url, child, timeoutMs = 45_000) {
     }
     try {
       const response = await fetch(url);
-      if (response.ok) return response;
-      lastError = new Error(`${url} returned ${response.status}`);
+      if (response.ok) {
+        if (!expectedMarker || (await response.text()).includes(expectedMarker)) return response;
+        lastError = new Error(`${url} returned another application`);
+      } else {
+        lastError = new Error(`${url} returned ${response.status}`);
+      }
     } catch (error) {
       lastError = error;
     }
@@ -77,10 +106,11 @@ async function waitForHttp(url, child, timeoutMs = 45_000) {
   throw new Error(`Timed out waiting for ${url}: ${lastError}\n${child.testOutput.join('')}`);
 }
 
-async function httpIsHealthy(url) {
+async function httpIsHealthy(url, expectedMarker = null) {
   try {
     const response = await fetch(url);
-    return response.ok;
+    if (!response.ok) return false;
+    return !expectedMarker || (await response.text()).includes(expectedMarker);
   } catch {
     return false;
   }
@@ -196,13 +226,20 @@ async function run() {
     );
     await waitForHttp(backendHealthUrl, backend);
   }
-  if (!(await httpIsHealthy(frontendHealthUrl))) {
+  if (!(await httpIsHealthy(frontendHealthUrl, frontendMarker))) {
     const vite = startProcess(
       process.execPath,
-      [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1'],
+      [
+        path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'),
+        '--host',
+        '127.0.0.1',
+        '--port',
+        String(frontendPort),
+        '--strictPort',
+      ],
       'newapp Vite server',
     );
-    await waitForHttp(frontendHealthUrl, vite);
+    await waitForHttp(frontendHealthUrl, vite, 45_000, frontendMarker);
   }
 
   const evidenceResponse = await fetch(

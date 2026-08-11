@@ -13,6 +13,7 @@
     "test:gene-family-contract": "node qa-gene-family-contract.mjs",
     "test:gene-family-domain-scale": "node qa-gene-family-domain-scale.mjs",
     "test:gene-family-browser": "node qa-gene-family-browser.mjs",
+    "test:vite-routing": "node qa-vite-routing.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
