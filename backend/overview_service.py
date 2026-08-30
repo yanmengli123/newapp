@@ -492,10 +492,12 @@ class ExpressionDistributionService:
                   AND stage_means IS NOT NULL
             ) j
             JOIN gene_expression_summary ges ON ges.gene_id = j.gene_id
+                AND ges.dataset_code = %s
+                AND ges.metric_code = %s
             JOIN mv_dataset_metric m ON m.dataset_code = ges.dataset_code
                 AND m.metric_code = ges.metric_code
             WHERE m.is_enabled = TRUE
-        """, (DEFAULT_DATASET, DEFAULT_METRIC))
+        """, (DEFAULT_DATASET, DEFAULT_METRIC, DEFAULT_DATASET, DEFAULT_METRIC))
         rows = cur.fetchall()
         cur.close()
 

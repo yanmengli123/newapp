@@ -725,19 +725,17 @@ Check current gold-standard status at `GET /comparative/gold-standard` and citat
   (inversion orientation + large gap), explicitly **NOT** validated SV calls.
   Inherits gold-standard filters (mapQ≥30, identity≥85%, length≥50kb).
 - **Cite This Analysis** — Methods tab now has a citation block generated from
-  provenance JSON via `/comparative/citation`. Currently shows
-  "minimap2 version not recorded" because of a known bug (see below).
+  provenance JSON via `/comparative/citation`. (The earlier "minimap2 version
+  not recorded" issue was the provenance.json BOM bug below — fixed; the API
+  now reports e.g. "minimap2 2.30-r1287".)
 - **Plotly dotplot** — replaces inline SVG. Axes start at 0 via explicit `range`.
 
-**Known bugs in `backend/comparative_gold.py`** (verify before modifying):
-- Line ~586: WSL tabix fallback `process.kill(); break` is de-indented out of
-  the `if len(lines) >= limit:` block, so it always kills after reading 1 line.
-  Effect: on Windows where pysam is usually not installed, base-level queries
-  silently degrade to bounded_scan (full-file scan) instead of indexed lookup.
-- Line ~741: `read_text(encoding="utf-8")` fails on UTF-8 BOM in
-  `provenance.json`. Should be `encoding="utf-8-sig"` to auto-strip BOM. This
-  is why Methods tab shows "minimap2 version not recorded" even when
-  `build_natural_synteny.sh` records the version.
+**Former known bugs in `backend/comparative_gold.py`** (both fixed — verified 2026-08-31):
+- Line ~586 WSL tabix fallback: `process.kill(); break` is now correctly inside
+  the `if len(lines) >= limit:` block — it kills only after the limit is reached,
+  and exit code -9 is tolerated. Indexed lookup works on Windows.
+- Line ~774 `provenance.json` is read with `encoding="utf-8-sig"` (auto-strips
+  UTF-8 BOM). Methods tab citation now records the minimap2 version.
 
 **Off-disk MUMmer pipeline** (not in Git, not wired into `/comparative`):
 `D:\jbrowsedata\projectdata\comparative\mummer_chr1_dotplot\GRCg6a_vs_GRCg7b_chr1\`
@@ -981,3 +979,50 @@ Key test functions in `test_go_enrichment.py`:
 - `test_go_alt_sql_parts` — verifies mock cursor receives correct args for `_table_exists("go_alt_id")`
 - `test_hypergeometric_*` — mathematical correctness of hypergeometric p-values
 - `test_fdr_*` — FDR correction behavior (BH, none, per-ontology separation, cutoff boundary)
+
+## Defect closure — 2026-08-31 (bug audit fixes)
+
+All changes verified: backend tests 50 passed, `tsc -b` / `eslint` clean, runtime probes OK.
+
+**Backend (backend/)**:
+- `main.py` `/genes/genomic` off-by-one: pyfaidx `fetch()` is 0-based half-open; now converts
+  from the API's 1-based inclusive contract with `fetch(nc_acc, start - 1, end)`.
+- `main.py` `init_pg_pool()` catches `OperationalError` and returns `None` so startup survives
+  PostgreSQL being down (previously the eager `minconn=2` connect aborted the lifespan);
+  `pg_getconn()` raises a clear error when the pool is unavailable.
+- `comparative_service.py` `_get_cursor()` raises `HTTPException(503)` on `psycopg2.Error`
+  instead of an unhandled 500 when PG dies after startup.
+- `api/kegg_image_router.py` resolves pathway image paths and rejects path escapes (same
+  containment pattern as the `/bwdata` router).
+- `api/chat_router.py` transcript count uses exact JSON match `"Parent":["<gene_id>"]`
+  instead of a loose LIKE that over-counted (`gene-X` matched `gene-X1`).
+- `go_enrichment_service.py` GODagNotReadyError messages no longer embed the PG DSN
+  (credentials) or WSL-only paths.
+- `expression_service.py` cross-dataset `sample_count` uses max per-metric sample_count
+  (metrics normalize the same samples), not integer-division average.
+
+**Frontend (src/)**:
+- New `pages/SearchResultsPage.tsx`; `/search` route registered in `App.tsx`, plus a
+  catch-all `*` 404 route; `/search` added to `isSpaRoute` in `vite.config.ts` so direct
+  visits serve the SPA instead of hitting the backend proxy.
+- `components/gene/GeneStructurePlot.tsx`: UTR type is strand-aware (5' UTR is left of CDS
+  only on `+` strand); selection/viewport reset when the transcript set changes.
+  `pages/GenePage.tsx` renders it with `key={geneId}` so state resets across genes.
+- `pages/ComparativeGenomicsPage.tsx`: request-id stale-response guards on
+  `loadAlignmentData` and `loadOrthologs`.
+- `pages/GenePage.tsx`: chromosome-fetch failure is non-fatal (page still renders).
+- `pages/DownloadsPage.tsx`: download errors surface to the user (previously console-only).
+- `pages/BlastPage.tsx`: status check tries a normal fetch first (detects HTTP errors),
+  falls back to `no-cors` probe when CORS blocks it.
+- `pages/GenomeJobPage.tsx`: polling stops after 3 consecutive errors; the stalled state
+  is shown instead of an endless spinner.
+- `components/home/GeneSearch.tsx`: request-id guard against stale suggestion responses.
+
+**Data/integration**:
+- Deleted 0-byte decoy `backend/grcg6a_nc.db` (real DB is `D:\jbrowsedata\projectdata\grcg6a_nc.db`).
+- `D:\jbrowsedata\projectdata\grcg6a_fastapi_backend.py` replaced with the deprecation stub
+  (original kept as `.deprecated`) to prevent launching the divergent legacy backend.
+
+**Still open**:
+- BigWig files in `bwdata/` have non-standard header byte order (see note above);
+  regeneration requires `bedGraphToBigWig` (not installed) and bedGraph sources (not on disk).

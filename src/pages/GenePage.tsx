@@ -296,9 +296,13 @@ export default function GenePage() {
         const result = await getGenePage(geneId, true);
         setData(result);
 
-        // Chromosome details
-        const chromData = await getChromosome(result.gene.seqid);
-        setChromosomeGeneCount(chromData.gene_count);
+        // Chromosome details are non-fatal — the gene page must still render
+        try {
+          const chromData = await getChromosome(result.gene.seqid);
+          setChromosomeGeneCount(chromData.gene_count);
+        } catch {
+          setChromosomeGeneCount(null);
+        }
       } catch (err) {
         setPageError(err instanceof Error ? err.message : 'Failed to load gene page');
       } finally {
@@ -834,8 +838,9 @@ export default function GenePage() {
           <Text c="dimmed">No transcripts found</Text>
         ) : (
           <>
-            {/* Gene Structure Plot — all transcripts combined */}
+            {/* Gene Structure Plot — all transcripts combined (key resets internal state per gene) */}
             <GeneStructurePlot
+              key={data?.gene.gene_id ?? "gene"}
               transcripts={transcripts}
               geneSymbol={data?.gene.gene_symbol}
             />

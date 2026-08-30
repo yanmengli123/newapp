@@ -11,6 +11,8 @@ function isSpaRoute(pathname: string) {
     || pathname === '/comparative/'
     || pathname === '/tools'
     || pathname === '/tools/'
+    || pathname === '/search'
+    || pathname === '/search/'
     || genomeUiRoute.test(pathname)
 }
 

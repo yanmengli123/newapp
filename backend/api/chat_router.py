@@ -140,9 +140,11 @@ def get_gene_detail(request: Request, gene_id: str) -> dict | None:
     chr_info = state.chromosome_by_seqid.get(gene["seqid"], {})
     sql = state.sql
 
+    # attributes is JSON ({"Parent":["gene-X"]}); match the exact quoted value so
+    # gene-X does not also match gene-X1/gene-X11
     tx_row = sql.execute(
         "SELECT COUNT(*) as n FROM features WHERE featuretype IN ('mRNA','transcript') AND attributes LIKE ?",
-        (f'%Parent={resolved}%',),
+        (f'%"Parent":["{resolved}"]%',),
     ).fetchone()
     go_row = sql.execute(
         "SELECT COUNT(*) as n FROM gene_go WHERE gene_id = ?", (resolved,)

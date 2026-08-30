@@ -33,6 +33,7 @@ export default function GeneSearch() {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useClickOutside(() => setShowSuggestions(false));
+  const requestIdRef = useRef(0);
 
   // Fetch suggestions when debounced query changes
   useEffect(() => {
@@ -61,10 +62,12 @@ export default function GeneSearch() {
 
     // For symbol/name, show suggestions
     const fetchSuggestions = async () => {
+      const requestId = ++requestIdRef.current;
       setLoading(true);
       setError(null);
       try {
         const result = await searchGenes(debouncedQuery, 8);
+        if (requestIdRef.current !== requestId) return;
         const items: SuggestionItem[] = result.items.map((gene) => ({
           ...gene,
           searchType: "symbol" as SearchType,
@@ -73,10 +76,11 @@ export default function GeneSearch() {
         setShowSuggestions(true);
         setSelectedIndex(-1);
       } catch (err) {
+        if (requestIdRef.current !== requestId) return;
         setError(err instanceof Error ? err.message : "Search failed");
         setSuggestions([]);
       } finally {
-        setLoading(false);
+        if (requestIdRef.current === requestId) setLoading(false);
       }
     };
 

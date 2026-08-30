@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Title,
@@ -48,11 +48,13 @@ export default function GenomeJobPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
+  const consecutiveErrorsRef = useRef(0);
 
   const fetchJob = useCallback(async () => {
     if (!jobId) return;
     try {
       setError(null);
+      consecutiveErrorsRef.current = 0;
       const result = await getGenomeJob(jobId);
       setJob(result);
 
@@ -61,7 +63,12 @@ export default function GenomeJobPage() {
         setPolling(false);
       }
     } catch (err) {
+      consecutiveErrorsRef.current += 1;
       setError(err instanceof Error ? err.message : 'Failed to load job');
+      // Stop after repeated failures so a dead backend doesn't poll forever
+      if (consecutiveErrorsRef.current >= 3) {
+        setPolling(false);
+      }
     } finally {
       setLoading(false);
     }
@@ -113,6 +120,8 @@ export default function GenomeJobPage() {
       </Alert>
     );
   }
+
+  const pollingStalled = Boolean(error) && consecutiveErrorsRef.current >= 3;
 
   return (
     <Stack gap="xl">
@@ -228,10 +237,14 @@ export default function GenomeJobPage() {
       )}
 
       {(job.status === 'pending' || job.status === 'running') && (
-        <Alert color="blue" title="Analysis In Progress">
+        <Alert color={pollingStalled ? 'red' : 'blue'} title={pollingStalled ? 'Refresh Failed' : 'Analysis In Progress'}>
           <Group justify="space-between">
-            <Text>The analysis is currently running. This page will auto-refresh.</Text>
-            <Loader size="sm" />
+            {pollingStalled ? (
+              <Text>Auto-refresh stopped after repeated errors. Check the backend and use Refresh.</Text>
+            ) : (
+              <Text>The analysis is currently running. This page will auto-refresh.</Text>
+            )}
+            {!pollingStalled && <Loader size="sm" />}
           </Group>
         </Alert>
       )}

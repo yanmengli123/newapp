@@ -15,14 +15,29 @@ export default function BlastPage() {
     setStatus('checking');
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 5000);
-    fetch(getBlastUrl('', blastBase), {
+    const opts: RequestInit = {
       method: 'GET',
-      mode: 'no-cors',
       cache: 'no-store',
       signal: controller.signal,
-    })
-      .then(() => setStatus('online'))
-      .catch(() => setStatus('offline'))
+    };
+    // Try a normal fetch first so HTTP error statuses are detectable; if CORS
+    // blocks it, fall back to a no-cors reachability probe (opaque response
+    // resolves only when the server is actually listening).
+    fetch(getBlastUrl('', blastBase), opts)
+      .then((res) => setStatus(res.ok ? 'online' : 'offline'))
+      .catch((err) => {
+        if (controller.signal.aborted) {
+          setStatus('offline');
+          return;
+        }
+        if (err instanceof TypeError) {
+          fetch(getBlastUrl('', blastBase), { ...opts, mode: 'no-cors' })
+            .then(() => setStatus('online'))
+            .catch(() => setStatus('offline'));
+          return;
+        }
+        setStatus('offline');
+      })
       .finally(() => {
         window.clearTimeout(timeout);
         setLastChecked(new Date());

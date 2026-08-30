@@ -61,18 +61,24 @@ logger = logging.getLogger("grcg6a_fastapi_backend")
 _pg_pool: psycopg2.pool.ThreadedConnectionPool | None = None
 
 
-def init_pg_pool(minconn=2, maxconn=10) -> psycopg2.pool.ThreadedConnectionPool:
+def init_pg_pool(minconn=2, maxconn=10) -> psycopg2.pool.ThreadedConnectionPool | None:
     global _pg_pool
     if _pg_pool is None:
-        _pg_pool = psycopg2.pool.ThreadedConnectionPool(minconn, maxconn, dsn=PG_DSN)
-        logger.info("PostgreSQL pool initialized: min=%d max=%d", minconn, maxconn)
+        # ThreadedConnectionPool opens minconn connections eagerly, so a down
+        # PostgreSQL raises here; degrade to None instead of aborting startup.
+        try:
+            _pg_pool = psycopg2.pool.ThreadedConnectionPool(minconn, maxconn, dsn=PG_DSN)
+            logger.info("PostgreSQL pool initialized: min=%d max=%d", minconn, maxconn)
+        except psycopg2.OperationalError as e:
+            logger.warning("PostgreSQL not available — pool not initialized: %s", e)
     return _pg_pool
 
 
 def pg_getconn() -> psycopg2.extensions.connection:
-    if _pg_pool is None:
-        init_pg_pool()
-    return _pg_pool.getconn()
+    pool = init_pg_pool()
+    if pool is None:
+        raise psycopg2.OperationalError("PostgreSQL pool unavailable")
+    return pool.getconn()
 
 
 def pg_putconn(conn: psycopg2.extensions.connection) -> None:
@@ -198,16 +204,19 @@ async def lifespan(app: FastAPI):
         raise RuntimeError(f"Database file not found: {DB_PATH}")
 
     pg_pool = init_pg_pool(minconn=2, maxconn=10)
-    pg_conn = pg_getconn()
-    pg_available = True
-    try:
-        with pg_conn.cursor() as cur:
-            cur.execute("SELECT 1")
-    except Exception:
-        logger.warning("PostgreSQL not available — some endpoints may fail")
-        pg_available = False
-    finally:
-        pg_putconn(pg_conn)
+    pg_available = False
+    if pg_pool is not None:
+        pg_conn = None
+        try:
+            pg_conn = pg_getconn()
+            with pg_conn.cursor() as cur:
+                cur.execute("SELECT 1")
+            pg_available = True
+        except Exception:
+            logger.warning("PostgreSQL not available — some endpoints may fail")
+        finally:
+            if pg_conn is not None:
+                pg_putconn(pg_conn)
 
     pg_getconn._pg_available = pg_available
 
@@ -803,7 +812,8 @@ def get_genomic_sequence(
         raise HTTPException(status_code=400, detail=f"Invalid refname: {refname}")
 
     try:
-        seq = chr_nc.fetch(nc_acc, start, end)
+        # faidx.fetch() is 0-based half-open; the API contract is 1-based inclusive
+        seq = chr_nc.fetch(nc_acc, start - 1, end)
         sequence = str(seq)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Sequence fetch failed: {e}")

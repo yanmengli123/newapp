@@ -11,6 +11,7 @@ import {
   Title,
 } from "@mantine/core";
 import { IconDownload, IconTable } from "@tabler/icons-react";
+import { useState } from "react";
 import { API_BASE } from "../lib/apiClient";
 
 const CHARTS = [
@@ -56,25 +57,32 @@ const CHARTS = [
   },
 ];
 
-async function handleDownload(chartId: string) {
-  try {
-    const res = await fetch(`${API_BASE}/overview/${chartId}/csv`);
-    if (!res.ok) throw new Error(res.statusText);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${chartId}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error("Download failed:", err);
-  }
+function downloadCsv(chartId: string) {
+  return fetch(`${API_BASE}/overview/${chartId}/csv`);
 }
 
 export default function DownloadsPage() {
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const handleDownload = async (chartId: string) => {
+    setDownloadError(null);
+    try {
+      const res = await downloadCsv(chartId);
+      if (!res.ok) throw new Error(res.statusText);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${chartId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setDownloadError(`Download failed for ${chartId}: ${err instanceof Error ? err.message : "unknown error"}`);
+    }
+  };
+
   return (
     <Stack gap="lg">
       <Stack gap={4}>
@@ -84,6 +92,10 @@ export default function DownloadsPage() {
           PNG/SVG exports coming soon — chart images are generated dynamically on the overview page.
         </Text>
       </Stack>
+
+      {downloadError && (
+        <Text c="red" size="sm">{downloadError}</Text>
+      )}
 
       <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="md">
         {CHARTS.map(chart => (

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { AppShell, Container, Divider, Loader, Stack } from '@mantine/core';
-import { Route, Routes } from 'react-router-dom';
+import { AppShell, Container, Divider, Loader, Stack, Text } from '@mantine/core';
+import { Link, Route, Routes } from 'react-router-dom';
 import AppFooter from './components/layout/AppFooter';
 import AppHeader from './components/layout/AppHeader';
 import ChatWidget from './components/chat/ChatWidget';
@@ -28,6 +28,7 @@ const HomePage = lazy(() => import('./pages/HomePage'));
 const JBrowseGenePage = lazy(() => import('./pages/JBrowseGenePage'));
 const JBrowsePage = lazy(() => import('./pages/JBrowsePage'));
 const PictureMakerPage = lazy(() => import('./pages/PictureMakerPage'));
+const SearchResultsPage = lazy(() => import('./pages/SearchResultsPage'));
 const ToolsPage = lazy(() => import('./pages/ToolsPage'));
 const VizPage = lazy(() => import('./pages/VizPage'));
 
@@ -76,6 +77,16 @@ export default function App() {
               <Route path="/picture-maker" element={<PictureMakerPage />} />
               <Route path="/go-enrichment" element={<GOEnrichmentPage />} />
               <Route path="/comparative" element={<ComparativeGenomicsPage />} />
+              <Route path="/search" element={<SearchResultsPage />} />
+              <Route
+                path="*"
+                element={
+                  <Stack align="center" py="xl" gap="sm">
+                    <Text fw={600} size="lg">404 — 页面不存在</Text>
+                    <Text c="dimmed" size="sm">请检查网址，或返回 <Link to="/">首页</Link>。</Text>
+                  </Stack>
+                }
+              />
             </Routes>
           </Suspense>
 

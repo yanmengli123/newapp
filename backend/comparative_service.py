@@ -8,6 +8,7 @@ from typing import Optional, Any, Literal
 import json
 
 import psycopg2
+from fastapi import HTTPException
 from psycopg2.extras import RealDictCursor
 
 from backend.comparative_paf import (
@@ -29,7 +30,11 @@ class ComparativeService:
         self.gold_store = GoldStandardComparativeStore(self._project_root())
 
     def _get_cursor(self):
-        conn = self.pg_pool.getconn()
+        try:
+            conn = self.pg_pool.getconn()
+        except psycopg2.Error as e:
+            # PG down after startup: surface 503 like the "not initialized" case
+            raise HTTPException(status_code=503, detail=f"Comparative genomics database unavailable: {e}") from e
         return conn, conn.cursor(cursor_factory=RealDictCursor)
 
     def _release(self, conn):

@@ -304,8 +304,8 @@ def _ensure_go_dag_ready(cur) -> None:
         raise GODagNotReadyError(
             f"GO DAG tables not loaded: {', '.join(sorted(missing))}. "
             "Run: python -m backend.scripts.load_go_dag "
-            "--obo /d/jbrowsedata/projectdata/downloads/go/go-basic.obo "
-            "--dsn postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a --replace"
+            "--obo <projectdata>/downloads/go/go-basic.obo "
+            "--dsn <postgresql_dsn> --replace"
         )
     for table in ("go_closure", "go_edge"):
         cur.execute(f"SELECT 1 FROM {table} LIMIT 1")
@@ -313,8 +313,8 @@ def _ensure_go_dag_ready(cur) -> None:
             raise GODagNotReadyError(
                 f"GO DAG table '{table}' is empty. "
                 "Run: python -m backend.scripts.load_go_dag "
-                "--obo /d/jbrowsedata/projectdata/downloads/go/go-basic.obo "
-                "--dsn postgresql://grcuser:grcpassword@127.0.0.1:5433/grcg6a --replace"
+                "--obo <projectdata>/downloads/go/go-basic.obo "
+                "--dsn <postgresql_dsn> --replace"
             )
 
 

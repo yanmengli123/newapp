@@ -17,13 +17,21 @@ from backend.config import KEGG_IMAGE_DIR
 kegg_image_router = APIRouter(prefix="/kegg-images", tags=["kegg-images"])
 
 
+def _resolve_image_path(pathway_id: str) -> Path:
+    """Resolve a pathway id to an image path, refusing path escapes."""
+    image_path = (KEGG_IMAGE_DIR / f"{pathway_id}.png").resolve()
+    if not image_path.is_relative_to(KEGG_IMAGE_DIR.resolve()):
+        raise HTTPException(status_code=404, detail="图片不存在")
+    return image_path
+
+
 @kegg_image_router.get("/{pathway_id}.png")
 def get_kegg_image_direct(pathway_id: str):
     """直接通过 /kegg-images/gga00603.png 访问图片"""
-    image_path = KEGG_IMAGE_DIR / f"{pathway_id}.png"
+    image_path = _resolve_image_path(pathway_id)
 
     if not image_path.exists():
-        raise HTTPException(status_code=404, detail=f"图片不存在：{image_path}")
+        raise HTTPException(status_code=404, detail=f"图片不存在：{pathway_id}.png")
 
     return FileResponse(
         path=image_path,
@@ -36,7 +44,7 @@ def get_kegg_image_direct(pathway_id: str):
 # 保留JSON信息接口（可选）
 @kegg_image_router.get("/{pathway_id}/info")
 def get_kegg_image_info(pathway_id: str):
-    image_path = KEGG_IMAGE_DIR / f"{pathway_id}.png"
+    image_path = _resolve_image_path(pathway_id)
     return {
         "pathway_id": pathway_id,
         "image_url": f"/kegg-images/{pathway_id}.png",

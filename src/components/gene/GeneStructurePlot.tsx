@@ -103,12 +103,14 @@ function processTranscript(tx: TranscriptResult): ProcessedTranscript {
       cds_id: c.cds_id ?? "", protein_id: c.protein_id ?? null,
     }));
     const utrRegions: UtrRegion[] = [];
+    // On the + strand the 5' UTR is left of the first CDS; on - strand it is right
+    const fivePrimeOnLeft = tx.strand !== "-";
     if (cdsRegions.length === 0) {
       utrRegions.push({ start: er.start, end: er.end, type: "5UTR" as const });
     } else {
       const f = cdsRegions[0], l = cdsRegions[cdsRegions.length - 1];
-      if (er.start < f.start) utrRegions.push({ start: er.start, end: f.start, type: "5UTR" as const });
-      if (l.end < er.end) utrRegions.push({ start: l.end, end: er.end, type: "3UTR" as const });
+      if (er.start < f.start) utrRegions.push({ start: er.start, end: f.start, type: fivePrimeOnLeft ? ("5UTR" as const) : ("3UTR" as const) });
+      if (l.end < er.end) utrRegions.push({ start: l.end, end: er.end, type: fivePrimeOnLeft ? ("3UTR" as const) : ("5UTR" as const) });
     }
     return { ...er, cdsRegions, utrRegions };
   });
@@ -529,6 +531,18 @@ export default function GeneStructurePlot({ transcripts, geneSymbol }: GeneStruc
     startBp: 0,
     endBp: totalLen,
   });
+
+  // Reset selection and viewport when a different gene's transcripts arrive
+  // (the component stays mounted while navigating /gene/:geneId → /gene/:otherId)
+  const transcriptIdsKey = useMemo(
+    () => processed.map((p) => p.tx.transcript_id).join(","),
+    [processed]
+  );
+  useEffect(() => {
+    setSelectedTxId(null);
+    setViewport({ startBp: 0, endBp: Math.max(defaultPt?.totalLength ?? 1, 1) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcriptIdsKey]);
 
   const startBp = viewport.startBp;
   const spanBp = viewport.endBp - viewport.startBp;

@@ -721,43 +721,46 @@ def get_pathway_mapdata(
     """
     # 获取数据库连接
     pg_conn = get_pg(request)
+    try:
+        # 解析highlight_gene（内部gene_id → NCBI ID）
+        resolved_ncbi = highlight_ncbi
+        if highlight_gene and not highlight_ncbi:
+            resolved_ncbi = _gene_id_to_ncbi(request, highlight_gene)
 
-    # 解析highlight_gene（内部gene_id → NCBI ID）
-    resolved_ncbi = highlight_ncbi
-    if highlight_gene and not highlight_ncbi:
-        resolved_ncbi = _gene_id_to_ncbi(request, highlight_gene)
-
-    # 获取并解析KGML
-    kgml_xml = fetch_and_cache_kgml(pathway_id)
-    result = parse_kgml_hotspots(
-        kgml_xml,
-        highlight_ncbi=resolved_ncbi,
-        highlight_gene_id=highlight_gene,
-        pg_conn=pg_conn
-    )
-
-    # 添加高亮基因详情
-    if resolved_ncbi:
-        kegg_gene_id = f"gga:{resolved_ncbi}"
-        highlighted_count = sum(
-            1 for n in result.get("nodes", []) if n.get("highlighted")
+        # 获取并解析KGML
+        kgml_xml = fetch_and_cache_kgml(pathway_id)
+        result = parse_kgml_hotspots(
+            kgml_xml,
+            highlight_ncbi=resolved_ncbi,
+            highlight_gene_id=highlight_gene,
+            pg_conn=pg_conn
         )
-        result["target_gene"] = {
-            "ncbi_gene_id": resolved_ncbi,
-            "kegg_gene_id": kegg_gene_id,
-            "symbol": _ncbi_to_symbol(request, resolved_ncbi),
-            "highlighted_count": highlighted_count,
-        }
-        # 兼容旧字段名
-        result["highlight_ncbi"] = resolved_ncbi
 
-    # 从数据库获取图片宽高（PostgreSQL）
-    with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-        cur.execute(
-            "SELECT png_width, png_height FROM kegg_pathway_asset WHERE pathway_id = %s",
-            (pathway_id,)
-        )
-        asset_row = cur.fetchone()
+        # 添加高亮基因详情
+        if resolved_ncbi:
+            kegg_gene_id = f"gga:{resolved_ncbi}"
+            highlighted_count = sum(
+                1 for n in result.get("nodes", []) if n.get("highlighted")
+            )
+            result["target_gene"] = {
+                "ncbi_gene_id": resolved_ncbi,
+                "kegg_gene_id": kegg_gene_id,
+                "symbol": _ncbi_to_symbol(request, resolved_ncbi),
+                "highlighted_count": highlighted_count,
+            }
+            # 兼容旧字段名
+            result["highlight_ncbi"] = resolved_ncbi
+
+        # 从数据库获取图片宽高（PostgreSQL）
+        with pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT png_width, png_height FROM kegg_pathway_asset WHERE pathway_id = %s",
+                (pathway_id,)
+            )
+            asset_row = cur.fetchone()
+    except Exception:
+        put_pg(request, pg_conn)
+        raise
     put_pg(request, pg_conn)
 
     if asset_row:

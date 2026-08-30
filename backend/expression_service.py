@@ -418,8 +418,10 @@ class ExpressionService:
                     "dataset_code":          ds_code,
                     "dataset_name":          ds_row["dataset_name"] if ds_row else ds_code,
                     "normalization_family":   ds_row["normalization_family"] if ds_row else "",
-                    "sample_count":          sum(m.get("summary", {}).get("sample_count") or 0
-                                               for m in metric_blocks) // max(len(metric_blocks), 1),
+                    # Metrics of a dataset normalize the same samples, so use the
+                    # max metric sample_count rather than averaging across metrics
+                    "sample_count":          max((m.get("summary", {}).get("sample_count") or 0
+                                               for m in metric_blocks), default=0),
                     "metrics":               metric_blocks,
                 })
 

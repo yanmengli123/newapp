@@ -171,7 +171,9 @@ export default function ComparativeGenomicsPage() {
     [baseSide, chromosomeFilterOptions, targetChromosomes],
   );
 
+  const alignmentRequestIdRef = useRef(0);
   const loadAlignmentData = useCallback(async () => {
+    const requestId = ++alignmentRequestIdRef.current;
     setLoading(true);
     setError("");
     try {
@@ -225,6 +227,7 @@ export default function ComparativeGenomicsPage() {
           return null;
         }),
       ]);
+      if (alignmentRequestIdRef.current !== requestId) return;
       setNaturalStats(naturalStatsRow);
       setNaturalBlocks(naturalBlockRows.blocks);
       setNaturalBlockMeta(naturalBlockRows);
@@ -241,14 +244,17 @@ export default function ComparativeGenomicsPage() {
       setSvCandidates(svRows);
       setLayerWarnings(warnings);
     } catch (err) {
+      if (alignmentRequestIdRef.current !== requestId) return;
       setError(getErrorMessage(err));
       setLayerWarnings([]);
     } finally {
-      setLoading(false);
+      if (alignmentRequestIdRef.current === requestId) setLoading(false);
     }
   }, [chrFilter]);
 
+  const orthologRequestIdRef = useRef(0);
   const loadOrthologs = useCallback(async (page = 0) => {
+    const requestId = ++orthologRequestIdRef.current;
     setOrthologLoading(true);
     try {
       const result = await getOrthologTable({
@@ -258,15 +264,17 @@ export default function ComparativeGenomicsPage() {
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       });
+      if (orthologRequestIdRef.current !== requestId) return;
       setOrthologs(result.data);
       setOrthologTotal(result.total);
       setOrthologPage(page);
     } catch {
+      if (orthologRequestIdRef.current !== requestId) return;
       setOrthologs([]);
       setOrthologTotal(0);
       setOrthologPage(0);
     } finally {
-      setOrthologLoading(false);
+      if (orthologRequestIdRef.current === requestId) setOrthologLoading(false);
     }
   }, [chrFilter]);
 
