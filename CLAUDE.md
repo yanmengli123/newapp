@@ -1026,3 +1026,38 @@ All changes verified: backend tests 50 passed, `tsc -b` / `eslint` clean, runtim
 **Still open**:
 - BigWig files in `bwdata/` have non-standard header byte order (see note above);
   regeneration requires `bedGraphToBigWig` (not installed) and bedGraph sources (not on disk).
+
+## Workspace cleanup — 2026-09-17
+
+**Removed from repo root (regenerable / unreferenced):**
+- `public/genome/` (1.8G) — stale copy of D-drive genome data; JBrowse URLs
+  (`primary_35.fna` etc.) were never present here and dev/preview serve `/genome`
+  via the Vite proxy to :8001, so the copy was unreachable. Verified with
+  `vite preview` before deletion. `dist/` rebuilt afterwards (now 59M, was 1.9G).
+- `dist/`, `logs/`, `backend-8001.*.log`, `debug.log`, `__pycache__/`,
+  `.pytest_cache/`, `.codex-mummer-subsets/` (orphan bytecode), `.vscode/` (empty),
+  `comparative_methods_tab.png` (orphan screenshot).
+- `test-results/.last-run.json` untracked (stale Playwright artifact).
+
+**Removed from D:\jbrowsedata\projectdata (legacy monolith remnants, ~0.5G):**
+`build_work/`, `genome_outputs/` (old-backend outputs; live path is `outputs/jobs`),
+`05_figures/` (duplicate of comparative/mummer_chr1_dotplot), `ricedata/` (empty),
+`api/`, `tools/`, `scripts/`, `tests/`, `sql/`, `docker_build/`, root-level
+legacy modules (`expression_service.py`, `gene_utils.py`, `esc_etl_phases4_8.py`,
+test/scratch scripts), `grcg6a_fastapi_backend.py(.deprecated)`.
+
+**Data dedup on D: (with code sync):**
+- Corrupt `GCF_000002315.6_GRCg6a_genomic.fna.gz` (ASCII text, not gzip) deleted.
+- Superseded FASTAs deleted: GRCg6a `genomic.fna` (chr.fna is the live reference),
+  GRCg7b `main_chr.*` trio and `genomic.*` trio (primary_42 supersedes; falls back
+  to `grcg7b/` originals), `genomic.fixed.fna.gz(.fai)`.
+- `main.py` fasta candidates and `comparative_service.py` fallback lists updated to
+  drop deleted paths.
+- `file_discovery.py` genomic patterns now point at the uncompressed references
+  (chr.fna / primary_35.fna); `scan()` now also searches the parent dir like
+  `get_file()` does, so `/genome-api/files` reports all five types.
+- SQL backups (708M + 702M) and `gene2go.gz` (1.26G) moved to
+  `D:\jbrowsedata\_archive_20260917\` (not deleted).
+
+**Known gap (pre-existing):** `hmmer_db/Pfam-A.hmm` expected uncompressed but only
+`Pfam-A.hmm.gz` exists — gunzip it before using /tools domain search.

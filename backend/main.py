@@ -910,7 +910,7 @@ def _get_faidx() -> pyfaidx.Faidx:
         _CHR_NC_MAP = _load_chr_nc_map()
         candidates = [
             RAWDATA_ROOT.parent / "GCF_000002315.6_GRCg6a_genomic.chr.fna",
-            RAWDATA_ROOT.parent / "GCF_000002315.6_GRCg6a_genomic.fna",
+            RAWDATA_ROOT.parent / "GCF_000002315.6_GRCg6a_primary_35.fna",
         ]
         for p in candidates:
             if p.exists():

@@ -11,14 +11,10 @@ class GenomeFileDiscovery:
 
     # Core genome files patterns
     GENOME_FILES = {
-        # NOTE: GCF_000002315.6_GRCg6a_genomic.fna.gz is corrupted (ASCII text, not gzip)
-        # Use GCF_000002315.6_GRCg6a_genomic.fixed.fna.gz instead
+        # uncompressed references kept on disk (corrupt fixed.fna.gz removed 2026-09-17)
         "genomic": [
-            "GCF_000002315.6_GRCg6a_genomic.fixed.fna.gz",  # 优先使用修复版
-            "GRCg6a_genomic.fixed.fna.gz",
-            "genomic.fna.gz",
-            "GRCg6a_genomic.fna.gz",
-            "GCF_000002315.6_GRCg6a_genomic.fna.gz",
+            "GCF_000002315.6_GRCg6a_genomic.chr.fna",
+            "GCF_000002315.6_GRCg6a_primary_35.fna",
             "genomic.fna",
         ],
         "gff": [
@@ -55,27 +51,31 @@ class GenomeFileDiscovery:
                 self.data_dir = GRCG6A_DB_PATH.parent
 
     def scan(self, data_dir: Optional[Path] = None) -> dict:
-        """Scan for genome files in the data directory."""
+        """Scan for genome files in the data directory (and its parent, matching get_file)."""
         if data_dir:
             self.data_dir = data_dir
 
         discovered = {}
         missing = []
+        search_dirs = [self.data_dir, self.data_dir.parent]
 
         for file_type, patterns in self.GENOME_FILES.items():
             found = False
-            for pattern in patterns:
-                file_path = self.data_dir / pattern
-                if file_path.exists():
-                    discovered[file_type] = {
-                        "file_type": file_type,
-                        "filename": file_path.name,
-                        "path": str(file_path),
-                        "size_bytes": file_path.stat().st_size,
-                        "is_compressed": str(file_path).endswith(".gz"),
-                        "exists": True,
-                    }
-                    found = True
+            for search_dir in search_dirs:
+                for pattern in patterns:
+                    file_path = search_dir / pattern
+                    if file_path.exists():
+                        discovered[file_type] = {
+                            "file_type": file_type,
+                            "filename": file_path.name,
+                            "path": str(file_path),
+                            "size_bytes": file_path.stat().st_size,
+                            "is_compressed": str(file_path).endswith(".gz"),
+                            "exists": True,
+                        }
+                        found = True
+                        break
+                if found:
                     break
 
             if not found:

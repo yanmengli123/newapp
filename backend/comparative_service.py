@@ -93,14 +93,10 @@ class ComparativeService:
         )
         grcg7b_fasta = self._first_existing(
             project_root / "GCF_016699485.2_GRCg7b_primary_42.fna",
-            project_root / "GCF_016699485.2_GRCg7b_main_chr.fna",
-            project_root / "GCF_016699485.2_GRCg7b_genomic.fna.gz",
             project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_genomic.fna.gz",
         )
         grcg7b_gff = self._first_existing(
             project_root / "GCF_016699485.2_GRCg7b_primary_42.gff.gz",
-            project_root / "GCF_016699485.2_GRCg7b_main_chr.gff.gz",
-            project_root / "GCF_016699485.2_GRCg7b_genomic.gff.gz",
             project_root / "grcg7b" / "GCF_016699485.2_bGalGal1.mat.broiler.GRCg7b_genomic.gff.gz",
         )
         return build_pair_registry(
