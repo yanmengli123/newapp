@@ -812,8 +812,9 @@ def get_genomic_sequence(
         raise HTTPException(status_code=400, detail=f"Invalid refname: {refname}")
 
     try:
-        # faidx.fetch() is 0-based half-open; the API contract is 1-based inclusive
-        seq = chr_nc.fetch(nc_acc, start - 1, end)
+        # pyfaidx Faidx.fetch() is 1-based inclusive, matching this API's contract
+        # (verified empirically: fetch(1,5) returns bases 1-5; start=0 is rejected)
+        seq = chr_nc.fetch(nc_acc, start, end)
         sequence = str(seq)
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Sequence fetch failed: {e}")
