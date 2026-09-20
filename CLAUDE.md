@@ -1061,3 +1061,25 @@ test/scratch scripts), `grcg6a_fastapi_backend.py(.deprecated)`.
 
 **Known gap (pre-existing):** `hmmer_db/Pfam-A.hmm` expected uncompressed but only
 `Pfam-A.hmm.gz` exists — gunzip it before using /tools domain search.
+
+## Workspace cleanup round 2 — 2026-09-20
+
+Freed ~11.5G on D: plus ~0.3G in the repo. Verified after: 11 route probes 200,
+backend tests 50 passed, `/genome-api/jobs` now empty list.
+
+- Repo: regenerated caches, `backend/venv/` (3.10 env, unused — runtime is
+  D:/soft/python310), `.venv/` (3.11 env, unreferenced), `test-results/`.
+- projectdata: 78 historical analysis job dirs (2.4G, Mar–Apr 2026) removed —
+  the Jobs page history list is now empty (sample results from
+  outputs/sample_results unaffected); `__pycache__`, `.pytest_cache`,
+  `.idea`, `.claude`, nested `outputs/jobs/jobs` artifact.
+- D:\jbrowsedata root (old Jan-2026 RNA-seq project, zero newapp references):
+  keepers moved to `_archive_rnaseq_20260920\` (366M: DE paper zip, 46 analysis
+  scripts, R_plots, 06_fpkm_data, geneproject source sans node_modules,
+  project CLAUDE.md); deleted bulk — `05_stringtie_gtf` 4.6G, `01_reference`
+  1.1G, `02_annotation` 905M, `rawdata` 420M (byte-size-verified duplicates of
+  active projectdata NCBI files), geneproject node_modules 411M,
+  `tmp_uDbLIv` 67M, empty `03_alignments`/`04_bigwig`/`bedgraph_all`.
+- `_archive_20260917`: removed `gene2go.gz` (NCBI re-downloadable) and the
+  older SQL dump (20260511); kept the newest `backup_20260518.sql` as the
+  single rollback point.
