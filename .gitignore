@@ -25,6 +25,27 @@ env/
 ENV/
 *.egg-info/
 backend/venv/
+.pytest_cache/
+
+# Machine-specific configuration and private deployment material
+.env
+.env.*
+!.env.development
+!.env.example
+!deploy/.env.example
+*.pem
+*.key
+
+# External runtime data and database backups
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.dump
+*.backup
 
 # Large data files (genome data, KEGG images)
 public/genome/

@@ -13,6 +13,20 @@ React/TypeScript + FastAPI platform for the GRCg6a chicken genome, expression at
 
 Deprecated root-level backend entrypoints now exit with a message. Start only `backend.main:app`.
 
+## Developer Handoff and Deployment
+
+Clone the complete frontend/backend branch:
+
+```bash
+git clone --branch fix/gene-family-tab-v1.0.1 --single-branch https://github.com/yanmengli123/newapp.git
+```
+
+See [deployment instructions](docs/DEPLOYMENT.md) for Docker Compose, Nginx,
+environment configuration, database restoration, and the external data checklist.
+The GitHub repository contains code and schemas; populated databases and large
+scientific data must be transferred separately. The repository's `master` branch
+is older than the active development branch.
+
 ## Runtime Commands
 
 ```powershell
@@ -27,7 +41,7 @@ D:\soft\python310\python.exe -m backend.test_comparative_paf
 D:\soft\python310\python.exe -m backend.test_core_config
 ```
 
-Frontend dev server defaults to `http://localhost:5173`; backend defaults to `http://localhost:8001`.
+Frontend dev server defaults to `http://localhost:5174`; backend defaults to `http://localhost:8001`.
 
 ## Configuration
 
